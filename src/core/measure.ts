@@ -21,12 +21,6 @@ export function scaleAt(sheet: Sheet | undefined, p: Pt | undefined): Scale {
   return sheet.scale ?? DEFAULT_SCALE;
 }
 
-export function isCalibrated(sheet: Sheet | undefined, p?: Pt): boolean {
-  if (!sheet) return false;
-  if (p && viewportAt(sheet, p)) return true;
-  return !!sheet.scale;
-}
-
 export function anchorPoint(m: Pick<Markup, 'type' | 'points'>): Pt | undefined {
   if (!m.points.length) return undefined;
   if (TYPE_INFO[m.type].closed) return centroid(m.points);

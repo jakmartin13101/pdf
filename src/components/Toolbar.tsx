@@ -41,7 +41,7 @@ function TB({ icon: Icon, label, onClick, active, disabled, title, small }: {
   small?: boolean;
 }) {
   return (
-    <button className={`tb-btn${active ? ' active' : ''}${small ? ' small' : ''}`} onClick={onClick} disabled={disabled} title={title ?? label} data-testid={`tb-${(label ?? title ?? '').toLowerCase().replace(/\s+/g, '-')}`}>
+    <button className={`tb-btn${active ? ' active' : ''}${small ? ' small' : ''}`} onClick={onClick} disabled={disabled} title={title ?? label} data-testid={`tb-${(label ?? title ?? '').replace(/\s*\(.*$/, '').toLowerCase().replace(/\s+/g, '-')}`}>
       <Icon size={19} strokeWidth={1.7} />
       {label && <span>{label}</span>}
     </button>

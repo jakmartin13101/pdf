@@ -9,6 +9,10 @@ import { CommitInput, CommitRange, ColorField } from '../fields';
 import { formatLength, parseLength } from '../../core/units';
 import { viewportAt } from '../../core/measure';
 import { TYPE_ICON } from '../icons';
+import { COMMON_SHAPES } from '../../core/steelShapes';
+
+/** Columns holding a steel designation get shape suggestions (and feed PLF()/PSF()). */
+const isShapeColumn = (name: string) => /member\s*size|shape|section/i.test(name);
 
 const SYMBOLS: CountSymbol[] = ['circle', 'square', 'triangle', 'diamond', 'star', 'check', 'cross'];
 const ENDS: LineEnd[] = ['none', 'arrow', 'tick', 'dot'];
@@ -315,10 +319,10 @@ export function PropertiesPanel() {
                 return (
                   <div className="field" key={c.id}>
                     <label title={c.name}>{c.name}</label>
-                    {c.kind === 'choice' ? (
+                    {c.kind === 'choice' || isShapeColumn(c.name) ? (
                       <ChoiceInput
                         value={val === undefined ? undefined : String(val)}
-                        options={c.options ?? []}
+                        options={c.kind === 'choice' ? c.options ?? [] : COMMON_SHAPES}
                         onCommit={(v) => st.setCustomValue(ids, c.id, v)}
                       />
                     ) : (

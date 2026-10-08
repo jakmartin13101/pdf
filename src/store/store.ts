@@ -590,7 +590,3 @@ export const getState = () => useStore.getState();
 export function currentSheet(s: AppState): Sheet | undefined {
   return s.doc.sheets.find((x) => x.id === s.currentSheetId);
 }
-
-export function allChestTools(s: AppState): ChestTool[] {
-  return s.toolChest.flatMap((t) => t.tools);
-}

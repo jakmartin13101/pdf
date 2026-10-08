@@ -1,6 +1,6 @@
 import { BlendMode, LineCapStyle, PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { DocState, Markup, Pt } from '../types';
-import { allColumns, buildRows, columnUnit, sheetDisplayName, type Row } from './columns';
+import { allColumns, columnUnit, sheetDisplayName, type Row } from './columns';
 import { buildSummary, columnName, primaryQuantity, summableCustomColumns } from './summary';
 import { centroid, dist, labelPoint } from './geometry';
 import { computeMeasure, drawingLabelLines, scaleForMarkup } from './measure';
@@ -484,8 +484,4 @@ export async function exportFlattenedPdf(doc: DocState, fileBytes: Map<string, U
   out.setTitle('Takeoff markups');
   out.setCreator('Takeoff Studio');
   return out.save();
-}
-
-export function rowsForExport(doc: DocState) {
-  return buildRows(doc);
 }

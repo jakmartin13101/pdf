@@ -16,10 +16,6 @@ export function registerPdf(fileId: string, bytes: Uint8Array): Promise<PDFDocum
   return p;
 }
 
-export function hasPdf(fileId: string) {
-  return docs.has(fileId);
-}
-
 export async function unregisterPdf(fileId: string) {
   const p = docs.get(fileId);
   docs.delete(fileId);

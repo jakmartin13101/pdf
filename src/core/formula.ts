@@ -188,24 +188,6 @@ export function validateFormula(src: string): string | null {
   }
 }
 
-export function referencedNames(src: string): string[] {
-  const out = new Set<string>();
-  const walk = (n: Node) => {
-    if (n.t === 'ref') out.add(n.name);
-    else if (n.t === 'call') n.args.forEach(walk);
-    else if (n.t === 'bin') {
-      walk(n.a);
-      walk(n.b);
-    } else if (n.t === 'neg') walk(n.a);
-  };
-  try {
-    walk(compile(src));
-  } catch {
-    /* ignore */
-  }
-  return [...out];
-}
-
 export const toNum = (v: FValue | undefined | null): number => {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
   if (v == null || v === '') return 0;

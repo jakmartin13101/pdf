@@ -299,17 +299,6 @@ export function lengthToReport(inches: number, s: ProjectSettings): number {
   }
 }
 
-export function reportToLength(v: number, s: ProjectSettings): number {
-  switch (s.lengthUnit) {
-    case 'ft':
-      return v * 12;
-    case 'in':
-      return v;
-    case 'm':
-      return v * IN_PER_M;
-  }
-}
-
 export function areaToReport(sqIn: number, s: ProjectSettings): number {
   switch (s.areaUnit) {
     case 'sf':

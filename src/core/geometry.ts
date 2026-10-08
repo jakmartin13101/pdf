@@ -87,15 +87,6 @@ export function rectFromPoints(a: Pt, b: Pt): Rect {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
 }
 
-export function rectCorners(r: Rect): Pt[] {
-  return [
-    { x: r.x, y: r.y },
-    { x: r.x + r.w, y: r.y },
-    { x: r.x + r.w, y: r.y + r.h },
-    { x: r.x, y: r.y + r.h },
-  ];
-}
-
 export function pointInRect(p: Pt, r: Rect): boolean {
   return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
 }
@@ -126,16 +117,6 @@ export function distToSegment(p: Pt, a: Pt, b: Pt): number {
   let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2;
   t = Math.max(0, Math.min(1, t));
   return dist(p, { x: a.x + t * dx, y: a.y + t * dy });
-}
-
-/** Nearest point on segment ab to p. */
-export function projectToSegment(p: Pt, a: Pt, b: Pt): Pt {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const l2 = dx * dx + dy * dy;
-  if (l2 === 0) return { ...a };
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
-  return { x: a.x + t * dx, y: a.y + t * dy };
 }
 
 /** Constrain p relative to origin to the nearest multiple of `stepDeg` degrees. */
@@ -196,14 +177,6 @@ export function cloudPath(pts: Pt[], arc: number, closed = true): string {
     }
   }
   return d;
-}
-
-export function ellipsePath(r: Rect): string {
-  const rx = r.w / 2;
-  const ry = r.h / 2;
-  const cx = r.x + rx;
-  const cy = r.y + ry;
-  return `M${cx - rx},${cy}A${rx},${ry} 0 1,0 ${cx + rx},${cy}A${rx},${ry} 0 1,0 ${cx - rx},${cy}Z`;
 }
 
 /** Ramer–Douglas–Peucker simplification for freehand strokes. */
