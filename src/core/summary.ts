@@ -98,7 +98,8 @@ export function primaryQuantity(l: SummaryLine, doc: DocState): string {
     case 'count':
       return `${fmtNumber(l.count, 0)} EA`;
     case 'length':
-      return `${fmtNumber(l.length, s.decimals)} ${LENGTH_SUFFIX[s.lengthUnit]}`;
+      // Linear members are usually priced by piece and by length (e.g. "12 EA · 276.00 LF").
+      return `${fmtNumber(l.count, 0)} EA · ${fmtNumber(l.length, s.decimals)} ${LENGTH_SUFFIX[s.lengthUnit]}`;
     case 'area':
       return `${fmtNumber(l.area, s.decimals)} ${AREA_SUFFIX[s.areaUnit]}`;
     case 'volume':

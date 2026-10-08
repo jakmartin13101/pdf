@@ -75,7 +75,21 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
     };
   }, [onClose]);
   return createPortal(
-    <div ref={ref} className="context-menu" style={{ left: pos.x, top: pos.y }} onContextMenu={(e) => e.preventDefault()}>
+    // React portals bubble synthetic events to their React parents (e.g. the viewer), so stop them here.
+    <div
+      ref={ref}
+      className="context-menu"
+      style={{ left: pos.x, top: pos.y }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
       <MenuList items={items} onClose={onClose} />
     </div>,
     document.body,

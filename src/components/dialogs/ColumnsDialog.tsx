@@ -56,7 +56,8 @@ export function ColumnsDialog() {
     if (!sample) return null;
     const tmp: CustomColumn = { ...form, id: '__preview', name: form.name || 'Preview' } as CustomColumn;
     const [row] = buildRows({ ...doc, columns: [...doc.columns.filter((c) => c.id !== editing?.id), tmp] }, [sample]);
-    return { subject: sample.subject, value: row.display[customColId(tmp)] };
+    const id = customColId(tmp);
+    return { subject: sample.subject, value: row.display[id] || String(row.values[id] ?? '') };
   }, [form, formulaError, doc, selection, editing]);
 
   const save = () => {

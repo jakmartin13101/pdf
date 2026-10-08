@@ -12,6 +12,7 @@ import {
   Frame,
   Table2,
   FileDown,
+  Sigma,
   type LucideIcon,
 } from 'lucide-react';
 import type { MarkupType } from '../types';
@@ -121,6 +122,13 @@ export function Toolbar() {
             active={bottom === 'markups'}
             onClick={() => st().setUI({ bottomPanel: bottom === 'markups' ? null : 'markups' })}
             title="Toggle the Markups List"
+          />
+          <TB
+            icon={Sigma}
+            label="Summary"
+            active={bottom === 'summary'}
+            onClick={() => st().setUI({ bottomPanel: bottom === 'summary' ? null : 'summary' })}
+            title="Toggle the Takeoff Summary"
           />
         </div>
         <div className="tb-caption">Data</div>

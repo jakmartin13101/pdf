@@ -400,7 +400,7 @@ export function Viewer() {
         }
         return;
       }
-      const id = target.closest('[data-mid]')?.getAttribute('data-mid');
+      const id = pickMarkupAt(e.clientX, e.clientY, st.selection);
       if (id) {
         let sel = st.selection;
         if (e.shiftKey || e.ctrlKey || e.metaKey) {
@@ -669,7 +669,7 @@ export function Viewer() {
       return;
     }
     if (tool.kind === 'select') {
-      const id = (e.target as Element).closest('[data-mid]')?.getAttribute('data-mid');
+      const id = pickMarkupAt(e.clientX, e.clientY, getState().selection);
       const m = id ? getState().doc.markups.find((x) => x.id === id) : undefined;
       if (m && (m.type === 'text' || m.type === 'callout' || m.type === 'stamp')) getState().setEditingText(m.id);
     }
@@ -714,7 +714,7 @@ export function Viewer() {
       return;
     }
     const st = getState();
-    const id = (e.target as Element).closest('[data-mid]')?.getAttribute('data-mid');
+    const id = pickMarkupAt(e.clientX, e.clientY, st.selection);
     const at = toPage(e.clientX, e.clientY);
     const items: MenuItem[] = [];
     if (id) {
@@ -1165,6 +1165,28 @@ function TextEditor({ m, zoom }: { m: Markup; zoom: number }) {
       }}
     />
   );
+}
+
+const FILL_TYPES = new Set<MarkupType>(['area', 'volume', 'polygon', 'rectangle', 'ellipse', 'highlight', 'cloud']);
+
+/**
+ * Markup under the pointer. Large filled markups (e.g. a deck area) often sit on top of beams and
+ * counts, so lines/symbols/text win over filled shapes; within each group a selected markup wins.
+ */
+function pickMarkupAt(clientX: number, clientY: number, selection: string[]): string | null {
+  const ids: string[] = [];
+  for (const el of document.elementsFromPoint(clientX, clientY)) {
+    const id = el.closest('[data-mid]')?.getAttribute('data-mid');
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  if (!ids.length) return null;
+  const markups = getState().doc.markups;
+  const lines = ids.filter((id) => {
+    const m = markups.find((x) => x.id === id);
+    return m && !FILL_TYPES.has(m.type);
+  });
+  const pool = lines.length ? lines : ids;
+  return pool.find((id) => selection.includes(id)) ?? pool[0];
 }
 
 function keyToTool(e: KeyboardEvent): ToolMode | null {

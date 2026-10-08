@@ -221,7 +221,7 @@ const defaultUI: UIState = {
   bottomPanel: 'markups',
   leftWidth: 230,
   rightWidth: 300,
-  bottomHeight: 260,
+  bottomHeight: 250,
   theme: 'dark',
 };
 

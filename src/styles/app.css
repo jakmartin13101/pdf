@@ -2101,3 +2101,7 @@ kbd {
   font-family: var(--mono);
   color: var(--text);
 }
+
+.summary tfoot td {
+  position: static;
+}
