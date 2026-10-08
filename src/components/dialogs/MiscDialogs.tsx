@@ -52,7 +52,8 @@ export function SettingsDialog() {
       </div>
       <div className="field">
         <label>Theme</label>
-        <select value={ui.theme} onChange={(e) => st.setUI({ theme: e.target.value as 'dark' | 'light' })}>
+        <select value={ui.theme} onChange={(e) => st.setUI({ theme: e.target.value as 'dark' | 'light' | 'system' })}>
+          <option value="system">Match system</option>
           <option value="dark">Dark</option>
           <option value="light">Light</option>
         </select>

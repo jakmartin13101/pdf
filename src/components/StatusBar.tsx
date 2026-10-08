@@ -48,7 +48,7 @@ function prompt(tool: ReturnType<typeof getState>['tool']): string {
 function Toggle({ k, label, title }: { k: keyof Prefs; label: string; title: string }) {
   const on = useStore((s) => s.prefs[k]);
   return (
-    <button className={`sb-toggle${on ? ' on' : ''}`} title={title} onClick={() => getState().setPrefs({ [k]: !on } as Partial<Prefs>)}>
+    <button className={`sb-toggle sb-wide${on ? ' on' : ''}`} title={title} onClick={() => getState().setPrefs({ [k]: !on } as Partial<Prefs>)}>
       {label}
     </button>
   );
@@ -76,14 +76,14 @@ export function StatusBar() {
       <div className="prompt">{loaded ? prompt(tool) : 'Open a PDF drawing set or the sample set to begin.'}</div>
       {loaded && sheet && (
         <>
-          <span title="Cursor position (real-world, from sheet origin)">
+          <span className="sb-wide" title="Cursor position (real-world, from sheet origin)">
             {cursor && scale
               ? `X ${formatLength(cursor.x * scale.realPerPt, scale.unit === 'ft-in' ? 'ft' : scale.unit, 1)}  Y ${formatLength(cursor.y * scale.realPerPt, scale.unit === 'ft-in' ? 'ft' : scale.unit, 1)}`
               : `${(sheet.width / 72).toFixed(1)}" × ${(sheet.height / 72).toFixed(1)}"`}
           </span>
-          <div className="sb-sep" />
-          <span title="Scale at cursor">{scale ? scale.label : 'Scale not set'}</span>
-          <div className="sb-sep" />
+          <div className="sb-sep sb-wide" />
+          <span className="sb-wide" title="Scale at cursor">{scale ? scale.label : 'Scale not set'}</span>
+          <div className="sb-sep sb-wide" />
           <Toggle k="snapContent" label="CONTENT" title="Snap to PDF line work (endpoints, midpoints, lines)" />
           <Toggle k="snapMarkup" label="MARKUP" title="Snap to existing markup vertices" />
           <Toggle k="ortho" label="ORTHO" title="Constrain drawing to horizontal/vertical (Shift for 45°)" />

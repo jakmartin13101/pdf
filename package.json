@@ -11,7 +11,9 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "sample": "node scripts/generate-sample.mjs"
+    "sample": "node scripts/generate-sample.mjs",
+    "build:artifact": "node scripts/build-artifact.mjs",
+    "example": "node scripts/generate-example.mjs"
   },
   "dependencies": {
     "lucide-react": "0.460.0",

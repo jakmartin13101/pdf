@@ -24,10 +24,11 @@
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   --font: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
   --mono: 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+  /* Dark-first workspace; light values follow for a light system setting or an explicit choice. */
   color-scheme: dark;
 }
 
-[data-theme='light'] {
+:root[data-theme='light'] {
   --bg-app: #e9edf2;
   --bg-chrome: #f6f8fb;
   --bg-chrome-2: #edf1f6;
@@ -49,6 +50,32 @@
   --row-sel: #cfe2fb;
   --shadow: 0 8px 28px rgba(20, 30, 50, 0.22);
   color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg-app: #e9edf2;
+    --bg-chrome: #f6f8fb;
+    --bg-chrome-2: #edf1f6;
+    --bg-panel: #f9fafc;
+    --bg-panel-2: #eef2f7;
+    --bg-input: #ffffff;
+    --bg-hover: #e1e8f1;
+    --bg-active: #cfe2fb;
+    --bg-viewer: #8d939c;
+    --border: #d3dae3;
+    --border-strong: #b9c3cf;
+    --text: #1e2631;
+    --text-dim: #566273;
+    --text-faint: #8a95a3;
+    --accent: #1a73e8;
+    --accent-2: #155fc2;
+    --accent-soft: rgba(26, 115, 232, 0.14);
+    --row-alt: rgba(0, 0, 0, 0.025);
+    --row-sel: #cfe2fb;
+    --shadow: 0 8px 28px rgba(20, 30, 50, 0.22);
+    color-scheme: light;
+  }
 }
 
 * {
@@ -451,6 +478,7 @@ input[type='range'] {
   display: flex;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .side-tabs {
@@ -2104,4 +2132,63 @@ kbd {
 
 .summary tfoot td {
   position: static;
+}
+
+/* ---------------------------------------------------------------- small screens */
+
+@media (max-width: 820px) {
+  .side-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 40;
+    width: min(320px, calc(100vw - 84px)) !important;
+    box-shadow: var(--shadow);
+  }
+
+  .side-panel.left {
+    left: 34px;
+  }
+
+  .side-panel.right {
+    right: 34px;
+  }
+
+  .workspace > .splitter-v,
+  .statusbar .sb-wide,
+  .docbar .hint,
+  .menubar .project-name,
+  .menubar .save-state,
+  .brand-name {
+    display: none;
+  }
+
+  .menubar .menu-btn {
+    padding: 5px 6px;
+  }
+
+  .start-card,
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .start-card {
+    padding: 22px 18px;
+    gap: 18px;
+  }
+
+  .workflow {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+
+  .list-toolbar .search input {
+    width: 110px;
+  }
+
+  .doc-tab {
+    max-width: 60vw;
+  }
 }

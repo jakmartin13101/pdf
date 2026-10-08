@@ -18,8 +18,9 @@ npm install
 npm run dev          # http://localhost:5173  (add ?sample to auto-open the sample set)
 ```
 
-On the start screen choose **Open Sample Drawing Set** (a 7-sheet warehouse set with foundation and framing plans,
-details at mixed scales, architectural and MEP sheets), or open / drop your own PDFs.
+On the start screen choose **Open Example Takeoff** (the sample set calibrated, with a structural takeoff already in
+progress), **Open Sample Drawing Set** (the same 7-sheet warehouse set — foundation and framing plans, details at mixed
+scales, architectural and MEP sheets — with no takeoff yet), or open / drop your own PDFs.
 
 A five-minute tour with the sample set:
 
@@ -99,7 +100,12 @@ npm run build      # type-check + production build to dist/
 npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate public/samples/Sample-Structural-Set.pdf
+npm run example    # regenerate the example takeoff project (needs `npm run dev` running)
+npm run build:artifact  # self-contained bundle in dist-artifact/ for publishing as a claude.ai Artifact
 ```
+
+The artifact build opens straight into the example takeoff, follows the viewer's light/dark theme, and saves
+files (project, CSV, PDF) through the viewer's download prompt, since a published page cannot start downloads itself.
 
 Stack: React 18, TypeScript, Vite, Zustand, pdf.js (rendering, text and vector extraction), pdf-lib (export), lucide icons.
 

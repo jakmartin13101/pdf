@@ -51,7 +51,42 @@ export function lsSet(key: string, value: unknown) {
   }
 }
 
-export function downloadBlob(blob: Blob, filename: string) {
+interface DownloadsNamespace {
+  save(req: { filename: string; data: Blob }): Promise<{ status: string }>;
+}
+
+let downloadsNs: Promise<DownloadsNamespace | null> | null = null;
+
+/**
+ * Inside a published artifact the page cannot start downloads itself; files are offered through the
+ * viewer's `downloads` capability instead. Standalone (dev server, static hosting) there is no
+ * `window.claude` and a plain link download is used.
+ */
+export function downloadsCapability(): Promise<DownloadsNamespace | null> {
+  const host = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
+  if (!host?.use) return Promise.resolve(null);
+  downloadsNs ??= host
+    .use('downloads')
+    .then((ns) => (ns as DownloadsNamespace | null) ?? null)
+    .catch(() => null);
+  return downloadsNs;
+}
+
+export type SaveOutcome = 'saved' | 'declined' | 'unavailable';
+
+export async function downloadBlob(blob: Blob, filename: string): Promise<SaveOutcome> {
+  const hosted = !!(window as unknown as { claude?: unknown }).claude;
+  const ns = await downloadsCapability();
+  if (ns) {
+    try {
+      await ns.save({ filename, data: blob });
+      return 'saved';
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      return code === 'declined' || code === 'rate_limited' ? 'declined' : 'unavailable';
+    }
+  }
+  if (hosted && window.top !== window) return 'unavailable';
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -60,6 +95,7 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return 'saved';
 }
 
 export function bytesToBase64(bytes: Uint8Array): string {

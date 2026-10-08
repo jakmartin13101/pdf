@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { MenuList, type MenuItem } from './ContextMenu';
 import { getState, useStore } from '../store/store';
-import { cmdAddPdf, cmdCloseProject, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject, view } from '../store/commands';
-import { exportFlattenedPdf, downloadText, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
+import { cmdAddPdf, cmdCloseProject, cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject, view } from '../store/commands';
+import { csvBlob, exportFlattenedPdf, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
 import { buildRows } from '../core/columns';
 import { fileBytes, safeName } from '../store/project';
-import { downloadBlob } from '../core/persistence';
+import { offerFile } from '../store/files';
 import { MEASURE_TYPES, MARKUP_TYPES, TYPE_INFO } from '../core/markupTypes';
 
 export async function exportPdf() {
@@ -13,8 +13,8 @@ export async function exportPdf() {
   st.setBusy('Exporting flattened PDF…');
   try {
     const bytes = await exportFlattenedPdf(st.doc, fileBytes);
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${safeName(st.projectName)}_markups.pdf`);
-    st.toast('Exported PDF with markups', 'success');
+    st.setBusy(null);
+    await offerFile(new Blob([bytes], { type: 'application/pdf' }), `${safeName(st.projectName)}_markups.pdf`, 'Marked-up PDF');
   } catch (e) {
     console.error(e);
     st.toast(`Export failed: ${(e as Error).message}`, 'error');
@@ -26,18 +26,20 @@ export async function exportPdf() {
 export function exportMarkupsCsv() {
   const st = getState();
   const rows = buildRows(st.doc);
-  downloadText(markupsCsv(rows, st.list.columns, st.doc), `${safeName(st.projectName)}_markups.csv`);
+  void offerFile(csvBlob(markupsCsv(rows, st.list.columns, st.doc)), `${safeName(st.projectName)}_markups.csv`, 'Markups list');
 }
 
 export function exportSummaryCsv(groupBy: string | null = 'c:category') {
   const st = getState();
   const rows = buildRows(st.doc);
-  downloadText(summaryCsv(rows, st.doc, groupBy), `${safeName(st.projectName)}_summary.csv`);
+  void offerFile(csvBlob(summaryCsv(rows, st.doc, groupBy)), `${safeName(st.projectName)}_summary.csv`, 'Takeoff summary');
 }
 
 export function printSummary(groupBy: string | null = 'c:category') {
   const st = getState();
-  openReport(summaryReportHtml(st.projectName, buildRows(st.doc), st.doc, groupBy));
+  const html = summaryReportHtml(st.projectName, buildRows(st.doc), st.doc, groupBy);
+  // Pop-ups are often blocked (always inside a published artifact): offer the report as a file instead.
+  if (!openReport(html)) void offerFile(new Blob([html], { type: 'text/html' }), `${safeName(st.projectName)}_summary_report.html`, 'Summary report');
 }
 
 export function MenuBar() {
@@ -68,6 +70,7 @@ export function MenuBar() {
       { label: 'Open PDF…', shortcut: 'Ctrl+O', onClick: cmdOpenPdf },
       { label: 'Add PDF to Set…', onClick: cmdAddPdf, disabled: !loaded },
       { label: 'Open Sample Drawing Set', onClick: cmdOpenSample },
+      { label: 'Open Example Takeoff', onClick: cmdOpenExample },
       { sep: true },
       { label: 'Open Project…', onClick: cmdOpenProject },
       { label: 'Save Project As…', shortcut: 'Ctrl+S', onClick: cmdSaveProject, disabled: !loaded },
@@ -123,7 +126,14 @@ export function MenuBar() {
       { label: 'Takeoff Summary', checked: ui.bottomPanel === 'summary', onClick: () => st().setUI({ bottomPanel: ui.bottomPanel === 'summary' ? null : 'summary' }) },
       { sep: true },
       { label: 'Measurement Labels on Drawing', checked: prefs.showLabels, onClick: () => st().setPrefs({ showLabels: !prefs.showLabels }) },
-      { label: ui.theme === 'dark' ? 'Light Theme' : 'Dark Theme', onClick: () => st().setUI({ theme: ui.theme === 'dark' ? 'light' : 'dark' }) },
+      {
+        label: 'Theme',
+        children: (['system', 'light', 'dark'] as const).map((t) => ({
+          label: t === 'system' ? 'Match System' : t === 'light' ? 'Light' : 'Dark',
+          checked: ui.theme === t,
+          onClick: () => st().setUI({ theme: t }),
+        })),
+      },
     ],
     Document: [
       { label: 'Page Labels…', onClick: () => st().setDialog({ kind: 'pageLabels' }), disabled: !loaded },
@@ -169,7 +179,7 @@ export function MenuBar() {
     <div className="menubar" ref={ref}>
       <div className="brand">
         <span className="brand-mark">◭</span>
-        Takeoff Studio
+        <span className="brand-name">Takeoff Studio</span>
       </div>
       {Object.entries(menus).map(([name, items]) => (
         <div className="menu-root" key={name}>

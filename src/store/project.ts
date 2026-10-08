@@ -1,7 +1,8 @@
 import type { DocState, Sheet, SourceFile } from '../types';
 import { detectSheetLabel, pageInfos, registerPdf, unregisterAll } from '../core/pdf';
 import { uid } from '../core/ids';
-import { base64ToBytes, bytesToBase64, downloadBlob, idbDel, idbGet, idbKeys, idbSet } from '../core/persistence';
+import { base64ToBytes, bytesToBase64, idbDel, idbGet, idbKeys, idbSet } from '../core/persistence';
+import { offerFile } from './files';
 import { emptyDoc, getState, useStore } from './store';
 import { DEFAULT_SETTINGS } from '../core/units';
 import { titleCase } from '../core/text';
@@ -31,7 +32,7 @@ async function importPdf(name: string, bytes: Uint8Array, startIndex: number): P
   const fileId = uid('f');
   const pdf = await registerPdf(fileId, bytes);
   fileBytes.set(fileId, bytes);
-  void idbSet(`file:${fileId}`, bytes);
+  idbSet(`file:${fileId}`, bytes).catch(() => {});
   const infos = await pageInfos(pdf);
   let labels: string[] | null = null;
   try {
@@ -140,16 +141,29 @@ export async function saveProjectFile() {
     currentSheetId: st.currentSheetId,
     files: st.doc.files.map((f) => ({ id: f.id, name: f.name, data: bytesToBase64(fileBytes.get(f.id) ?? new Uint8Array()) })),
   };
-  downloadBlob(new Blob([JSON.stringify(pf)], { type: 'application/json' }), `${safeName(st.projectName)}.takeoff.json`);
-  useStore.setState({ lastSaved: Date.now() });
-  st.toast('Project saved', 'success');
+  if (await offerFile(new Blob([JSON.stringify(pf)], { type: 'application/json' }), `${safeName(st.projectName)}.takeoff.json`, 'Project')) {
+    useStore.setState({ lastSaved: Date.now() });
+  }
 }
 
 export async function openProjectFile(file: File) {
+  await openProjectText(() => file.text(), file.name);
+}
+
+/** The sample drawing set with a structural takeoff already in progress. */
+export async function openExampleTakeoff() {
+  await openProjectText(async () => {
+    const res = await fetch('./samples/Example-Takeoff.takeoff.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.text();
+  }, 'example takeoff');
+}
+
+async function openProjectText(read: () => Promise<string>, label: string) {
   const st = getState();
-  st.setBusy(`Opening ${file.name}…`);
+  st.setBusy(`Opening ${label}…`);
   try {
-    const pf = JSON.parse(await file.text()) as ProjectFile;
+    const pf = JSON.parse(await read()) as ProjectFile;
     if (pf.app !== 'takeoff-studio' || !pf.doc) throw new Error('Not a Takeoff Studio project file');
     unregisterAll();
     fileBytes.clear();
@@ -158,7 +172,7 @@ export async function openProjectFile(file: File) {
       const bytes = base64ToBytes(f.data);
       fileBytes.set(f.id, bytes);
       await registerPdf(f.id, bytes);
-      void idbSet(`file:${f.id}`, bytes);
+      idbSet(`file:${f.id}`, bytes).catch(() => {});
     }
     st.loadDoc(normalizeDoc(pf.doc), pf.name);
     if (pf.currentSheetId && pf.doc.sheets.some((s) => s.id === pf.currentSheetId)) useStore.setState({ currentSheetId: pf.currentSheetId });

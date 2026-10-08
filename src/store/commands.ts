@@ -1,6 +1,6 @@
 // UI commands shared by the menu bar, toolbar and context menus.
 import { getState, type ViewRequest } from './store';
-import { openPdfFiles, openProjectFile, openSample, saveProjectFile, closeProject } from './project';
+import { openExampleTakeoff, openPdfFiles, openProjectFile, openSample, saveProjectFile, closeProject } from './project';
 
 function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
   return new Promise((resolve) => {
@@ -30,6 +30,7 @@ export async function cmdOpenProject() {
 
 export const cmdSaveProject = () => saveProjectFile();
 export const cmdOpenSample = () => openSample();
+export const cmdOpenExample = () => openExampleTakeoff();
 
 export function cmdCloseProject() {
   getState().setDialog({

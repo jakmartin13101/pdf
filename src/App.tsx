@@ -18,8 +18,9 @@ import { ColumnsDialog } from './components/dialogs/ColumnsDialog';
 import { ToolEditDialog } from './components/dialogs/ToolEditDialog';
 import { AboutDialog, ConfirmDialog, SettingsDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
 import { openPdfFiles, openProjectFile, restoreAutosave, startAutosave } from './store/project';
-import { cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject } from './store/commands';
+import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject } from './store/commands';
 import { sheetDisplayName } from './core/columns';
+import { downloadsCapability } from './core/persistence';
 
 function Splitter({ dir, onDrag }: { dir: 'v' | 'h'; onDrag: (delta: number) => void }) {
   const [dragging, setDragging] = useState(false);
@@ -71,6 +72,15 @@ function StartScreen() {
             with every quantity in an editable markup database.
           </p>
           <div className="start-actions">
+            <button className="start-action" onClick={cmdOpenExample} data-testid="open-example">
+              <span className="ico">
+                <Ruler size={20} />
+              </span>
+              <span>
+                <b>Open Example Takeoff</b>
+                <small>The sample set calibrated, with steel, deck and concrete already taken off</small>
+              </span>
+            </button>
             <button className="start-action" onClick={cmdOpenSample} data-testid="open-sample">
               <span className="ico">
                 <BookOpen size={20} />
@@ -211,8 +221,17 @@ export function App() {
   const [dragOver, setDragOver] = useState(false);
   const dragDepth = useRef(0);
 
+  // "system" leaves the root alone so the viewer's own light/dark setting (or the OS) decides.
+  const appliedTheme = useRef(false);
   useEffect(() => {
-    document.documentElement.dataset.theme = ui.theme;
+    const root = document.documentElement;
+    if (ui.theme === 'system') {
+      if (appliedTheme.current) delete root.dataset.theme;
+      appliedTheme.current = false;
+    } else {
+      root.dataset.theme = ui.theme;
+      appliedTheme.current = true;
+    }
   }, [ui.theme]);
 
   useEffect(() => {
@@ -220,11 +239,14 @@ export function App() {
   }, [sheet]);
 
   useEffect(() => {
+    void downloadsCapability();
     startAutosave();
     const params = new URLSearchParams(location.search);
     (async () => {
       const restored = await restoreAutosave();
-      if (!restored && params.has('sample')) await cmdOpenSample();
+      // The published build opens straight into a working example; locally the start screen shows.
+      if (!restored && (import.meta.env.VITE_OPEN_EXAMPLE === '1' || location.hash === '#example')) await cmdOpenExample();
+      else if (!restored && params.has('sample')) await cmdOpenSample();
       setBooting(false);
     })();
   }, []);
@@ -300,7 +322,7 @@ export function App() {
         </div>
         {ui.leftPanel && loaded && (
           <>
-            <div style={{ width: ui.leftWidth, display: 'flex', minWidth: 0 }}>
+            <div className="side-panel left" style={{ width: ui.leftWidth, display: 'flex', minWidth: 0 }}>
               <SheetsPanel />
             </div>
             <Splitter dir="v" onDrag={(d) => st().setUI({ leftWidth: Math.max(160, Math.min(520, st().ui.leftWidth + d)) })} />
@@ -313,7 +335,7 @@ export function App() {
         {ui.rightPanel && (
           <>
             <Splitter dir="v" onDrag={(d) => st().setUI({ rightWidth: Math.max(220, Math.min(620, st().ui.rightWidth - d)) })} />
-            <div style={{ width: ui.rightWidth, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div className="side-panel right" style={{ width: ui.rightWidth, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               {ui.rightPanel === 'toolchest' && <ToolChestPanel />}
               {ui.rightPanel === 'properties' && <PropertiesPanel />}
               {ui.rightPanel === 'measurements' && <MeasurementsPanel />}

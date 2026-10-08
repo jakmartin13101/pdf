@@ -7,7 +7,8 @@ import { buildSummary, primaryQuantity, summableCustomColumns } from '../../core
 import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, fmtNumber } from '../../core/units';
 import { useFilteredRows } from './MarkupsList';
 import { exportSummaryCsv, printSummary } from '../MenuBar';
-import { downloadText, summaryCsv } from '../../core/export';
+import { csvBlob, summaryCsv } from '../../core/export';
+import { offerFile } from '../../store/files';
 import { safeName } from '../../store/project';
 
 export function SummaryPanel() {
@@ -89,7 +90,7 @@ export function SummaryPanel() {
         <div style={{ flex: 1 }} />
         <button
           className="btn sm"
-          onClick={() => (useFilter ? downloadText(summaryCsv(filtered, doc, validGroup), `${safeName(projectName)}_summary.csv`) : exportSummaryCsv(validGroup))}
+          onClick={() => (useFilter ? void offerFile(csvBlob(summaryCsv(filtered, doc, validGroup)), `${safeName(projectName)}_summary.csv`, 'Takeoff summary') : exportSummaryCsv(validGroup))}
         >
           <Download size={13} /> CSV
         </button>

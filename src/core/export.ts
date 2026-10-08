@@ -8,7 +8,6 @@ import { TYPE_INFO } from './markupTypes';
 import { calloutAnchor, calloutBox, dashArray, markupRect, polylineLabelAnchor, stampFontSize, uprightAngle, wrapText } from './shapes';
 import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, fmtNumber } from './units';
 import { getPage } from './pdf';
-import { downloadBlob } from './persistence';
 import { customColId } from './columns';
 
 // ---------------------------------------------------------------------------
@@ -86,8 +85,9 @@ export function summaryCsv(rows: Row[], doc: DocState, groupBy: string | null): 
   return toCsv(out);
 }
 
-export function downloadText(text: string, filename: string, type = 'text/csv') {
-  downloadBlob(new Blob(['﻿' + text], { type: `${type};charset=utf-8` }), filename);
+export function csvBlob(text: string) {
+  // Byte-order mark so Excel opens UTF-8 (², ³, ·) correctly.
+  return new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' });
 }
 
 // ---------------------------------------------------------------------------
@@ -138,15 +138,19 @@ ul{padding-left:18px;margin:4px 0}@media print{body{margin:12mm}button{display:n
 </body></html>`;
 }
 
-export function openReport(html: string) {
-  const w = window.open('', '_blank');
-  if (!w) {
-    downloadBlob(new Blob([html], { type: 'text/html' }), 'takeoff-summary.html');
-    return;
+/** Opens the report in a new window; returns false when pop-ups are not allowed. */
+export function openReport(html: string): boolean {
+  let w: Window | null = null;
+  try {
+    w = window.open('', '_blank');
+  } catch {
+    w = null;
   }
+  if (!w) return false;
   w.document.open();
   w.document.write(html);
   w.document.close();
+  return true;
 }
 
 // ---------------------------------------------------------------------------

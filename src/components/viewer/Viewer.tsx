@@ -1114,15 +1114,15 @@ function TextEditor({ m, zoom }: { m: Markup; zoom: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState(m.text ?? '');
   const r = m.type === 'callout' ? calloutBox(m) : markupRect(m);
+  const mountedAt = useRef(Date.now());
+  const focus = () => {
+    if (ref.current && document.activeElement !== ref.current) {
+      ref.current.focus();
+      ref.current.setSelectionRange(ref.current.value.length, ref.current.value.length);
+    }
+  };
   useEffect(() => {
-    // Focus now, and again once the creating click's mousedown has finished moving focus.
-    const focus = () => {
-      if (ref.current && document.activeElement !== ref.current) {
-        ref.current.focus();
-        ref.current.setSelectionRange(ref.current.value.length, ref.current.value.length);
-      }
-    };
-    focus();
+    // Wait for the creating click's mousedown to finish moving focus, then take it.
     const t1 = setTimeout(focus, 0);
     const t2 = setTimeout(focus, 40);
     return () => {
@@ -1145,7 +1145,11 @@ function TextEditor({ m, zoom }: { m: Markup; zoom: number }) {
       className="text-editor"
       value={value}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={commit}
+      onBlur={() => {
+        // A blur right after creation comes from the creating click itself, not the user leaving.
+        if (Date.now() - mountedAt.current < 250) setTimeout(focus, 0);
+        else commit();
+      }}
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {

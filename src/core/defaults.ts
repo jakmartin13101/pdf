@@ -65,7 +65,8 @@ function tool(
 ): ChestTool {
   const base = defaultStyle(type);
   const { subject, depth, text, ...styleExtra } = extra;
-  const fill = base.fillColor ? color : null;
+  // Measurement fills follow the tool colour; text boxes and callouts keep their white background.
+  const fill = base.fillColor && base.fillColor !== '#ffffff' ? color : base.fillColor;
   return {
     id: uid(),
     name,

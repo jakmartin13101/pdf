@@ -68,7 +68,7 @@ export interface UIState {
   leftWidth: number;
   rightWidth: number;
   bottomHeight: number;
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'system';
 }
 
 export interface Prefs {
@@ -222,8 +222,15 @@ const defaultUI: UIState = {
   leftWidth: 230,
   rightWidth: 300,
   bottomHeight: 250,
-  theme: 'dark',
+  theme: 'system',
 };
+
+// Small screens start with the drawing visible; side panels open as overlays on demand.
+if (typeof window !== 'undefined' && window.innerWidth < 820) {
+  defaultUI.leftPanel = null;
+  defaultUI.rightPanel = null;
+  defaultUI.bottomHeight = 200;
+}
 
 const defaultPrefs: Prefs = {
   author: 'Estimator',

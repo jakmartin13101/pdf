@@ -6,7 +6,7 @@ import { ToolSwatch } from '../icons';
 import { TYPE_INFO } from '../../core/markupTypes';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { defaultToolChest } from '../../core/defaults';
-import { downloadBlob } from '../../core/persistence';
+import { offerFile } from '../../store/files';
 import { cmdImportToolChest } from '../../store/commands';
 import { uid } from '../../core/ids';
 
@@ -62,7 +62,7 @@ export function ToolChestPanel() {
         { label: 'Rename', onClick: () => setRenaming(set.id) },
         {
           label: 'Export Set…',
-          onClick: () => downloadBlob(new Blob([JSON.stringify({ toolSets: [set] }, null, 2)], { type: 'application/json' }), `${set.name}.toolset.json`),
+          onClick: () => void offerFile(new Blob([JSON.stringify({ toolSets: [set] }, null, 2)], { type: 'application/json' }), `${set.name}.toolset.json`, 'Tool set'),
         },
         { sep: true },
         {
@@ -96,7 +96,7 @@ export function ToolChestPanel() {
         <button
           className="icon-btn"
           title="Export tool chest"
-          onClick={() => downloadBlob(new Blob([JSON.stringify({ toolSets: sets }, null, 2)], { type: 'application/json' }), 'toolchest.json')}
+          onClick={() => void offerFile(new Blob([JSON.stringify({ toolSets: sets }, null, 2)], { type: 'application/json' }), 'toolchest.json', 'Tool chest')}
         >
           <Download size={14} />
         </button>
