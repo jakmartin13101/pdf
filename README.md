@@ -90,6 +90,8 @@ A five-minute tour with the sample set:
   hidden tools (dimmed) with per-tool and per-set eye toggles to bring them back.
 * Any tool can be made a size tool from its properties (*Size / label tool*), and fonts are available on every tool.
 
+<img src="docs/screenshot-size-tool.png" width="520" alt="New Steel Shape / Size Tool dialog">
+
 ### Count editing
 
 Select a count markup (or right-click it on the drawing or in the list):
