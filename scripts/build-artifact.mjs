@@ -47,9 +47,10 @@ const styles = readFileSync(join(assetsDir, css), 'utf8');
 rmSync(join(assetsDir, css));
 rmSync(join(out, 'index.html'));
 rmSync(join(out, 'favicon.svg'), { force: true });
+for (const f of ['icon-64.png', 'icon-256.png']) rmSync(join(out, 'brand', f), { force: true }); // desktop-only sizes
 
 // Artifact pages are wrapped in their own document skeleton, so this is page content only.
-const page = `<title>Takeoff Studio</title>
+const page = `<title>BuildSuite Takeoff Studio</title>
 <style>
 ${styles}
 </style>
