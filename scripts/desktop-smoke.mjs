@@ -68,6 +68,20 @@ async function launch(extraArgs = []) {
   await report.waitForLoadState('domcontentloaded');
   check((await report.locator('h1').textContent()) === 'Report', 'summary report opens in its own window');
 
+  // Split the view and detach a pane into its own desktop window.
+  await win.getByTestId('split-vertical').click();
+  const paneOpened = app.waitForEvent('window');
+  await win.getByTestId('pane-detach').nth(1).click();
+  const paneWin = await paneOpened;
+  const paneRendered = await paneWin
+    .waitForSelector('.pane canvas', { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false);
+  check(paneRendered && (await win.getByTestId('pane').count()) === 1, 'a split pane detaches into its own window');
+  if (shots) await paneWin.screenshot({ path: join(shots, 'desktop-detached-pane.png') });
+  const paneTitle = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.getTitle()));
+  check(paneTitle.some((t) => t.includes('BuildSuite Takeoff Studio') && t.includes('–')), `detached window is titled (${paneTitle.join(' | ')})`);
+
   check(errors.length === 0, `no renderer errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
   await app.close();
 }

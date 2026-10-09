@@ -2,7 +2,7 @@
   "name": "buildsuite-takeoff-studio",
   "productName": "BuildSuite Takeoff Studio",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "BuildSuite Takeoff Studio - construction drawing measurement, markup and quantity takeoff for Windows.",
   "author": {
     "name": "BuildSuite"

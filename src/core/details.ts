@@ -197,6 +197,11 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
           type: 'Standard Detail',
           measurement: q.warning ? `⚠ ${q.warning}` : measurement,
         });
+        // Qty was 1 only so formulas see the material row on its own; don't add it to Qty totals.
+        if (qtyCol) {
+          row.values[qtyCol] = 0;
+          row.display[qtyCol] = '';
+        }
         row.detail = {
           parentId: r.markup.id,
           detailId: d.id,

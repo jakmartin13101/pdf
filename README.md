@@ -8,12 +8,16 @@ sheets, calibrate scales, measure and count with standardized Tool Chest tools, 
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
 > Independent implementation inspired by the Revu workflow. Not affiliated with or endorsed by Bluebeam, Inc.
+>
+> **Version 1.1.0** adds Standard Details and detachable split windows – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
 ![Takeoff summary grouped by category](docs/screenshot-summary.png)
 
 ![Split view: plan and details side by side](docs/screenshot-split.png)
+
+![A split pane detached into its own window](docs/screenshot-detached-pane.png)
 
 ## Install on Windows
 
@@ -77,6 +81,7 @@ A five-minute tour with the sample set:
 | **10. Drawing ⇄ data link** | Selecting a row navigates to its sheet, zooms and flashes the markup; selecting on the drawing highlights and scrolls to the row. Hover a markup for a quick readout. |
 | **11. Takeoff summary** | Totals per subject grouped by Category (or any column): pieces (EA), length (LF), area (SF), volume (CY), Qty and every numeric/formula column (e.g. weight in lbs and tons). Click a line to select its markups. |
 | **12. Export / report** | Markups CSV, summary CSV, printable summary report (save as PDF from the print dialog), flattened PDF with markups and measurement labels burned in, and portable project files (`.takeoff.json`, drawings embedded). |
+| **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length. See [Standard details](#standard-details). |
 
 ### Tool Chest: size tools and hidden tools
 
@@ -101,11 +106,45 @@ Select a count markup (or right-click it on the drawing or in the list):
 * **Split This Item** (right-click a symbol) / **Split All** – break symbols out into separate count markups with the
   same properties; *Remove This Item* deletes one symbol.
 
+### Standard details
+
+*Tools → Standard Details…* (also the package button in the Markups List and Summary, and *New Detail for This…* in a
+markup's Properties) defines rules that add material wherever the takeoff matches:
+
+```
+IF [Member Size] = "W24x55"     → ADD Clip Angle  L4x4x3/8  × 0'-11 1/2"  × 4 EA
+IF [Subject] = "Handrail"       → ADD Post  HSS1-1/2x1-1/2x1/8  × 3'-6"  @ 4'-0" OC (+1)
+IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
+```
+
+* **IF** – pick the column from a drop-down, then the value from a drop-down of the values that column holds in the
+  takeoff (*Other value…* to type one). Use *=*, *≠* or *contains*, and add more conditions (AND).
+* **ADD** – one or more materials, each with **Subject**, **Size** and **Length** (each piece; bare numbers are inches),
+  and how many: **@ spacing OC** along the measured length (an area's perimeter), with an optional end piece;
+  **× quantity** per markup or per counted item; or **full length** of the measured run. The markup's Qty multiplies
+  the result.
+* The added material appears under each matching markup in the Markups List (*Standard Detail*, read-only) and as its
+  own lines in the Takeoff Summary and exports. The size fills Member Size, so Weight computes for it (steel shapes,
+  plate, pipe, rod and rebar). *Detail material* in the list (or the summary) shows or hides it.
+* The editor shows the rule as a formula and a live preview of pieces, length and weight. Details are saved with the
+  project; export/import them as JSON to reuse on other jobs. The example takeoff includes four.
+
+<img src="docs/screenshot-standard-details.png" width="640" alt="Standard Details dialog">
+
+![Material added by standard details in the Markups List](docs/screenshot-detail-rows.png)
+
 ### Split view and workspace layout
 
 * **Split the document** like Revu: *Window → Split Vertical / Split Horizontal / Four Ways* or the status-bar
   buttons. Each pane has its own sheet selector, zoom and pan; the active pane is outlined and receives tools.
   Drag the divider to resize; close a pane with its ×.
+* **Detach a pane** with the ↗ button in its header (or *Window → Detach Active Pane*). In the desktop app it becomes
+  its own window you can move to another monitor and resize; in a browser that blocks pop-ups it floats inside the
+  app (drag its header to move, the corner to resize). A detached pane uses the main window's toolbar, menus and
+  panels, and whichever pane or window you click is the active one. Put it back with the header button, or close its
+  window to close the pane.
+* Tools stay on when you move between panes and windows, so you can measure in one and carry on in another. The
+  **count** tool starts a new count when you switch to another pane, window or sheet.
 * **Panels** (Sheets, Tool Chest, Properties, Measurements, Layers, Markups List, Takeoff Summary) dock to the
   **left, right, top or bottom**, or **float** in their own movable, resizable window. Drag a panel's header or tab
   (drop zones appear at the edges; drop elsewhere to float) or use its layout menu. The **toolbar** docks top, left,
@@ -186,11 +225,12 @@ src/
     steelShapes.ts   PLF/PSF weight lookup
     columns.ts       built-in + custom column model, row building for the list
     summary.ts       takeoff summary aggregation
+    details.ts       standard details: matching rules and the material rows they add
     pdf.ts           pdf.js loading, rendering, title-block text, snap index
     export.ts        CSV, printable report, flattened PDF
   store/           Zustand store (undo/redo history), project I/O, autosave, commands
   components/      viewer (canvas + SVG markup layer), panels, markups list, summary, dialogs,
-                   dock/ (dockable/floating panels, split panes)
+                   dock/ (dockable/floating panels; Panes.tsx: split panes and detached pane windows)
 electron/          Windows desktop shell (main process + preload)
 legal/             Terms of Service (source for the app and the installer)
 branding/          BuildSuite Takeoff icon artwork

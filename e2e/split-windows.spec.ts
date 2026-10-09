@@ -79,10 +79,12 @@ test('without pop-ups a detached pane floats inside the window and can be moved 
 
   const before = (await float.boundingBox())!;
   const head = float.getByTestId('pane-head');
-  const hb = (await head.locator('.pane-num').boundingBox())!;
-  await page.mouse.move(hb.x + hb.width + 200, hb.y + hb.height / 2);
+  // Drag by the empty part of the header (left of the attach/close buttons).
+  const hb = (await head.boundingBox())!;
+  const grab = { x: hb.x + hb.width - 80, y: hb.y + hb.height / 2 };
+  await page.mouse.move(grab.x, grab.y);
   await page.mouse.down();
-  await page.mouse.move(hb.x + hb.width + 120, hb.y + hb.height / 2 + 60, { steps: 6 });
+  await page.mouse.move(grab.x - 80, grab.y + 60, { steps: 6 });
   await page.mouse.up();
   const moved = (await float.boundingBox())!;
   expect(moved.x).toBeCloseTo(before.x - 80, 0);
