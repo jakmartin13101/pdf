@@ -42,7 +42,7 @@ export type DialogState =
   | { kind: 'columns' }
   | { kind: 'toolEdit'; setId: string; toolId?: string; fromMarkupId?: string }
   | { kind: 'shapeTool'; setId?: string; toolId?: string }
-  | { kind: 'terms'; mustAccept?: boolean }
+  | { kind: 'terms' }
   | { kind: 'settings' }
   | { kind: 'shortcuts' }
   | { kind: 'about' }

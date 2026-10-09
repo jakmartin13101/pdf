@@ -1,5 +1,7 @@
 // Minimal IndexedDB key-value store used for autosave (project JSON + PDF bytes).
 
+import { desktop } from '../brand';
+
 const DB_NAME = 'takeoff-studio';
 const STORE = 'kv';
 
@@ -75,6 +77,14 @@ export function downloadsCapability(): Promise<DownloadsNamespace | null> {
 export type SaveOutcome = 'saved' | 'declined' | 'unavailable';
 
 export async function downloadBlob(blob: Blob, filename: string): Promise<SaveOutcome> {
+  if (desktop) {
+    // Windows desktop app: native Save dialog.
+    try {
+      return (await desktop.saveFile(filename, new Uint8Array(await blob.arrayBuffer()))) ? 'saved' : 'declined';
+    } catch {
+      return 'unavailable';
+    }
+  }
   const hosted = !!(window as unknown as { claude?: unknown }).claude;
   const ns = await downloadsCapability();
   if (ns) {

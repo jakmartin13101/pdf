@@ -11,11 +11,12 @@ import { PageLabelsDialog } from './components/dialogs/PageLabelsDialog';
 import { ColumnsDialog } from './components/dialogs/ColumnsDialog';
 import { ToolEditDialog } from './components/dialogs/ToolEditDialog';
 import { AboutDialog, ConfirmDialog, SettingsDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
+import { TermsDialog } from './components/dialogs/TermsDialog';
 import { openPdfFiles, openProjectFile, restoreAutosave, startAutosave } from './store/project';
 import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject } from './store/commands';
 import { sheetDisplayName } from './core/columns';
 import { downloadsCapability } from './core/persistence';
-import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from './brand';
+import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME, desktop } from './brand';
 
 function StartScreen() {
   return (
@@ -117,6 +118,13 @@ function StartScreen() {
   );
 }
 
+/** Opens dropped or launched files: a project file replaces the project, PDFs are added to it. */
+async function openGivenFiles(files: File[]) {
+  const project = files.find((f) => f.name.toLowerCase().endsWith('.json'));
+  if (project) await openProjectFile(project);
+  else if (files.length) await openPdfFiles(files, getState().loaded ? 'append' : 'new');
+}
+
 function Dialogs() {
   const d = useStore((s) => s.dialog);
   if (!d) return null;
@@ -139,6 +147,8 @@ function Dialogs() {
       return <SettingsDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
+    case 'terms':
+      return <TermsDialog />;
     case 'about':
       return <AboutDialog />;
     case 'confirm':
@@ -208,11 +218,15 @@ export function App() {
     const params = new URLSearchParams(location.search);
     (async () => {
       const restored = await restoreAutosave();
+      const launchFiles = desktop ? await desktop.takeOpenFiles().catch(() => []) : [];
+      if (launchFiles.length) await openGivenFiles(launchFiles.map((f) => new File([f.data], f.name)));
       // The published build opens straight into a working example; locally the start screen shows.
-      if (!restored && (import.meta.env.VITE_OPEN_EXAMPLE === '1' || location.hash === '#example')) await cmdOpenExample();
+      else if (!restored && (import.meta.env.VITE_OPEN_EXAMPLE === '1' || location.hash === '#example')) await cmdOpenExample();
       else if (!restored && params.has('sample')) await cmdOpenSample();
       setBooting(false);
     })();
+    // Desktop: files opened from Explorer while the app is already running.
+    return desktop?.onOpenFiles((files) => void openGivenFiles(files.map((f) => new File([f.data], f.name))));
   }, []);
 
   // Global shortcuts that are not tied to the drawing.
@@ -251,10 +265,7 @@ export function App() {
       e.preventDefault();
       dragDepth.current = 0;
       setDragOver(false);
-      const files = [...(e.dataTransfer?.files ?? [])];
-      const project = files.find((f) => f.name.endsWith('.json'));
-      if (project) void openProjectFile(project);
-      else if (files.length) void openPdfFiles(files, getState().loaded && e.shiftKey ? 'append' : getState().loaded ? 'append' : 'new');
+      void openGivenFiles([...(e.dataTransfer?.files ?? [])]);
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragleave', leave);

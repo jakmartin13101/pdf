@@ -1,7 +1,7 @@
 import { Info, Keyboard, Settings } from 'lucide-react';
 import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
-import { FULL_NAME, SUITE_NAME } from '../../brand';
+import { APP_VERSION, FULL_NAME, SUITE_NAME, isDesktop } from '../../brand';
 
 export function ConfirmDialog({ title, message, onConfirm }: { title: string; message: string; onConfirm: () => void }) {
   const st = getState();
@@ -129,7 +129,16 @@ export function AboutDialog() {
         and formula columns → filter, sort and group → summarize and export.
       </p>
       <p style={{ margin: 0 }} className="hint">
-        All processing happens locally in your browser. Projects autosave to this browser; use File → Save Project to keep a portable copy. Not affiliated with Bluebeam, Inc.
+        {isDesktop
+          ? 'All processing happens locally on this computer. Projects autosave between sessions; use File → Save Project to keep a portable copy.'
+          : 'All processing happens locally in your browser. Projects autosave to this browser; use File → Save Project to keep a portable copy.'}{' '}
+        Not affiliated with Bluebeam, Inc.
+      </p>
+      <p style={{ margin: 0 }} className="hint">
+        Version {APP_VERSION} ·{' '}
+        <a href="#" onClick={(e) => (e.preventDefault(), st.setDialog({ kind: 'terms' }))}>
+          Terms of Service
+        </a>
       </p>
     </Modal>
   );

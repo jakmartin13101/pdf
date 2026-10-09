@@ -202,3 +202,21 @@ describe('size tools', () => {
     expect(normalizeSize('L', '')).toBe('');
   });
 });
+
+import { legalToPlainText, parseLegalMarkdown, splitBold } from '../src/core/legal';
+import { readFileSync } from 'node:fs';
+
+describe('terms of service', () => {
+  it('parses headings, paragraphs and lists', () => {
+    const blocks = parseLegalMarkdown('# Title\n\nIntro **bold** text\nsecond line\n\n## 1. Part\n\n- a\n- b\n\n1. one\n2. two\n');
+    expect(blocks.map((b) => b.kind)).toEqual(['h1', 'p', 'h2', 'ul', 'ol']);
+    expect(blocks[1]).toEqual({ kind: 'p', text: 'Intro **bold** text\nsecond line' });
+    expect(splitBold('Intro **bold** text')).toEqual(['Intro ', 'bold', ' text']);
+  });
+  it('renders the shipped terms as plain text for the installer', () => {
+    const txt = legalToPlainText(readFileSync('legal/terms-of-service.md', 'utf8'));
+    expect(txt).toMatch(/^BUILDSUITE TAKEOFF STUDIO/);
+    expect(txt).toContain('12. DISCLAIMER OF WARRANTIES');
+    expect(txt).not.toContain('**');
+  });
+});

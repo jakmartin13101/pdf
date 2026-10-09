@@ -9,6 +9,7 @@ import { calloutAnchor, calloutBox, dashArray, markupRect, polylineLabelAnchor, 
 import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, fmtNumber } from './units';
 import { getPage } from './pdf';
 import { customColId } from './columns';
+import { desktop } from '../brand';
 
 // ---------------------------------------------------------------------------
 // CSV
@@ -140,6 +141,10 @@ ul{padding-left:18px;margin:4px 0}@media print{body{margin:12mm}button{display:n
 
 /** Opens the report in a new window; returns false when pop-ups are not allowed. */
 export function openReport(html: string): boolean {
+  if (desktop) {
+    void desktop.openReport(html);
+    return true;
+  }
   let w: Window | null = null;
   try {
     w = window.open('', '_blank');

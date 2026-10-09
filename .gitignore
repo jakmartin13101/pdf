@@ -8,3 +8,5 @@ playwright-report
 dist-artifact
 build/icons/
 release
+build/license.txt
+build/THIRD-PARTY-NOTICES.txt

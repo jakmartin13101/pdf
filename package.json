@@ -1,9 +1,14 @@
 {
-  "name": "takeoff-studio",
+  "name": "buildsuite-takeoff-studio",
+  "productName": "BuildSuite Takeoff Studio",
   "private": true,
   "version": "1.0.0",
-  "description": "Construction drawing measurement, markup and quantity takeoff workspace (Bluebeam Revu-style).",
+  "description": "BuildSuite Takeoff Studio - construction drawing measurement, markup and quantity takeoff for Windows.",
+  "author": {
+    "name": "BuildSuite"
+  },
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -13,15 +18,11 @@
     "test:e2e": "playwright test",
     "sample": "node scripts/generate-sample.mjs",
     "build:artifact": "node scripts/build-artifact.mjs",
-    "example": "node scripts/generate-example.mjs"
-  },
-  "dependencies": {
-    "lucide-react": "0.460.0",
-    "pdf-lib": "1.17.1",
-    "pdfjs-dist": "4.10.38",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "zustand": "5.0.3"
+    "example": "node scripts/generate-example.mjs",
+    "desktop": "npm run build && electron .",
+    "legal": "node scripts/make-legal.mjs",
+    "icons": "node scripts/build-icons.mjs",
+    "dist:win": "npm run build && node scripts/make-legal.mjs && electron-builder --win nsis --x64 --publish never"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
@@ -29,8 +30,16 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",
+    "electron": "43.7.4",
+    "electron-builder": "26.15.3",
+    "lucide-react": "0.460.0",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "4.10.38",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "typescript": "5.6.3",
     "vite": "5.4.11",
-    "vitest": "2.1.8"
+    "vitest": "2.1.8",
+    "zustand": "5.0.3"
   }
 }

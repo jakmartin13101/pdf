@@ -1,0 +1,48 @@
+# Windows installer for BuildSuite Takeoff Studio.
+# Build with: npm run dist:win   (output in release/)
+appId: com.buildsuite.takeoffstudio
+productName: BuildSuite Takeoff Studio
+copyright: Copyright (c) 2026 BuildSuite
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - electron/**/*
+  - build/icon.ico
+  - build/icon.png
+  - package.json
+extraResources:
+  - from: build/license.txt
+    to: TERMS-OF-SERVICE.txt
+  - from: build/THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES.txt
+asar: true
+publish: null
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  executableName: BuildSuiteTakeoffStudio
+  legalTrademarks: BuildSuite
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  license: build/license.txt
+  include: build/installer.nsh
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  installerSidebar: build/installerSidebar.bmp
+  uninstallerSidebar: build/installerSidebar.bmp
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  menuCategory: BuildSuite
+  shortcutName: BuildSuite Takeoff Studio
+  uninstallDisplayName: BuildSuite Takeoff Studio
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  artifactName: BuildSuite-Takeoff-Studio-Setup-${version}.${ext}
