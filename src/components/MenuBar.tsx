@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { MenuList, type MenuItem } from './ContextMenu';
-import { getState, useStore } from '../store/store';
+import { getState, useStore, PANEL_IDS, PANEL_TITLES, type LayoutState, type PanelId } from '../store/store';
+import { dockMenuItems } from './dock/PanelHeader';
+import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from '../brand';
 import { cmdAddPdf, cmdCloseProject, cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject, view } from '../store/commands';
 import { csvBlob, exportFlattenedPdf, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
 import { buildRows } from '../core/columns';
 import { fileBytes, safeName } from '../store/project';
 import { offerFile } from '../store/files';
 import { MEASURE_TYPES, MARKUP_TYPES, TYPE_INFO } from '../core/markupTypes';
+
+function panelOpen(layout: LayoutState, id: PanelId) {
+  const p = layout.panels[id];
+  return p.dock === 'float' ? p.open : layout.active[p.dock] === id;
+}
 
 export async function exportPdf() {
   const st = getState();
@@ -52,6 +59,8 @@ export function MenuBar() {
   const projectName = useStore((s) => s.projectName);
   const lastSaved = useStore((s) => s.lastSaved);
   const ui = useStore((s) => s.ui);
+  const layout = useStore((s) => s.layout);
+  const paneLayout = useStore((s) => s.paneLayout);
   const prefs = useStore((s) => s.prefs);
 
   useEffect(() => {
@@ -117,13 +126,7 @@ export function MenuBar() {
       { label: 'Zoom In', shortcut: 'Ctrl+=', onClick: () => view('zoomBy', 1.25), disabled: !loaded },
       { label: 'Zoom Out', shortcut: 'Ctrl+-', onClick: () => view('zoomBy', 0.8), disabled: !loaded },
       { sep: true },
-      { label: 'Sheets Panel', checked: ui.leftPanel === 'sheets', onClick: () => st().setUI({ leftPanel: ui.leftPanel === 'sheets' ? null : 'sheets' }) },
-      { label: 'Tool Chest', checked: ui.rightPanel === 'toolchest', onClick: () => st().setUI({ rightPanel: ui.rightPanel === 'toolchest' ? null : 'toolchest' }) },
-      { label: 'Properties', checked: ui.rightPanel === 'properties', onClick: () => st().setUI({ rightPanel: ui.rightPanel === 'properties' ? null : 'properties' }) },
-      { label: 'Measurements', checked: ui.rightPanel === 'measurements', onClick: () => st().setUI({ rightPanel: ui.rightPanel === 'measurements' ? null : 'measurements' }) },
-      { label: 'Layers', checked: ui.rightPanel === 'layers', onClick: () => st().setUI({ rightPanel: ui.rightPanel === 'layers' ? null : 'layers' }) },
-      { label: 'Markups List', checked: ui.bottomPanel === 'markups', onClick: () => st().setUI({ bottomPanel: ui.bottomPanel === 'markups' ? null : 'markups' }) },
-      { label: 'Takeoff Summary', checked: ui.bottomPanel === 'summary', onClick: () => st().setUI({ bottomPanel: ui.bottomPanel === 'summary' ? null : 'summary' }) },
+      ...PANEL_IDS.map<MenuItem>((id) => ({ label: PANEL_TITLES[id], checked: panelOpen(layout, id), onClick: () => st().togglePanel(id) })),
       { sep: true },
       { label: 'Measurement Labels on Drawing', checked: prefs.showLabels, onClick: () => st().setPrefs({ showLabels: !prefs.showLabels }) },
       {
@@ -154,7 +157,7 @@ export function MenuBar() {
         disabled: !loaded,
       })),
       { sep: true },
-      { label: 'Measurement Settings', onClick: () => st().setUI({ rightPanel: 'measurements' }) },
+      { label: 'Measurement Settings', onClick: () => st().showPanel('measurements') },
     ],
     Tools: [
       {
@@ -167,19 +170,37 @@ export function MenuBar() {
       { label: 'Zoom Rectangle', shortcut: 'Z', onClick: () => st().setTool({ kind: 'zoomrect' }) },
       { sep: true },
       { label: 'Manage Columns…', onClick: () => st().setDialog({ kind: 'columns' }) },
-      { label: 'Tool Chest', onClick: () => st().setUI({ rightPanel: 'toolchest' }) },
+      { label: 'Tool Chest', onClick: () => st().showPanel('toolchest') },
+      { label: 'New Steel Shape / Size Tool…', onClick: () => st().setDialog({ kind: 'shapeTool' }) },
+    ],
+    Window: [
+      { label: 'Single View', checked: paneLayout === 'single', disabled: !loaded, onClick: () => st().setPaneLayout('single') },
+      { label: 'Split Vertical', checked: paneLayout === 'vertical', disabled: !loaded, onClick: () => st().setPaneLayout('vertical') },
+      { label: 'Split Horizontal', checked: paneLayout === 'horizontal', disabled: !loaded, onClick: () => st().setPaneLayout('horizontal') },
+      { label: 'Split Four Ways', checked: paneLayout === 'grid', disabled: !loaded, onClick: () => st().setPaneLayout('grid') },
+      { sep: true },
+      {
+        label: 'Panel Position',
+        children: PANEL_IDS.map<MenuItem>((id) => ({ label: PANEL_TITLES[id], children: dockMenuItems(id).filter((i) => !i.sep && !/Workspace|Close|Collapse/.test(i.label ?? '')) })),
+      },
+      { label: 'Toolbar Position', children: dockMenuItems('toolbar').filter((i) => !i.sep && !/Workspace/.test(i.label ?? '')) },
+      { label: 'Lock Workspace Layout', checked: layout.locked, onClick: () => st().setLayoutLocked(!layout.locked) },
+      { label: 'Reset Workspace Layout', onClick: () => st().resetLayout() },
     ],
     Help: [
       { label: 'Keyboard Shortcuts', onClick: () => st().setDialog({ kind: 'shortcuts' }) },
-      { label: 'About Takeoff Studio', onClick: () => st().setDialog({ kind: 'about' }) },
+      { label: 'Terms of Service', onClick: () => st().setDialog({ kind: 'terms' }) },
+      { label: `About ${FULL_NAME}`, onClick: () => st().setDialog({ kind: 'about' }) },
     ],
   };
 
   return (
     <div className="menubar" ref={ref}>
       <div className="brand">
-        <span className="brand-mark">◭</span>
-        <span className="brand-name">Takeoff Studio</span>
+        <img className="brand-logo" src={ICON_URL} alt="" />
+        <span className="brand-name">
+          <span className="brand-suite">{SUITE_NAME}</span> {PRODUCT_NAME}
+        </span>
       </div>
       {Object.entries(menus).map(([name, items]) => (
         <div className="menu-root" key={name}>

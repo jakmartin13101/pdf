@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Crosshair, Lock, PackagePlus, Pin } from 'lucide-react';
-import type { CountSymbol, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
+import { Crosshair, Lock, PackagePlus, Pin, Play, Scissors, SlidersHorizontal } from 'lucide-react';
+import type { CountSymbol, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { buildRows, customColId } from '../../core/columns';
@@ -10,6 +10,7 @@ import { formatLength, parseLength } from '../../core/units';
 import { viewportAt } from '../../core/measure';
 import { TYPE_ICON } from '../icons';
 import { COMMON_SHAPES } from '../../core/steelShapes';
+import { PanelHeader } from '../dock/PanelHeader';
 
 /** Columns holding a steel designation get shape suggestions (and feed PLF()/PSF()). */
 const isShapeColumn = (name: string) => /member\s*size|shape|section/i.test(name);
@@ -35,9 +36,7 @@ export function PropertiesPanel() {
   if (!items.length) {
     return (
       <div className="panel" style={{ height: '100%' }}>
-        <div className="panel-header">
-          <span className="title">Properties</span>
-        </div>
+        <PanelHeader title="Properties" icon={<SlidersHorizontal size={14} />} />
         <div className="empty-note">
           Select a markup on the drawing or in the Markups List to view and edit its properties and takeoff data.
         </div>
@@ -64,9 +63,7 @@ export function PropertiesPanel() {
 
   return (
     <div className="panel" style={{ height: '100%' }}>
-      <div className="panel-header">
-        {Icon && <Icon size={14} />}
-        <span className="title">{one ? `${TYPE_INFO[one.type].listName}` : `${items.length} markups selected`}</span>
+      <PanelHeader icon={Icon ? <Icon size={14} /> : undefined} title={one ? `${TYPE_INFO[one.type].listName}` : `${items.length} markups selected`}>
         {one && (
           <button className="icon-btn" title="Zoom to markup" onClick={() => st.focusMarkup(one.id)}>
             <Crosshair size={14} />
@@ -85,7 +82,7 @@ export function PropertiesPanel() {
             <Pin size={14} />
           </button>
         )}
-      </div>
+      </PanelHeader>
       <div className="panel-body">
         <div className="form" data-testid="properties">
           {one && row && TYPE_INFO[one.type].measure && (
@@ -141,6 +138,7 @@ export function PropertiesPanel() {
                   Add Cutout (hole)
                 </button>
               )}
+              {one.type === 'count' && <CountControls m={one} />}
             </>
           )}
 
@@ -292,6 +290,27 @@ export function PropertiesPanel() {
                 </div>
               </>
             )}
+            {(hasText || types.has('count') || types.has('stamp')) && (
+              <div className="field">
+                <label>Font</label>
+                <div className="field-row">
+                  <select value={(style('fontFamily') as string) ?? (common(items, (m) => m.style.fontFamily ?? 'Helvetica') ?? '')} onChange={(e) => setStyle('fontFamily', e.target.value as FontFamily)} data-testid="prop-font">
+                    {common(items, (m) => m.style.fontFamily ?? 'Helvetica') === undefined && <option value="">(multiple)</option>}
+                    <option value="Helvetica">Arial / Helvetica</option>
+                    <option value="Times">Times New Roman</option>
+                    <option value="Courier">Courier New</option>
+                  </select>
+                  <label className="narrow" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={items.every((m) => (TYPE_INFO[m.type].measure ? m.style.fontBold !== false : !!m.style.fontBold))}
+                      onChange={(e) => setStyle('fontBold', e.target.checked)}
+                    />
+                    Bold
+                  </label>
+                </div>
+              </div>
+            )}
             {hasText && (
               <div className="field">
                 <label>Font size</label>
@@ -397,5 +416,49 @@ function SelectionTotals({ rows }: { rows: ReturnType<typeof buildRows> }) {
           </div>
         ))}
     </>
+  );
+}
+
+/** Count-specific controls: manual quantity, resume, split. */
+function CountControls({ m }: { m: Markup }) {
+  const st = getState();
+  const counted = m.points.length;
+  return (
+    <div className="count-controls">
+      <div className="field">
+        <label>Quantity</label>
+        <div className="field-row">
+          <CommitInput
+            value={m.countOverride != null ? String(m.countOverride) : ''}
+            placeholder={`${counted} (counted)`}
+            inputMode="numeric"
+            onCommit={(v) => {
+              const t = v.trim();
+              if (!t) return st.updateMarkup(m.id, { countOverride: undefined });
+              const n = Number(t);
+              if (Number.isFinite(n) && n >= 0) st.updateMarkup(m.id, { countOverride: Math.round(n) });
+              else st.toast('Quantity must be a whole number', 'error');
+            }}
+            data-testid="prop-count-override"
+          />
+          {m.countOverride != null && (
+            <button className="btn sm narrow" onClick={() => st.updateMarkup(m.id, { countOverride: undefined })} title={`Go back to the counted quantity (${counted})`}>
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="hint">
+        {m.countOverride != null ? `Manual quantity replaces the ${counted} counted symbol${counted === 1 ? '' : 's'}.` : 'Type a quantity to override the number of symbols counted.'}
+      </div>
+      <div className="field-row" style={{ flexWrap: 'wrap' }}>
+        <button className="btn sm" onClick={() => st.resumeCount(m.id)} data-testid="btn-resume-count">
+          <Play size={12} /> Resume Count
+        </button>
+        <button className="btn sm" disabled={counted < 2} onClick={() => st.splitCount(m.id, 'all')} data-testid="btn-split-all">
+          <Scissors size={12} /> Split All ({counted})
+        </button>
+      </div>
+    </div>
   );
 }

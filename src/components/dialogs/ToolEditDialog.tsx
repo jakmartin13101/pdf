@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Wrench } from 'lucide-react';
-import type { ChestTool, CountSymbol, LineStyle, MarkupType } from '../../types';
+import type { ChestTool, CountSymbol, FontFamily, LineStyle, MarkupType } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
 import { defaultStyle, MARKUP_TYPES, MEASURE_TYPES, STAMP_TEXTS, TYPE_INFO } from '../../core/markupTypes';
@@ -177,9 +177,57 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
               </div>
             )}
             <div className="field">
-              <label>Font size</label>
-              <input type="number" min={6} max={72} value={s.fontSize} onChange={(e) => setStyle({ fontSize: Number(e.target.value) })} />
+              <label>Font</label>
+              <div className="field-row">
+                <select value={s.fontFamily ?? 'Helvetica'} onChange={(e) => setStyle({ fontFamily: e.target.value as FontFamily })}>
+                  <option value="Helvetica">Arial / Helvetica</option>
+                  <option value="Times">Times New Roman</option>
+                  <option value="Courier">Courier New</option>
+                </select>
+                <input type="number" min={6} max={72} value={s.fontSize} onChange={(e) => setStyle({ fontSize: Number(e.target.value) })} title="Font size" style={{ width: 64 }} className="narrow" />
+                <label className="narrow" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={TYPE_INFO[tool.type].measure ? s.fontBold !== false : !!s.fontBold}
+                    onChange={(e) => setStyle({ fontBold: e.target.checked })}
+                  />{' '}
+                  Bold
+                </label>
+              </div>
             </div>
+          </div>
+          <div className="form-section">
+            <h4>Size / label tool</h4>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={!!tool.sizeTool}
+                onChange={(e) =>
+                  setTool({
+                    ...tool,
+                    sizeTool: e.target.checked ? { family: '', value: tool.label ?? tool.subject, setSubject: true, setMemberSize: false } : undefined,
+                  })
+                }
+                data-testid="tool-size-toggle"
+              />
+              Type the label in the Tool Chest (kept on the tool until changed)
+            </label>
+            {tool.sizeTool && (
+              <>
+                <div className="field">
+                  <label>Current label</label>
+                  <input value={tool.sizeTool.value} onChange={(e) => setTool({ ...tool, sizeTool: { ...tool.sizeTool!, value: e.target.value } })} />
+                </div>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="checkbox" checked={tool.sizeTool.setSubject} onChange={(e) => setTool({ ...tool, sizeTool: { ...tool.sizeTool!, setSubject: e.target.checked } })} /> Also use it as the
+                  Subject
+                </label>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="checkbox" checked={tool.sizeTool.setMemberSize} onChange={(e) => setTool({ ...tool, sizeTool: { ...tool.sizeTool!, setMemberSize: e.target.checked } })} /> Also
+                  write it to Member Size
+                </label>
+              </>
+            )}
           </div>
         </div>
         <div className="form" style={{ padding: 0 }}>

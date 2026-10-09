@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Markup, MarkupType, Pt, Rect, Sheet } from '../../types';
-import { currentSheet, getState, useStore, type ToolMode, type ViewRequest } from '../../store/store';
+import { getState, useStore, type ToolMode, type ViewRequest } from '../../store/store';
 import { MarkupShape } from './MarkupShape';
 import { PageCanvas } from './PageCanvas';
 import { defaultStyle as defaultStyleFor, TYPE_INFO } from '../../core/markupTypes';
@@ -117,8 +117,11 @@ function ViewportsLayer({ sheet, zoom }: { sheet: Sheet; zoom: number }) {
 
 // ---------------------------------------------------------------------------
 
-export function Viewer() {
-  const sheet = useStore(currentSheet);
+export function Viewer({ paneId }: { paneId: string }) {
+  const paneSheetId = useStore((s) => s.panes.find((p) => p.id === paneId)?.sheetId ?? null);
+  const sheet = useStore((s) => s.doc.sheets.find((x) => x.id === paneSheetId));
+  const isActive = useStore((s) => s.activePaneId === paneId);
+  const multiPane = useStore((s) => s.panes.length > 1);
   const allMarkups = useStore((s) => s.doc.markups);
   const layers = useStore((s) => s.doc.layers);
   const settings = useStore((s) => s.doc.settings);
@@ -256,7 +259,8 @@ export function Viewer() {
     if (lastSheetId.current && lastSheetId.current !== sheet.id) viewsBySheet.current.set(lastSheetId.current, viewRef.current);
     const sheetChanged = lastSheetId.current !== sheet.id;
     lastSheetId.current = sheet.id;
-    if (viewRequest && viewRequest.nonce !== handledNonce.current) {
+    // Each pane handles only the view requests addressed to it (requests target the active pane).
+    if (viewRequest && viewRequest.nonce !== handledNonce.current && (!viewRequest.paneId || viewRequest.paneId === paneId)) {
       handledNonce.current = viewRequest.nonce;
       if (sheetChanged) restoreOrFit(sheet);
       applyRequest(viewRequest, sheet);
@@ -268,15 +272,16 @@ export function Viewer() {
   }, [sheet?.id, viewRequest, size.w, size.h, applyRequest, fitView, setView]);
 
   useEffect(() => {
-    getState().setZoom(view.zoom / PX_PER_PT_ACTUAL);
-  }, [view.zoom]);
+    if (isActive) getState().setZoom(view.zoom / PX_PER_PT_ACTUAL);
+  }, [view.zoom, isActive]);
 
   // ---- reset transient state on sheet/tool change
   useEffect(() => {
     setDraft(null);
     setRectPreview(null);
     setFreehand(null);
-    countRef.current = null;
+    // "Resume Count" continues an existing count markup; otherwise the next click starts a new one.
+    countRef.current = tool.kind === 'markup' && tool.resumeId ? tool.resumeId : null;
   }, [sheet?.id, tool]);
 
   // ---- content snap index
@@ -372,6 +377,7 @@ export function Viewer() {
   const onPointerDown = (e: React.PointerEvent) => {
     if (!sheet) return;
     setMenu(null);
+    if (getState().activePaneId !== paneId) getState().setActivePane(paneId);
     const el = containerRef.current!;
     if (e.button === 1 || (e.button === 0 && (spaceDown.current || tool.kind === 'pan'))) {
       e.preventDefault();
@@ -724,7 +730,32 @@ export function Viewer() {
       if (m.type === 'text' || m.type === 'callout' || m.type === 'stamp') items.push({ label: 'Edit Text', onClick: () => st.setEditingText(id) });
       if (m.type === 'area' || m.type === 'volume') items.push({ label: 'Add Cutout', onClick: () => st.setTool({ kind: 'cutout', markupId: id }) });
       if (m.cutouts?.length) items.push({ label: 'Remove Cutouts', onClick: () => st.updateMarkup(id, { cutouts: [] }) });
-      items.push({ label: 'Properties', onClick: () => st.setUI({ rightPanel: 'properties' }) });
+      if (m.type === 'count') {
+        // The symbol nearest the click is the one "this item" refers to.
+        let near = 0;
+        m.points.forEach((p, i) => {
+          if (dist(p, at) < dist(m.points[near], at)) near = i;
+        });
+        const n = m.points.length;
+        items.push({
+          label: 'Count',
+          children: [
+            { label: 'Resume Count', onClick: () => st.resumeCount(id) },
+            { label: 'Split This Item', disabled: n < 2, onClick: () => st.splitCount(id, near) },
+            { label: `Split All (${n})`, disabled: n < 2, onClick: () => st.splitCount(id, 'all') },
+            { label: 'Remove This Item', danger: true, onClick: () => st.removeCountPoint(id, near) },
+            { sep: true },
+            {
+              label: m.countOverride != null ? `Clear Manual Quantity (${m.countOverride})` : 'Set Quantity…',
+              onClick: () => {
+                if (m.countOverride != null) st.updateMarkup(id, { countOverride: undefined });
+                else st.showPanel('properties');
+              },
+            },
+          ],
+        });
+      }
+      items.push({ label: 'Properties', onClick: () => st.showPanel('properties') });
       items.push({ label: 'Add to Tool Chest…', onClick: () => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: id }) });
       items.push({ label: 'Set as Default for Tool', onClick: () => st.setTypeDefault(m.type, { style: m.style, subject: m.subject }) });
       items.push({ sep: true });
@@ -771,7 +802,8 @@ export function Viewer() {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e)) return;
       const st = getState();
-      if (st.dialog || st.editingTextId) return;
+      // With split panes only the active pane reacts to the keyboard.
+      if (st.dialog || st.editingTextId || st.activePaneId !== paneId) return;
       const ctrl = e.ctrlKey || e.metaKey;
       const k = e.key;
       if (k === ' ' && !e.repeat) {
@@ -978,7 +1010,7 @@ export function Viewer() {
   return (
     <div
       ref={containerRef}
-      className={`viewer ${cursorClass}`}
+      className={`viewer ${cursorClass}${multiPane ? (isActive ? ' pane-active' : ' pane-inactive') : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -1059,7 +1091,7 @@ export function Viewer() {
             </g>
           )}
         </svg>
-        {editing && <TextEditor m={editing} zoom={z} />}
+        {editing && isActive && <TextEditor m={editing} zoom={z} />}
       </div>
       {mouse && draftLabel && (
         <div className="live-measure" style={{ left: mouse.x + 18, top: mouse.y + 14 }}>

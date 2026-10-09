@@ -130,3 +130,40 @@ export const COMMON_SHAPES = [
   'L3x3x1/4', 'L4x4x3/8', 'L6x4x3/8', 'C8x11.5', 'C10x15.3', 'C12x20.7', 'MC12x31',
   'PL3/8', 'PL1/2', 'PL3/4', 'PL1', 'Pipe 4 Std', 'Pipe 6 Std', '18K4', '24K6',
 ];
+
+export interface ShapeFamily {
+  id: string;
+  label: string;
+  example: string;
+}
+
+/** Families offered when creating a steel shape tool. `id` is the prefix added to a typed size. */
+export const SHAPE_FAMILIES: ShapeFamily[] = [
+  { id: 'W', label: 'W – Wide flange', example: 'W18x35' },
+  { id: 'HSS', label: 'HSS – Tube / round HSS', example: 'HSS6x6x3/8' },
+  { id: 'L', label: 'L – Angle', example: 'L4x4x3/8' },
+  { id: 'C', label: 'C – Channel', example: 'C10x15.3' },
+  { id: 'MC', label: 'MC – Misc. channel', example: 'MC12x31' },
+  { id: 'WT', label: 'WT – Structural tee', example: 'WT9x17.5' },
+  { id: 'S', label: 'S – American standard beam', example: 'S12x31.8' },
+  { id: 'HP', label: 'HP – Bearing pile', example: 'HP12x53' },
+  { id: 'PL', label: 'PL – Plate / flat bar', example: 'PL1/2x8' },
+  { id: 'Pipe', label: 'Pipe', example: 'Pipe 6 Std' },
+  { id: '', label: 'Joist (K-series)', example: '24K6' },
+  { id: '', label: 'Other / free text', example: '' },
+];
+
+/**
+ * Normalise a size typed into a size tool: "18x35" in the W family becomes "W18x35",
+ * "w24x55" becomes "W24x55", "6 std" in Pipe becomes "Pipe 6 std". Other text is kept as typed.
+ */
+export function normalizeSize(family: string, raw: string): string {
+  const v = raw.trim().replace(/(\d)\s*[xX×]\s*(?=[\d.])/g, '$1x');
+  if (!family || !v) return v;
+  if (v.toLowerCase().startsWith(family.toLowerCase())) {
+    const rest = v.slice(family.length).trim();
+    return family === 'Pipe' ? `Pipe ${rest}` : family + rest;
+  }
+  if (/^[\d.]/.test(v)) return family === 'Pipe' ? `Pipe ${v}` : family + v;
+  return v;
+}

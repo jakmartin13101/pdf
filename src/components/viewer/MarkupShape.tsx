@@ -1,5 +1,5 @@
 import { memo, type CSSProperties } from 'react';
-import type { Markup, Pt } from '../../types';
+import type { FontFamily, Markup, Pt } from '../../types';
 import { cloudPath, labelPoint, pointsToPath } from '../../core/geometry';
 import {
   calloutAnchor,
@@ -24,6 +24,12 @@ interface Props {
 
 const LABEL_FONT = 'Arial, Helvetica, sans-serif';
 
+export function cssFontFamily(f: FontFamily | undefined): string {
+  if (f === 'Times') return '"Times New Roman", Times, serif';
+  if (f === 'Courier') return '"Courier New", Courier, monospace';
+  return LABEL_FONT;
+}
+
 function strokeStyle(m: Markup, width = m.style.lineWidth): CSSProperties {
   const d = dashArray(m.style);
   return {
@@ -40,7 +46,9 @@ function fillStyle(m: Markup): CSSProperties {
   return m.style.fillColor ? { fill: m.style.fillColor, fillOpacity: m.style.fillOpacity } : { fill: 'none' };
 }
 
-function Halo({ x, y, lines, size, color, angle = 0, anchor = 'middle', valign = 'middle' }: {
+function Halo({ x, y, lines, size, color, angle = 0, anchor = 'middle', valign = 'middle', family = LABEL_FONT, weight = 600 }: {
+  family?: string;
+  weight?: number;
   x: number;
   y: number;
   lines: string[];
@@ -58,8 +66,8 @@ function Halo({ x, y, lines, size, color, angle = 0, anchor = 'middle', valign =
       className="mk-label"
       transform={`translate(${x},${y}) rotate(${(angle * 180) / Math.PI})`}
       fontSize={size}
-      fontFamily={LABEL_FONT}
-      fontWeight={600}
+      fontFamily={family}
+      fontWeight={weight}
       textAnchor={anchor}
       dominantBaseline={valign === 'middle' ? 'central' : 'auto'}
       fill={color}
@@ -107,6 +115,8 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
   const lines = showLabels && label ? label.split('\n') : [];
   const fs = m.style.fontSize;
   const labelColor = m.style.color;
+  const ff = cssFontFamily(m.style.fontFamily);
+  const fw = m.style.fontBold === false ? 400 : 600;
 
   switch (m.type) {
     case 'length':
@@ -124,7 +134,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
           {!draft && <Hit d={d} />}
           <path d={d} style={strokeStyle(m)} />
           <Ends m={m} pts={pts} />
-          {lines.length > 0 && <Halo x={mx} y={my} lines={lines} size={fs} color={labelColor} angle={ang} valign="bottom" />}
+          {lines.length > 0 && <Halo family={ff} weight={fw} x={mx} y={my} lines={lines} size={fs} color={labelColor} angle={ang} valign="bottom" />}
         </>
       );
     }
@@ -141,7 +151,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
           <path d={d} style={strokeStyle(m)} />
           {m.type !== 'pen' && <Ends m={m} pts={pts} />}
           {lines.length > 0 && (
-            <Halo
+            <Halo family={ff} weight={fw}
               x={anchor.p.x + Math.sin(anchor.angle) * off}
               y={anchor.p.y - Math.cos(anchor.angle) * off}
               lines={lines}
@@ -167,7 +177,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
         <>
           {!draft && <Hit d={d} />}
           <path d={d} fillRule="evenodd" style={{ ...strokeStyle(m), ...(m.type === 'perimeter' ? {} : fillStyle(m)) }} />
-          {lines.length > 0 && <Halo x={lp.x} y={lp.y} lines={lines} size={fs} color={labelColor} />}
+          {lines.length > 0 && <Halo family={ff} weight={fw} x={lp.x} y={lp.y} lines={lines} size={fs} color={labelColor} />}
         </>
       );
     }
@@ -190,7 +200,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
             {!draft && <Hit d={d} />}
             <path d={d} style={strokeStyle(m)} />
             <path d={arc} style={{ ...strokeStyle(m), strokeDasharray: undefined }} />
-            {lines.length > 0 && <Halo x={b.x + Math.cos(mid) * (r + fs)} y={b.y + Math.sin(mid) * (r + fs)} lines={lines} size={fs} color={labelColor} />}
+            {lines.length > 0 && <Halo family={ff} weight={fw} x={b.x + Math.cos(mid) * (r + fs)} y={b.y + Math.sin(mid) * (r + fs)} lines={lines} size={fs} color={labelColor} />}
           </>
         );
       }
@@ -216,7 +226,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
             }}
           />
           {lines.length > 0 && last && (
-            <Halo x={last.x + r * 1.5} y={last.y - r * 1.2} lines={[lines[lines.length - 1]]} size={Math.max(8, r * 1.2)} color={labelColor} anchor="start" />
+            <Halo family={ff} weight={fw} x={last.x + r * 1.5} y={last.y - r * 1.2} lines={lines} size={Math.max(8, r * 1.2)} color={labelColor} anchor="start" valign="bottom" />
           )}
         </>
       );
@@ -295,7 +305,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
           <foreignObject x={r.x} y={r.y} width={Math.max(1, r.w)} height={Math.max(1, r.h)} style={{ pointerEvents: 'none' }}>
             <div
               className="mk-text"
-              style={{ fontSize: fs, color: m.style.color, fontFamily: LABEL_FONT, padding: Math.max(2, fs * 0.25), lineHeight: 1.2 }}
+              style={{ fontSize: fs, color: m.style.color, fontFamily: ff, fontWeight: m.style.fontBold ? 700 : 400, padding: Math.max(2, fs * 0.25), lineHeight: 1.2 }}
             >
               {m.text}
             </div>
@@ -323,7 +333,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
             x={r.x + r.w / 2}
             y={r.y + r.h / 2}
             fontSize={size}
-            fontFamily={LABEL_FONT}
+            fontFamily={ff}
             fontWeight={800}
             textAnchor="middle"
             dominantBaseline="central"

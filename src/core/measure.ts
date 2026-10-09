@@ -31,7 +31,7 @@ export function scaleForMarkup(m: Pick<Markup, 'type' | 'points'>, sheet: Sheet 
   return scaleAt(sheet, anchorPoint(m));
 }
 
-export function computeMeasure(m: Pick<Markup, 'type' | 'points' | 'cutouts' | 'depth'>, scale: Scale): MeasureValues {
+export function computeMeasure(m: Pick<Markup, 'type' | 'points' | 'cutouts' | 'depth' | 'countOverride'>, scale: Scale): MeasureValues {
   const k = scale.realPerPt;
   switch (m.type) {
     case 'length':
@@ -52,7 +52,7 @@ export function computeMeasure(m: Pick<Markup, 'type' | 'points' | 'cutouts' | '
       return v;
     }
     case 'count':
-      return { count: m.points.length };
+      return { count: m.countOverride ?? m.points.length };
     case 'angle':
       return m.points.length >= 3 ? { angle: angleAt(m.points[0], m.points[1], m.points[2]) } : {};
     default:

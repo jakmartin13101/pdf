@@ -1,6 +1,7 @@
 import { DraftingCompass, Frame, Pencil, Ruler, Trash2 } from 'lucide-react';
 import type { LengthUnit, ProjectSettings, Scale } from '../../types';
 import { currentSheet, getState, useStore } from '../../store/store';
+import { PanelHeader } from '../dock/PanelHeader';
 import { LENGTH_UNITS, SCALE_PRESETS, isMetric, precisionOptions, scaleFromPreset, defaultPrecision } from '../../core/units';
 import { sheetDisplayName } from '../../core/columns';
 
@@ -13,9 +14,7 @@ export function MeasurementsPanel() {
   if (!sheet) {
     return (
       <div className="panel" style={{ height: '100%' }}>
-        <div className="panel-header">
-          <span className="title">Measurements</span>
-        </div>
+        <PanelHeader title="Measurements" icon={<Ruler size={14} />} />
         <div className="empty-note">Open a drawing set to calibrate scales.</div>
       </div>
     );
@@ -28,10 +27,7 @@ export function MeasurementsPanel() {
 
   return (
     <div className="panel" style={{ height: '100%' }}>
-      <div className="panel-header">
-        <Ruler size={14} />
-        <span className="title">Measurements</span>
-      </div>
+      <PanelHeader title="Measurements" icon={<Ruler size={14} />} />
       <div className="panel-body">
         <div className="form" data-testid="measurements">
           <div className="hint" style={{ fontWeight: 600, color: 'var(--text)' }}>

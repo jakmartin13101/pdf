@@ -13,10 +13,14 @@ import {
   Table2,
   FileDown,
   Sigma,
+  GripVertical,
   type LucideIcon,
 } from 'lucide-react';
+import { useRef } from 'react';
+import { beginDockDrag } from './dock/dragging';
+import { DockMenuButton } from './dock/PanelHeader';
 import type { MarkupType } from '../types';
-import { useStore, getState, type ToolMode } from '../store/store';
+import { useStore, getState, type ToolMode, type PanelId } from '../store/store';
 import { TYPE_ICON } from './icons';
 import { TYPE_INFO } from '../core/markupTypes';
 import { cmdOpenPdf, cmdSaveProject, view } from '../store/commands';
@@ -48,17 +52,47 @@ function TB({ icon: Icon, label, onClick, active, disabled, title, small }: {
   );
 }
 
-export function Toolbar() {
+/** True when a panel is currently showing (open in its dock or as an open floating window). */
+export function usePanelOpen(id: PanelId) {
+  return useStore((s) => {
+    const p = s.layout.panels[id];
+    return p.dock === 'float' ? p.open : s.layout.active[p.dock] === id;
+  });
+}
+
+export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | 'float' }) {
   const tool = useStore((s) => s.tool);
   const loaded = useStore((s) => s.loaded);
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
-  const bottom = useStore((s) => s.ui.bottomPanel);
+  const markupsOpen = usePanelOpen('markups');
+  const summaryOpen = usePanelOpen('summary');
+  const locked = useStore((s) => s.layout.locked);
+  const pos = useStore((s) => s.layout.toolbar);
+  const ref = useRef<HTMLDivElement>(null);
   const st = getState;
   const set = (t: ToolMode) => st().setTool(sameTool(st().tool, t) && t.kind !== 'select' ? { kind: 'select' } : t);
+  const vertical = placement === 'left' || placement === 'right';
 
   return (
-    <div className="toolbar">
+    <div
+      ref={ref}
+      className={`toolbar${vertical ? ' vertical' : ''}${placement === 'float' ? ' floating' : ''}`}
+      style={placement === 'float' ? { left: Math.min(pos.x, window.innerWidth - 200), top: Math.min(pos.y, window.innerHeight - 80) } : undefined}
+      data-testid="toolbar"
+    >
+      <div
+        className={`tb-grip${locked ? ' locked' : ''}`}
+        title={locked ? 'Workspace layout is locked' : 'Drag to dock the toolbar top, left or right, or to float it'}
+        onPointerDown={(e) => {
+          const r = ref.current?.getBoundingClientRect();
+          beginDockDrag(e, 'toolbar', { w: r?.width ?? 600, h: r?.height ?? 60 }, r ? { x: r.left, y: r.top } : undefined);
+        }}
+        data-testid="toolbar-grip"
+      >
+        <GripVertical size={14} />
+        <DockMenuButton id="toolbar" />
+      </div>
       <div className="tb-group">
         <div className="tb-row">
           <TB icon={FolderOpen} label="Open" onClick={cmdOpenPdf} title="Open PDF drawings (Ctrl+O)" />
@@ -116,20 +150,8 @@ export function Toolbar() {
       </div>
       <div className="tb-group">
         <div className="tb-row">
-          <TB
-            icon={Table2}
-            label="Markups"
-            active={bottom === 'markups'}
-            onClick={() => st().setUI({ bottomPanel: bottom === 'markups' ? null : 'markups' })}
-            title="Toggle the Markups List"
-          />
-          <TB
-            icon={Sigma}
-            label="Summary"
-            active={bottom === 'summary'}
-            onClick={() => st().setUI({ bottomPanel: bottom === 'summary' ? null : 'summary' })}
-            title="Toggle the Takeoff Summary"
-          />
+          <TB icon={Table2} label="Markups" active={markupsOpen} onClick={() => st().togglePanel('markups')} title="Show or hide the Markups List" />
+          <TB icon={Sigma} label="Summary" active={summaryOpen} onClick={() => st().togglePanel('summary')} title="Show or hide the Takeoff Summary" />
         </div>
         <div className="tb-caption">Data</div>
       </div>

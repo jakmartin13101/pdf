@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { FilePlus2, LayoutGrid, List, Search, Tags } from 'lucide-react';
+import { FilePlus2, Files, LayoutGrid, List, Search, Tags } from 'lucide-react';
+import { PanelHeader } from '../dock/PanelHeader';
 import type { Sheet } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { renderPage } from '../../core/pdf';
@@ -197,13 +198,9 @@ export function SheetsPanel() {
 
   return (
     <div className="panel" style={{ height: '100%' }}>
-      <div className="panel-header">
-        <span className="title">Sheets ({sheets.length})</span>
-        <button className={`icon-btn${listView ? '' : ' active'}`} title="Thumbnails" onClick={() => setListView(false)}>
-          <LayoutGrid size={14} />
-        </button>
-        <button className={`icon-btn${listView ? ' active' : ''}`} title="List" onClick={() => setListView(true)}>
-          <List size={14} />
+      <PanelHeader title={`Sheets (${sheets.length})`} icon={<Files size={14} />}>
+        <button className="icon-btn" title={listView ? 'Show thumbnails' : 'Show as list'} onClick={() => setListView(!listView)}>
+          {listView ? <LayoutGrid size={14} /> : <List size={14} />}
         </button>
         <button className="icon-btn" title="Page Labels (sheet numbers & titles)" onClick={() => getState().setDialog({ kind: 'pageLabels' })}>
           <Tags size={14} />
@@ -211,7 +208,7 @@ export function SheetsPanel() {
         <button className="icon-btn" title="Add PDF to set" onClick={cmdAddPdf}>
           <FilePlus2 size={14} />
         </button>
-      </div>
+      </PanelHeader>
       <div className="sheet-search">
         <Search size={14} style={{ color: 'var(--text-faint)' }} />
         <input placeholder="Find sheet (e.g. S1.02, framing)" value={q} onChange={(e) => setQ(e.target.value)} />

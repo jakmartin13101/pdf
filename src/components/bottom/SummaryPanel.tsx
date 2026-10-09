@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
+import { PanelContext, PanelHeader } from '../dock/PanelHeader';
 import type { CustomColumn, DocState } from '../../types';
-import { Download, Printer } from 'lucide-react';
+import { Download, Printer, Sigma } from 'lucide-react';
 import { getState, useStore } from '../../store/store';
 import { allColumns, customColId } from '../../core/columns';
 import { buildSummary, primaryQuantity, summableCustomColumns } from '../../core/summary';
@@ -12,6 +13,8 @@ import { offerFile } from '../../store/files';
 import { safeName } from '../../store/project';
 
 export function SummaryPanel() {
+  const ctx = useContext(PanelContext);
+  const showHeader = !!ctx && (ctx.dock === 'left' || ctx.dock === 'right' || ctx.dock === 'float');
   const doc = useStore((s) => s.doc);
   const projectName = useStore((s) => s.projectName);
   const { rows, filtered } = useFilteredRows();
@@ -34,6 +37,8 @@ export function SummaryPanel() {
   };
 
   return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+      {showHeader && <PanelHeader title="Takeoff Summary" icon={<Sigma size={14} />} />}
     <div className="panel-body summary" data-testid="summary">
       <div className="kpis">
         <div className="kpi">
@@ -163,6 +168,7 @@ export function SummaryPanel() {
           </tfoot>
         )}
       </table>
+    </div>
     </div>
   );
 }

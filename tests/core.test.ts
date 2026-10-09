@@ -187,3 +187,18 @@ describe('markup rows', () => {
     expect(scaleForMarkup({ type: 'length', points: [{ x: 600, y: 10 }, { x: 700, y: 10 }] }, sheet)).toBe(scale);
   });
 });
+
+import { normalizeSize } from '../src/core/steelShapes';
+
+describe('size tools', () => {
+  it('normalizes typed sizes to the tool family', () => {
+    expect(normalizeSize('W', '18x35')).toBe('W18x35');
+    expect(normalizeSize('W', 'w24 X 55')).toBe('W24x55');
+    expect(normalizeSize('W', 'W 12 x 26')).toBe('W12x26');
+    expect(normalizeSize('Pipe', 'pipe 4 xs')).toBe('Pipe 4 xs');
+    expect(normalizeSize('HSS', '6x6x3/8')).toBe('HSS6x6x3/8');
+    expect(normalizeSize('Pipe', '6 Std')).toBe('Pipe 6 Std');
+    expect(normalizeSize('', 'Custom beam')).toBe('Custom beam');
+    expect(normalizeSize('L', '')).toBe('');
+  });
+});

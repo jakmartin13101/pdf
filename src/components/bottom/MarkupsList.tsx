@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Columns3, Download, Filter, Search, Trash2, X } from 'lucide-react';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { PanelContext, PanelHeader } from '../dock/PanelHeader';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Columns3, Download, Filter, Search, Table2, Trash2, X } from 'lucide-react';
 import type { Markup, MarkupStatus } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
@@ -124,7 +125,9 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
   const initial =
     col.editor === 'length'
       ? formatLength(m.depth ?? 0, row.scale.unit === 'ft' ? 'ft-in' : row.scale.unit, 8)
-      : col.custom
+      : col.editor === 'count'
+        ? String(m.countOverride ?? m.points.length)
+        : col.custom
         ? String(m.custom[col.custom.id] ?? '')
         : String((m as unknown as Record<string, unknown>)[col.id] ?? '');
   const [v, setV] = useState(initial);
@@ -137,6 +140,14 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
         else if (isFinite(Number(val))) st.setCustomValue(ids, col.custom.id, Number(val));
         else st.toast(`${col.name} must be a number`, 'error');
       } else st.setCustomValue(ids, col.custom.id, val);
+      return;
+    }
+    if (col.editor === 'count') {
+      const t = val.trim();
+      // Blank or the counted number clears the manual quantity.
+      if (!t || Number(t) === m.points.length) st.updateMarkup(m.id, { countOverride: undefined });
+      else if (Number.isFinite(Number(t)) && Number(t) >= 0) st.updateMarkup(m.id, { countOverride: Math.round(Number(t)) });
+      else st.toast('Count must be a whole number', 'error');
       return;
     }
     if (col.editor === 'length') {
@@ -253,6 +264,9 @@ function Cell({ col, row, editing }: { col: ColumnSpec; row: Row; editing: boole
 }
 
 export function MarkupsList() {
+  // Inside the top/bottom tab bars the tab names the panel; elsewhere it needs its own header.
+  const ctx = useContext(PanelContext);
+  const showHeader = !!ctx && (ctx.dock === 'left' || ctx.dock === 'right' || ctx.dock === 'float');
   const doc = useStore((s) => s.doc);
   const list = useStore((s) => s.list);
   const selection = useStore((s) => s.selection);
@@ -353,7 +367,18 @@ export function MarkupsList() {
       y: e.clientY,
       items: [
         { label: 'Zoom To', onClick: () => s.focusMarkup(r.markup.id) },
-        { label: 'Properties', onClick: () => s.setUI({ rightPanel: 'properties' }) },
+        { label: 'Properties', onClick: () => s.showPanel('properties') },
+        ...(r.markup.type === 'count'
+          ? [
+              { label: 'Resume Count', onClick: () => s.resumeCount(r.markup.id) },
+              { label: `Split All (${r.markup.points.length})`, disabled: r.markup.points.length < 2, onClick: () => s.splitCount(r.markup.id, 'all') },
+              {
+                label: r.markup.countOverride != null ? 'Clear Manual Quantity' : 'Set Quantity…',
+                onClick: () =>
+                  r.markup.countOverride != null ? s.updateMarkup(r.markup.id, { countOverride: undefined }) : setEditing({ id: r.markup.id, col: 'count' }),
+              },
+            ]
+          : []),
         {
           label: `Select All “${r.markup.subject}”`,
           onClick: () => s.setSelection(s.doc.markups.filter((m) => m.subject === r.markup.subject).map((m) => m.id)),
@@ -410,6 +435,7 @@ export function MarkupsList() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+      {showHeader && <PanelHeader title="Markups List" icon={<Table2 size={14} />} />}
       <div className="list-toolbar">
         <div className="search">
           <Search size={13} style={{ color: 'var(--text-faint)' }} />
@@ -563,7 +589,7 @@ export function MarkupsList() {
                 >
                   {visibleCols.map((c) => {
                     const isEditing = editing?.id === r.markup.id && editing.col === c.id;
-                    const editable = c.editor !== 'none' && !(c.editor === 'length' && r.markup.type !== 'volume');
+                    const editable = c.editor !== 'none' && !(c.editor === 'length' && r.markup.type !== 'volume') && !(c.editor === 'count' && r.markup.type !== 'count');
                     return (
                       <td
                         key={c.id}

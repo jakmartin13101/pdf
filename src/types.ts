@@ -74,6 +74,8 @@ export interface Sheet {
 }
 
 export type LineStyle = 'solid' | 'dashed' | 'dotted';
+/** Label/text typeface; maps to the PDF standard fonts on export. */
+export type FontFamily = 'Helvetica' | 'Times' | 'Courier';
 export type CountSymbol = 'circle' | 'square' | 'triangle' | 'diamond' | 'check' | 'cross' | 'star';
 export type LineEnd = 'none' | 'arrow' | 'tick' | 'dot';
 export type MarkupStatus = 'None' | 'Accepted' | 'Rejected' | 'Cancelled' | 'Completed';
@@ -88,6 +90,9 @@ export interface MarkupStyle {
   lineWidth: number;
   lineStyle: LineStyle;
   fontSize: number;
+  fontFamily?: FontFamily;
+  /** Undefined: measurement labels bold, text boxes regular. */
+  fontBold?: boolean;
   symbol: CountSymbol;
   symbolSize: number;
   lineStart: LineEnd;
@@ -116,6 +121,8 @@ export interface Markup {
   style: MarkupStyle;
   /** Volume depth in real inches. */
   depth?: number;
+  /** Count markups: a manually entered quantity that replaces the number of symbols. */
+  countOverride?: number;
   custom: Record<string, CustomValue>;
   toolId?: string;
   locked?: boolean;
@@ -161,9 +168,25 @@ export interface DocState {
   settings: ProjectSettings;
 }
 
+/**
+ * A "size tool" keeps a typed size (e.g. W18x35) on the tool itself. Every markup placed with it is
+ * labelled with that size until the size is changed in the Tool Chest.
+ */
+export interface SizeToolConfig {
+  /** Shape family prefix such as W, HSS, L, C; empty for free text. */
+  family: string;
+  value: string;
+  /** Use the size as the markup subject (groups the takeoff by size). */
+  setSubject: boolean;
+  /** Write the size into the Member Size column (drives PLF/PSF weight formulas). */
+  setMemberSize: boolean;
+}
+
 export interface ChestTool {
   id: string;
   name: string;
+  hidden?: boolean;
+  sizeTool?: SizeToolConfig;
   type: MarkupType;
   subject: string;
   label?: string;
@@ -179,6 +202,7 @@ export interface ToolSet {
   id: string;
   name: string;
   collapsed?: boolean;
+  hidden?: boolean;
   tools: ChestTool[];
 }
 

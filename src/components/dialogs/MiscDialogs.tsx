@@ -1,6 +1,7 @@
 import { Info, Keyboard, Settings } from 'lucide-react';
 import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
+import { FULL_NAME, SUITE_NAME } from '../../brand';
 
 export function ConfirmDialog({ title, message, onConfirm }: { title: string; message: string; onConfirm: () => void }) {
   const st = getState();
@@ -119,9 +120,9 @@ export function ShortcutsDialog() {
 export function AboutDialog() {
   const st = getState();
   return (
-    <Modal title="About Takeoff Studio" icon={<Info size={16} />} onClose={() => st.setDialog(null)}>
+    <Modal title={`About ${FULL_NAME}`} icon={<Info size={16} />} onClose={() => st.setDialog(null)}>
       <p style={{ margin: 0 }}>
-        <b>Takeoff Studio</b> is a browser-based construction drawing measurement, markup and quantity takeoff workspace modelled on the Bluebeam Revu estimating workflow.
+        <b>{FULL_NAME}</b> is a construction drawing measurement, markup and quantity takeoff workspace, part of the {SUITE_NAME} suite of construction programs.
       </p>
       <p style={{ margin: 0 }} className="hint">
         Import drawings → label sheets → calibrate scales (per sheet and per viewport) → measure, count and mark up with Tool Chest tools → review the editable Markups List with custom

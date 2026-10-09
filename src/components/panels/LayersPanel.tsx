@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDownToLine, Eye, EyeOff, Layers as LayersIcon, Plus, Trash2 } from 'lucide-react';
 import { getState, useStore } from '../../store/store';
+import { PanelHeader } from '../dock/PanelHeader';
 
 export function LayersPanel() {
   const layers = useStore((s) => s.doc.layers);
@@ -16,13 +17,11 @@ export function LayersPanel() {
 
   return (
     <div className="panel" style={{ height: '100%' }}>
-      <div className="panel-header">
-        <LayersIcon size={14} />
-        <span className="title">Layers</span>
+      <PanelHeader title="Layers" icon={<LayersIcon size={14} />}>
         <button className="icon-btn" title="New layer" onClick={() => setEditing(st.addLayer('New Layer'))}>
           <Plus size={14} />
         </button>
-      </div>
+      </PanelHeader>
       <div className="panel-body">
         <div className="form">
           <div className="hint">Organize markups into layers. Hidden layers are not drawn, and are excluded from flattened PDF exports.</div>

@@ -6,3 +6,5 @@ playwright-report
 .DS_Store
 *.tsbuildinfo
 dist-artifact
+build/icons/
+release

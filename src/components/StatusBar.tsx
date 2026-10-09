@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Minus, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns2, Grid2x2, Minus, Plus, Rows2, Square } from 'lucide-react';
 import { currentSheet, getState, useStore, type Prefs } from '../store/store';
 import { TYPE_INFO } from '../core/markupTypes';
 import { scaleAt } from '../core/measure';
@@ -118,6 +118,8 @@ export function StatusBar() {
             </button>
           </div>
           <div className="sb-sep" />
+          <SplitButtons />
+          <div className="sb-sep" />
           <button className="icon-btn" onClick={() => view('zoomBy', 0.8)} title="Zoom out">
             <Minus size={13} />
           </button>
@@ -129,6 +131,24 @@ export function StatusBar() {
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+function SplitButtons() {
+  const layout = useStore((s) => s.paneLayout);
+  const st = getState();
+  const btn = (id: typeof layout, Icon: typeof Square, title: string) => (
+    <button className={`icon-btn${layout === id ? ' active' : ''}`} title={title} onClick={() => st.setPaneLayout(id)} data-testid={`split-${id}`}>
+      <Icon size={13} />
+    </button>
+  );
+  return (
+    <div className="sb-nav" title="Split the view to work on several sheets at once">
+      {btn('single', Square, 'Single view')}
+      {btn('vertical', Columns2, 'Split vertical (side by side)')}
+      {btn('horizontal', Rows2, 'Split horizontal (stacked)')}
+      {btn('grid', Grid2x2, 'Split four ways')}
     </div>
   );
 }

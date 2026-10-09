@@ -1,5 +1,5 @@
 import { BlendMode, LineCapStyle, PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import type { DocState, Markup, Pt } from '../types';
+import type { DocState, FontFamily, Markup, Pt } from '../types';
 import { allColumns, columnUnit, sheetDisplayName, type Row } from './columns';
 import { buildSummary, columnName, primaryQuantity, summableCustomColumns } from './summary';
 import { centroid, dist, labelPoint } from './geometry';
@@ -245,11 +245,14 @@ function symbolPolys(sym: Markup['style']['symbol'], p: Pt, r: number): { pts: P
 
 interface Painter {
   path(pts: Pt[], o: { closed?: boolean; stroke?: string; width?: number; dash?: number[]; fill?: string; fillOpacity?: number; opacity?: number; multiply?: boolean; holes?: Pt[][] }): void;
-  text(s: string, at: Pt, o: { size: number; color: string; angle?: number; bold?: boolean; align?: 'left' | 'center'; halo?: boolean; opacity?: number }): void;
-  font: PDFFont;
+  text(s: string, at: Pt, o: { size: number; color: string; angle?: number; bold?: boolean; family?: FontFamily; align?: 'left' | 'center'; halo?: boolean; opacity?: number }): void;
+  fontFor(family: FontFamily | undefined, bold: boolean): PDFFont;
 }
 
-function makePainter(page: PDFPage, toPdf: (p: Pt) => Pt, font: PDFFont, bold: PDFFont): Painter {
+type FontSet = Record<FontFamily, [PDFFont, PDFFont]>;
+
+function makePainter(page: PDFPage, toPdf: (p: Pt) => Pt, fonts: FontSet): Painter {
+  const fontFor = (family: FontFamily | undefined, bold: boolean) => fonts[family ?? 'Helvetica'][bold ? 1 : 0];
   const pathD = (pts: Pt[], closed: boolean) => {
     let d = '';
     pts.forEach((p, i) => {
@@ -259,7 +262,7 @@ function makePainter(page: PDFPage, toPdf: (p: Pt) => Pt, font: PDFFont, bold: P
     return closed ? d + 'Z' : d;
   };
   return {
-    font,
+    fontFor,
     path(pts, o) {
       if (pts.length < 2) return;
       let d = pathD(pts, !!o.closed);
@@ -287,7 +290,7 @@ function makePainter(page: PDFPage, toPdf: (p: Pt) => Pt, font: PDFFont, bold: P
       }
     },
     text(s, at, o) {
-      const f = o.bold ? bold : font;
+      const f = fontFor(o.family, !!o.bold);
       const str = sanitize(s);
       const w = f.widthOfTextAtSize(str, o.size);
       const ang = o.angle ?? 0;
@@ -345,7 +348,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
   const pts = m.points;
   const labelBlock = (at: Pt, lines: string[], size = fs) => {
     const lh = size * 1.18;
-    lines.forEach((l, i) => p.text(l, { x: at.x, y: at.y - ((lines.length - 1) * lh) / 2 + i * lh + size * 0.35 }, { size, color: s.color, align: 'center', bold: true, halo: true }));
+    lines.forEach((l, i) => p.text(l, { x: at.x, y: at.y - ((lines.length - 1) * lh) / 2 + i * lh + size * 0.35 }, { size, color: s.color, align: 'center', bold: s.fontBold !== false, family: s.fontFamily, halo: true }));
   };
   switch (m.type) {
     case 'length':
@@ -364,7 +367,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
         const off = fs * 0.55 + s.lineWidth;
         labelLines.forEach((l, i) => {
           const k = off + (labelLines.length - 1 - i) * fs * 1.18;
-          p.text(l, { x: anc.p.x + Math.sin(anc.angle) * k, y: anc.p.y - Math.cos(anc.angle) * k }, { size: fs, color: s.color, angle: anc.angle, align: 'center', bold: true, halo: true });
+          p.text(l, { x: anc.p.x + Math.sin(anc.angle) * k, y: anc.p.y - Math.cos(anc.angle) * k }, { size: fs, color: s.color, angle: anc.angle, align: 'center', bold: s.fontBold !== false, family: s.fontFamily, halo: true });
         });
       }
       break;
@@ -395,7 +398,12 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
         }
       }
       const last = pts[pts.length - 1];
-      if (last && labelLines.length) p.text(labelLines[labelLines.length - 1], { x: last.x + r * 1.5, y: last.y - r * 0.8 }, { size: Math.max(8, r * 1.2), color: s.color, bold: true, halo: true });
+      if (last && labelLines.length) {
+        const size = Math.max(8, r * 1.2);
+        labelLines.forEach((l, i) =>
+          p.text(l, { x: last.x + r * 1.5, y: last.y - r * 0.8 - (labelLines.length - 1 - i) * size * 1.18 }, { size, color: s.color, bold: s.fontBold !== false, family: s.fontFamily, halo: true }),
+        );
+      }
       break;
     }
     case 'cloud':
@@ -430,10 +438,11 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
       const corners = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
       p.path(corners, { closed: true, fill: s.fillColor ?? undefined, fillOpacity: s.fillOpacity, ...(s.lineWidth > 0 ? stroke : {}), dash: undefined });
       const pad = Math.max(2, fs * 0.25);
-      const lines = wrapText(m.text ?? '', r.w - pad * 2, (t) => p.font.widthOfTextAtSize(sanitize(t), fs));
+      const tf = p.fontFor(s.fontFamily, !!s.fontBold);
+      const lines = wrapText(m.text ?? '', r.w - pad * 2, (t) => tf.widthOfTextAtSize(sanitize(t), fs));
       lines.forEach((l, i) => {
         const y = r.y + pad + fs * 0.9 + i * fs * 1.2;
-        if (y < r.y + r.h + fs * 0.2) p.text(l, { x: r.x + pad, y }, { size: fs, color: s.color, opacity: o });
+        if (y < r.y + r.h + fs * 0.2) p.text(l, { x: r.x + pad, y }, { size: fs, color: s.color, opacity: o, bold: !!s.fontBold, family: s.fontFamily });
       });
       break;
     }
@@ -444,8 +453,9 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
       p.path(rectPts(r), { closed: true, stroke: s.color, width: lw, opacity: o });
       p.path(rectPts({ x: r.x + lw * 1.8, y: r.y + lw * 1.8, w: r.w - lw * 3.6, h: r.h - lw * 3.6 }), { closed: true, stroke: s.color, width: lw * 0.45, opacity: o });
       const text = m.text || 'STAMP';
-      const size = Math.min(stampFontSize(text, r), (r.w * 0.86) / Math.max(1, p.font.widthOfTextAtSize(sanitize(text), 1) * 1.12));
-      p.text(text, { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.35 }, { size, color: s.color, align: 'center', bold: true, opacity: o });
+      const sf = p.fontFor(s.fontFamily, true);
+      const size = Math.min(stampFontSize(text, r), (r.w * 0.86) / Math.max(1, sf.widthOfTextAtSize(sanitize(text), 1) * 1.12));
+      p.text(text, { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.35 }, { size, color: s.color, align: 'center', bold: true, family: s.fontFamily, opacity: o });
       break;
     }
   }
@@ -453,8 +463,11 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
 
 export async function exportFlattenedPdf(doc: DocState, fileBytes: Map<string, Uint8Array>, opts: { includeHidden?: boolean } = {}): Promise<Uint8Array> {
   const out = await PDFDocument.create();
-  const font = await out.embedFont(StandardFonts.Helvetica);
-  const bold = await out.embedFont(StandardFonts.HelveticaBold);
+  const fonts: FontSet = {
+    Helvetica: [await out.embedFont(StandardFonts.Helvetica), await out.embedFont(StandardFonts.HelveticaBold)],
+    Times: [await out.embedFont(StandardFonts.TimesRoman), await out.embedFont(StandardFonts.TimesRomanBold)],
+    Courier: [await out.embedFont(StandardFonts.Courier), await out.embedFont(StandardFonts.CourierBold)],
+  };
   const sources = new Map<string, PDFDocument>();
   const hidden = new Set(doc.layers.filter((l) => !l.visible).map((l) => l.id));
   for (const sheet of doc.sheets) {
@@ -472,7 +485,7 @@ export async function exportFlattenedPdf(doc: DocState, fileBytes: Map<string, U
       const [x, y] = vp.convertToPdfPoint(q.x, q.y);
       return { x, y };
     };
-    const painter = makePainter(page, toPdf, font, bold);
+    const painter = makePainter(page, toPdf, fonts);
     for (const m of doc.markups) {
       if (m.sheetId !== sheet.id) continue;
       if (!opts.includeHidden && hidden.has(m.layer)) continue;
@@ -486,6 +499,6 @@ export async function exportFlattenedPdf(doc: DocState, fileBytes: Map<string, U
     }
   }
   out.setTitle('Takeoff markups');
-  out.setCreator('Takeoff Studio');
+  out.setCreator('BuildSuite Takeoff Studio');
   return out.save();
 }

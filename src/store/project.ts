@@ -89,7 +89,7 @@ export async function openPdfs(files: { name: string; bytes: Uint8Array }[], mod
     const doc = { ...base, files: newFiles, sheets };
     const name = mode === 'new' ? baseName(files[0]?.name ?? 'Untitled Project') : st.projectName;
     st.loadDoc(doc, name, { keepHistory: mode === 'append' });
-    if (firstNew) useStore.setState({ currentSheetId: firstNew });
+    if (firstNew) getState().setCurrentSheet(firstNew);
     st.requestView({ kind: 'fit' });
     st.toast(`Loaded ${sheets.length - base.sheets.length} sheet${sheets.length - base.sheets.length === 1 ? '' : 's'}`, 'success');
   } catch (e) {
@@ -175,7 +175,7 @@ async function openProjectText(read: () => Promise<string>, label: string) {
       idbSet(`file:${f.id}`, bytes).catch(() => {});
     }
     st.loadDoc(normalizeDoc(pf.doc), pf.name);
-    if (pf.currentSheetId && pf.doc.sheets.some((s) => s.id === pf.currentSheetId)) useStore.setState({ currentSheetId: pf.currentSheetId });
+    if (pf.currentSheetId && pf.doc.sheets.some((s) => s.id === pf.currentSheetId)) getState().setCurrentSheet(pf.currentSheetId);
     st.requestView({ kind: 'fit' });
     st.toast(`Opened ${pf.name}`, 'success');
   } catch (e) {
@@ -202,7 +202,18 @@ export async function closeProject() {
   unregisterAll();
   fileBytes.clear();
   await clearAutosave();
-  useStore.setState({ doc: emptyDoc(), past: [], future: [], loaded: false, currentSheetId: null, selection: [], projectName: 'Untitled Project' });
+  useStore.setState({
+    doc: emptyDoc(),
+    past: [],
+    future: [],
+    loaded: false,
+    currentSheetId: null,
+    selection: [],
+    projectName: 'Untitled Project',
+    panes: [{ id: 'pane-1', sheetId: null }],
+    paneLayout: 'single',
+    activePaneId: 'pane-1',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +258,7 @@ export async function restoreAutosave(): Promise<boolean> {
     }
     const st = getState();
     st.loadDoc(normalizeDoc(sp.doc), sp.name);
-    if (sp.currentSheetId && sp.doc.sheets.some((s) => s.id === sp.currentSheetId)) useStore.setState({ currentSheetId: sp.currentSheetId });
+    if (sp.currentSheetId && sp.doc.sheets.some((s) => s.id === sp.currentSheetId)) getState().setCurrentSheet(sp.currentSheetId);
     st.requestView({ kind: 'fit' });
     return true;
   } catch (e) {

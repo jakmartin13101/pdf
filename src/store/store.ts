@@ -28,7 +28,7 @@ export type ToolMode =
   | { kind: 'select' }
   | { kind: 'pan' }
   | { kind: 'zoomrect' }
-  | { kind: 'markup'; type: MarkupType; chestToolId?: string }
+  | { kind: 'markup'; type: MarkupType; chestToolId?: string; resumeId?: string }
   | { kind: 'calibrate' }
   | { kind: 'viewport' }
   | { kind: 'region'; purpose: 'number' | 'title' }
@@ -41,15 +41,18 @@ export type DialogState =
   | { kind: 'pageLabels'; region?: { purpose: 'number' | 'title'; rect: Rect } }
   | { kind: 'columns' }
   | { kind: 'toolEdit'; setId: string; toolId?: string; fromMarkupId?: string }
+  | { kind: 'shapeTool'; setId?: string; toolId?: string }
+  | { kind: 'terms'; mustAccept?: boolean }
   | { kind: 'settings' }
   | { kind: 'shortcuts' }
   | { kind: 'about' }
   | { kind: 'confirm'; title: string; message: string; onConfirm: () => void };
 
-export type ViewRequest =
+export type ViewRequest = (
   | { kind: 'fit' | 'fitWidth' | 'actual'; nonce: number }
   | { kind: 'zoomBy'; factor: number; nonce: number }
-  | { kind: 'zoomTo'; rect: Rect; nonce: number };
+  | { kind: 'zoomTo'; rect: Rect; nonce: number }
+) & { paneId?: string };
 
 export interface ListState {
   sort: { col: string; dir: 1 | -1 } | null;
@@ -62,14 +65,66 @@ export interface ListState {
 }
 
 export interface UIState {
-  leftPanel: 'sheets' | 'search' | null;
-  rightPanel: 'toolchest' | 'properties' | 'measurements' | 'layers' | null;
-  bottomPanel: 'markups' | 'summary' | null;
-  leftWidth: number;
-  rightWidth: number;
-  bottomHeight: number;
   theme: 'dark' | 'light' | 'system';
+  showHiddenTools: boolean;
 }
+
+export type PanelId = 'sheets' | 'toolchest' | 'properties' | 'measurements' | 'layers' | 'markups' | 'summary';
+export type DockSide = 'left' | 'right' | 'top' | 'bottom';
+export const PANEL_IDS: PanelId[] = ['sheets', 'toolchest', 'properties', 'measurements', 'layers', 'markups', 'summary'];
+export const PANEL_TITLES: Record<PanelId, string> = {
+  sheets: 'Sheets',
+  toolchest: 'Tool Chest',
+  properties: 'Properties',
+  measurements: 'Measurements',
+  layers: 'Layers',
+  markups: 'Markups List',
+  summary: 'Takeoff Summary',
+};
+
+export interface FloatRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface PanelPlace {
+  dock: DockSide | 'float';
+  float: FloatRect;
+  /** Floating panels only: whether the window is showing. */
+  open: boolean;
+}
+
+/** Workspace arrangement: where each panel and the toolbar live. Persisted per browser / install. */
+export interface LayoutState {
+  panels: Record<PanelId, PanelPlace>;
+  /** Open (expanded) panel in each dock, or null when the dock is collapsed. */
+  active: Record<DockSide, PanelId | null>;
+  size: Record<DockSide, number>;
+  floatOrder: PanelId[];
+  toolbar: { dock: 'top' | 'left' | 'right' | 'float'; x: number; y: number };
+  locked: boolean;
+}
+
+export interface PanelDrag {
+  id: PanelId | 'toolbar';
+  x: number;
+  y: number;
+  /** Pointer offset inside the dragged window, so it doesn't jump. */
+  dx: number;
+  dy: number;
+  w: number;
+  h: number;
+  zone: DockSide | 'float' | null;
+}
+
+export interface Pane {
+  id: string;
+  sheetId: string | null;
+}
+
+export type PaneLayout = 'single' | 'vertical' | 'horizontal' | 'grid';
 
 export interface Prefs {
   author: string;
@@ -110,6 +165,13 @@ export interface AppState {
   editingTextId: string | null;
   list: ListState;
   ui: UIState;
+  layout: LayoutState;
+  /** Panel or toolbar being dragged to a new dock position. */
+  panelDrag: PanelDrag | null;
+  panes: Pane[];
+  paneLayout: PaneLayout;
+  activePaneId: string;
+  paneSplit: { x: number; y: number };
   prefs: Prefs;
   toolChest: ToolSet[];
   typeDefaults: Partial<Record<MarkupType, TypeDefault>>;
@@ -182,6 +244,30 @@ export interface AppState {
   // settings
   updateSettings: (patch: Partial<ProjectSettings>) => void;
   setUI: (patch: Partial<UIState>) => void;
+
+  // workspace layout
+  showPanel: (id: PanelId) => void;
+  togglePanel: (id: PanelId) => void;
+  dockPanel: (id: PanelId, dock: DockSide | 'float', float?: Partial<FloatRect>) => void;
+  closeFloat: (id: PanelId) => void;
+  setFloatRect: (id: PanelId, rect: Partial<FloatRect>) => void;
+  setDockSize: (side: DockSide, px: number) => void;
+  setToolbarDock: (dock: LayoutState['toolbar']['dock'], pos?: { x: number; y: number }) => void;
+  setLayoutLocked: (locked: boolean) => void;
+  setPanelDrag: (d: PanelDrag | null) => void;
+  resetLayout: () => void;
+
+  // split view
+  setPaneLayout: (layout: PaneLayout) => void;
+  setActivePane: (id: string) => void;
+  setPaneSheet: (paneId: string, sheetId: string) => void;
+  setPaneSplit: (patch: Partial<{ x: number; y: number }>) => void;
+  closePane: (id: string) => void;
+
+  // counts
+  splitCount: (id: string, pointIndex: number | 'all') => void;
+  removeCountPoint: (id: string, pointIndex: number) => void;
+  resumeCount: (id: string) => void;
   setPrefs: (patch: Partial<Prefs>) => void;
 
   // tool chest
@@ -190,6 +276,7 @@ export interface AppState {
   updateToolSet: (id: string, patch: Partial<ToolSet>) => void;
   deleteToolSet: (id: string) => void;
   upsertTool: (setId: string, tool: ChestTool) => void;
+  patchTool: (toolId: string, patch: Partial<ChestTool>) => void;
   deleteTool: (setId: string, toolId: string) => void;
   toolFromMarkup: (markupId: string, name?: string) => ChestTool | null;
 }
@@ -216,21 +303,52 @@ const defaultList: ListState = {
 };
 
 const defaultUI: UIState = {
-  leftPanel: 'sheets',
-  rightPanel: 'toolchest',
-  bottomPanel: 'markups',
-  leftWidth: 230,
-  rightWidth: 300,
-  bottomHeight: 250,
   theme: 'system',
+  showHiddenTools: false,
 };
 
-// Small screens start with the drawing visible; side panels open as overlays on demand.
-if (typeof window !== 'undefined' && window.innerWidth < 820) {
-  defaultUI.leftPanel = null;
-  defaultUI.rightPanel = null;
-  defaultUI.bottomHeight = 200;
+const floatAt = (i: number): FloatRect => ({ x: 120 + i * 28, y: 140 + i * 28, w: 340, h: 460 });
+
+export function defaultLayout(): LayoutState {
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 820;
+  const place = (dock: PanelPlace['dock'], i: number): PanelPlace => ({ dock, float: floatAt(i), open: false });
+  return {
+    panels: {
+      sheets: place('left', 0),
+      toolchest: place('right', 1),
+      properties: place('right', 2),
+      measurements: place('right', 3),
+      layers: place('right', 4),
+      markups: { ...place('bottom', 5), float: { x: 160, y: 220, w: 760, h: 320 } },
+      summary: { ...place('bottom', 6), float: { x: 190, y: 250, w: 760, h: 360 } },
+    },
+    // Small screens start with the drawing visible; side panels open as overlays on demand.
+    active: { left: narrow ? null : 'sheets', right: narrow ? null : 'toolchest', top: null, bottom: 'markups' },
+    size: { left: 250, right: 310, top: 220, bottom: narrow ? 200 : 250 },
+    floatOrder: [],
+    toolbar: { dock: 'top', x: 200, y: 120 },
+    locked: false,
+  };
 }
+
+function loadLayout(): LayoutState {
+  const d = defaultLayout();
+  const saved = lsGet<Partial<LayoutState> | null>('ts.layout', null);
+  if (!saved) return d;
+  const panels = { ...d.panels };
+  for (const id of PANEL_IDS) if (saved.panels?.[id]) panels[id] = { ...d.panels[id], ...saved.panels[id] };
+  return {
+    ...d,
+    ...saved,
+    panels,
+    active: { ...d.active, ...saved.active },
+    size: { ...d.size, ...saved.size },
+    toolbar: { ...d.toolbar, ...saved.toolbar },
+    floatOrder: (saved.floatOrder ?? []).filter((id) => PANEL_IDS.includes(id)),
+  };
+}
+
+const PANE_COUNT: Record<PaneLayout, number> = { single: 1, vertical: 2, horizontal: 2, grid: 4 };
 
 const defaultPrefs: Prefs = {
   author: 'Estimator',
@@ -262,6 +380,21 @@ export const useStore = create<AppState>()((set, get) => {
     set({ toolChest: sets });
   };
 
+  const setLayout = (patch: Partial<LayoutState>) => {
+    const layout = { ...get().layout, ...patch };
+    lsSet('ts.layout', layout);
+    set({ layout });
+  };
+
+  /** Keep every split pane pointing at an existing sheet. */
+  const syncPanes = () => {
+    const { panes, doc, currentSheetId, activePaneId } = get();
+    const ids = new Set(doc.sheets.map((s) => s.id));
+    const fallback = currentSheetId && ids.has(currentSheetId) ? currentSheetId : doc.sheets[0]?.id ?? null;
+    const next = panes.map((p) => (p.id === activePaneId ? { ...p, sheetId: fallback } : p.sheetId && ids.has(p.sheetId) ? p : { ...p, sheetId: fallback }));
+    set({ panes: next, currentSheetId: next.find((p) => p.id === activePaneId)?.sheetId ?? fallback });
+  };
+
   const pruneSelection = (doc: DocState, sel: string[]) => {
     const ids = new Set(doc.markups.map((m) => m.id));
     return sel.filter((id) => ids.has(id));
@@ -285,6 +418,12 @@ export const useStore = create<AppState>()((set, get) => {
     editingTextId: null,
     list: { ...defaultList, ...lsGet<Partial<ListState>>('ts.list', {}) },
     ui: { ...defaultUI, ...lsGet<Partial<UIState>>('ts.ui', {}) },
+    layout: loadLayout(),
+    panelDrag: null,
+    panes: [{ id: 'pane-1', sheetId: null }],
+    paneLayout: 'single',
+    activePaneId: 'pane-1',
+    paneSplit: { x: 0.5, y: 0.5 },
     prefs: { ...defaultPrefs, ...lsGet<Partial<Prefs>>('ts.prefs', {}) },
     toolChest: toolChestFromStorage ?? defaultToolChest(),
     typeDefaults: lsGet('ts.typeDefaults', {}),
@@ -325,6 +464,7 @@ export const useStore = create<AppState>()((set, get) => {
         currentSheetId: doc.sheets.find((x) => x.id === s.currentSheetId)?.id ?? doc.sheets[0]?.id ?? null,
         tool: { kind: 'select' },
       }));
+      syncPanes();
     },
     setBusy: (busy) => set({ busy }),
     setProjectName: (projectName) => set({ projectName }),
@@ -336,8 +476,9 @@ export const useStore = create<AppState>()((set, get) => {
     dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
     setCurrentSheet: (id) => {
-      if (id === get().currentSheetId) return;
-      set({ currentSheetId: id, editingTextId: null });
+      const { currentSheetId, panes, activePaneId } = get();
+      if (id === currentSheetId && panes.find((p) => p.id === activePaneId)?.sheetId === id) return;
+      set({ currentSheetId: id, editingTextId: null, panes: panes.map((p) => (p.id === activePaneId ? { ...p, sheetId: id } : p)) });
     },
     gotoSheetOffset: (delta) => {
       const { doc, currentSheetId } = get();
@@ -345,7 +486,7 @@ export const useStore = create<AppState>()((set, get) => {
       const n = doc.sheets[Math.max(0, Math.min(doc.sheets.length - 1, i + delta))];
       if (n) get().setCurrentSheet(n.id);
     },
-    requestView: (r) => set({ viewRequest: { ...(r as ViewRequest), nonce: Date.now() + Math.random() } }),
+    requestView: (r) => set({ viewRequest: { ...(r as ViewRequest), paneId: get().activePaneId, nonce: Date.now() + Math.random() } }),
     setZoom: (zoom) => set({ zoom }),
     setCursor: (cursor) => set({ cursor }),
 
@@ -354,7 +495,8 @@ export const useStore = create<AppState>()((set, get) => {
     focusMarkup: (id, zoom = true) => {
       const m = get().doc.markups.find((x) => x.id === id);
       if (!m) return;
-      set({ currentSheetId: m.sheetId, selection: [id], flash: { id, nonce: Date.now() } });
+      get().setCurrentSheet(m.sheetId);
+      set({ selection: [id], flash: { id, nonce: Date.now() } });
       if (zoom) {
         const b = bbox(m.points);
         get().requestView({ kind: 'zoomTo', rect: b } as ViewRequest);
@@ -386,6 +528,7 @@ export const useStore = create<AppState>()((set, get) => {
         const sheets = get().doc.sheets;
         set({ currentSheetId: sheets[Math.min(idx, sheets.length - 1)]?.id ?? null, selection: [] });
       }
+      syncPanes();
     },
     setScale: (sheetIds, scale) => {
       const ids = new Set(sheetIds);
@@ -425,13 +568,19 @@ export const useStore = create<AppState>()((set, get) => {
       const layerIds = new Set(doc.layers.map((l) => l.id));
       const layer = chestTool?.layer && layerIds.has(chestTool.layer) ? chestTool.layer : '';
       const now = Date.now();
+      // Size tools stamp their current size on the markup (label, optionally subject and Member Size).
+      const size = chestTool?.sizeTool?.value.trim() ?? '';
+      if (size && chestTool?.sizeTool?.setMemberSize) {
+        const col = doc.columns.find((c) => normName(c.name) === 'membersize');
+        if (col) custom[col.id] = size;
+      }
       const m: Markup = {
         id: uid('m'),
         sheetId,
         type,
         points,
-        subject: chestTool?.subject ?? td?.subject ?? TYPE_INFO[type].listName,
-        label: chestTool?.label ?? '',
+        subject: (size && chestTool?.sizeTool?.setSubject ? size : chestTool?.subject) ?? td?.subject ?? TYPE_INFO[type].listName,
+        label: size || chestTool?.label || '',
         comments: '',
         author: prefs.author,
         created: now,
@@ -550,6 +699,128 @@ export const useStore = create<AppState>()((set, get) => {
       set({ prefs });
     },
 
+    showPanel: (id) => {
+      const l = get().layout;
+      const p = l.panels[id];
+      if (p.dock === 'float') setLayout({ panels: { ...l.panels, [id]: { ...p, open: true } }, floatOrder: [...l.floatOrder.filter((x) => x !== id), id] });
+      else setLayout({ active: { ...l.active, [p.dock]: id } });
+    },
+    togglePanel: (id) => {
+      const l = get().layout;
+      const p = l.panels[id];
+      if (p.dock === 'float') {
+        if (p.open) get().closeFloat(id);
+        else get().showPanel(id);
+      } else if (l.active[p.dock] === id) setLayout({ active: { ...l.active, [p.dock]: null } });
+      else get().showPanel(id);
+    },
+    dockPanel: (id, dock, float) => {
+      const l = get().layout;
+      if (l.locked) return;
+      const prev = l.panels[id];
+      const active = { ...l.active };
+      if (prev.dock !== 'float' && active[prev.dock] === id) {
+        active[prev.dock] = PANEL_IDS.find((x) => x !== id && l.panels[x].dock === prev.dock) ?? null;
+      }
+      const next: PanelPlace = { ...prev, dock, open: dock === 'float', float: { ...prev.float, ...float } };
+      if (dock !== 'float') active[dock] = id;
+      setLayout({
+        panels: { ...l.panels, [id]: next },
+        active,
+        floatOrder: dock === 'float' ? [...l.floatOrder.filter((x) => x !== id), id] : l.floatOrder.filter((x) => x !== id),
+      });
+    },
+    closeFloat: (id) => {
+      const l = get().layout;
+      setLayout({ panels: { ...l.panels, [id]: { ...l.panels[id], open: false } } });
+    },
+    setFloatRect: (id, rect) => {
+      const l = get().layout;
+      const p = l.panels[id];
+      setLayout({ panels: { ...l.panels, [id]: { ...p, float: { ...p.float, ...rect } } }, floatOrder: [...l.floatOrder.filter((x) => x !== id), id] });
+    },
+    setDockSize: (side, px) => setLayout({ size: { ...get().layout.size, [side]: px } }),
+    setToolbarDock: (dock, pos) => {
+      const l = get().layout;
+      if (l.locked && !pos) return;
+      setLayout({ toolbar: { ...l.toolbar, dock, ...(pos ?? {}) } });
+    },
+    setLayoutLocked: (locked) => setLayout({ locked }),
+    setPanelDrag: (panelDrag) => set({ panelDrag }),
+    resetLayout: () => {
+      const d = defaultLayout();
+      lsSet('ts.layout', d);
+      set({ layout: d });
+    },
+
+    setPaneLayout: (paneLayout) => {
+      const { panes, activePaneId, currentSheetId } = get();
+      const n = PANE_COUNT[paneLayout];
+      let next = panes.slice(0, n);
+      if (!next.some((p) => p.id === activePaneId) && n === 1) next = [panes.find((p) => p.id === activePaneId) ?? panes[0]];
+      while (next.length < n) next.push({ id: uid('pane'), sheetId: currentSheetId });
+      const active = next.some((p) => p.id === activePaneId) ? activePaneId : next[0].id;
+      set({ paneLayout, panes: next, activePaneId: active, currentSheetId: next.find((p) => p.id === active)?.sheetId ?? currentSheetId, editingTextId: null });
+    },
+    setActivePane: (id) => {
+      const p = get().panes.find((x) => x.id === id);
+      if (!p || id === get().activePaneId) return;
+      set({ activePaneId: id, currentSheetId: p.sheetId, editingTextId: null });
+    },
+    setPaneSheet: (paneId, sheetId) => {
+      set((s) => ({
+        panes: s.panes.map((p) => (p.id === paneId ? { ...p, sheetId } : p)),
+        ...(paneId === s.activePaneId ? { currentSheetId: sheetId, editingTextId: null } : {}),
+      }));
+    },
+    setPaneSplit: (patch) => set((s) => ({ paneSplit: { ...s.paneSplit, ...patch } })),
+    closePane: (id) => {
+      const { panes, activePaneId, paneLayout } = get();
+      if (panes.length <= 1) return;
+      const rest = panes.filter((p) => p.id !== id);
+      // Closing one of four panes leaves a side-by-side pair; closing one of two leaves a single view.
+      const next = rest.length >= 2 ? rest.slice(0, 2) : rest;
+      const layout: PaneLayout = next.length === 1 ? 'single' : paneLayout === 'horizontal' ? 'horizontal' : 'vertical';
+      const active = next.some((p) => p.id === activePaneId) ? activePaneId : next[0].id;
+      set({ panes: next, paneLayout: layout, activePaneId: active, currentSheetId: next.find((p) => p.id === active)?.sheetId ?? null, editingTextId: null });
+    },
+
+    splitCount: (id, pointIndex) => {
+      const m = get().doc.markups.find((x) => x.id === id);
+      if (!m || m.type !== 'count' || m.points.length < 2) return;
+      const now = Date.now();
+      const piece = (pts: Pt[]): Markup => ({ ...structuredClone(m), id: uid('m'), points: pts, countOverride: undefined, created: now, modified: now });
+      let created: Markup[];
+      let keep: Markup | null;
+      if (pointIndex === 'all') {
+        created = m.points.map((p) => piece([p]));
+        keep = null;
+      } else {
+        created = [piece([m.points[pointIndex]])];
+        keep = { ...m, points: m.points.filter((_, i) => i !== pointIndex), countOverride: undefined, modified: now };
+      }
+      commit((d) => ({
+        ...d,
+        markups: d.markups.flatMap((x) => (x.id === id ? [...(keep ? [keep] : []), ...created] : [x])),
+      }));
+      set({ selection: created.map((c) => c.id) });
+    },
+    removeCountPoint: (id, pointIndex) => {
+      const m = get().doc.markups.find((x) => x.id === id);
+      if (!m) return;
+      if (m.points.length <= 1) return get().deleteMarkups([id]);
+      mapMarkups(new Set([id]), (x) => ({ ...x, points: x.points.filter((_, i) => i !== pointIndex) }));
+    },
+    resumeCount: (id) => {
+      const st = get();
+      const m = st.doc.markups.find((x) => x.id === id);
+      if (!m || m.type !== 'count') return;
+      if (m.sheetId !== st.currentSheetId) st.setCurrentSheet(m.sheetId);
+      const chestToolId = m.toolId && st.toolChest.some((s) => s.tools.some((t) => t.id === m.toolId)) ? m.toolId : undefined;
+      set({ tool: { kind: 'markup', type: 'count', chestToolId, resumeId: id }, selection: [id], editingTextId: null });
+      st.toast(`Resumed “${m.subject}” – click to add more. Esc to finish.`);
+    },
+
     setToolChest: (sets) => saveChest(sets),
     addToolSet: (name) => {
       const id = uid('set');
@@ -566,6 +837,8 @@ export const useStore = create<AppState>()((set, get) => {
           return { ...s, tools: exists ? s.tools.map((t) => (t.id === tool.id ? tool : t)) : [...s.tools, tool] };
         }),
       ),
+    patchTool: (toolId, patch) =>
+      saveChest(get().toolChest.map((s) => (s.tools.some((t) => t.id === toolId) ? { ...s, tools: s.tools.map((t) => (t.id === toolId ? { ...t, ...patch } : t)) } : s))),
     deleteTool: (setId, toolId) =>
       saveChest(get().toolChest.map((s) => (s.id === setId ? { ...s, tools: s.tools.filter((t) => t.id !== toolId) } : s))),
     toolFromMarkup: (markupId, name) => {

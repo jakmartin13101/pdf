@@ -1,17 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, FolderOpen, Files, FileJson, Layers, Ruler, SlidersHorizontal, Sigma, Table2, Wrench } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { BookOpen, FolderOpen, Files, FileJson, Ruler } from 'lucide-react';
 import { useStore, getState, currentSheet } from './store/store';
 import { MenuBar } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
 import { StatusBar } from './components/StatusBar';
-import { Viewer } from './components/viewer/Viewer';
-import { SheetsPanel } from './components/panels/SheetsPanel';
-import { ToolChestPanel } from './components/panels/ToolChestPanel';
-import { PropertiesPanel } from './components/panels/PropertiesPanel';
-import { MeasurementsPanel } from './components/panels/MeasurementsPanel';
-import { LayersPanel } from './components/panels/LayersPanel';
-import { MarkupsList } from './components/bottom/MarkupsList';
-import { SummaryPanel } from './components/bottom/SummaryPanel';
+import { DropOverlay, EdgeDock, FloatingPanels, PaneArea, SideDock } from './components/dock/Workspace';
+import { ShapeToolDialog } from './components/dialogs/ShapeToolDialog';
 import { CalibrateDialog, ScaleDialog, ViewportDialog } from './components/dialogs/ScaleDialogs';
 import { PageLabelsDialog } from './components/dialogs/PageLabelsDialog';
 import { ColumnsDialog } from './components/dialogs/ColumnsDialog';
@@ -21,40 +15,7 @@ import { openPdfFiles, openProjectFile, restoreAutosave, startAutosave } from '.
 import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject } from './store/commands';
 import { sheetDisplayName } from './core/columns';
 import { downloadsCapability } from './core/persistence';
-
-function Splitter({ dir, onDrag }: { dir: 'v' | 'h'; onDrag: (delta: number) => void }) {
-  const [dragging, setDragging] = useState(false);
-  return (
-    <div
-      className={`splitter-${dir}${dragging ? ' dragging' : ''}`}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        let last = dir === 'v' ? e.clientX : e.clientY;
-        setDragging(true);
-        const move = (ev: PointerEvent) => {
-          const cur = dir === 'v' ? ev.clientX : ev.clientY;
-          onDrag(cur - last);
-          last = cur;
-        };
-        const up = () => {
-          setDragging(false);
-          window.removeEventListener('pointermove', move);
-          window.removeEventListener('pointerup', up);
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-      }}
-    />
-  );
-}
-
-function SideTab({ active, title, onClick, children }: { active: boolean; title: string; onClick: () => void; children: ReactNode }) {
-  return (
-    <button className={`side-tab${active ? ' active' : ''}`} title={title} onClick={onClick} data-testid={`tab-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      {children}
-    </button>
-  );
-}
+import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from './brand';
 
 function StartScreen() {
   return (
@@ -62,10 +23,11 @@ function StartScreen() {
       <div className="start-card">
         <div>
           <h1>
-            <span className="brand-mark" style={{ width: 30, height: 30, fontSize: 17 }}>
-              ◭
+            <img className="start-logo" src={ICON_URL} alt="" />
+            <span>
+              <small className="start-suite">{SUITE_NAME}</small>
+              {PRODUCT_NAME}
             </span>
-            Takeoff Studio
           </h1>
           <p className="lead">
             Turn construction drawings into an interactive takeoff workspace: label sheets, calibrate scales, measure lengths and areas, count items with standardized tools, and work
@@ -169,6 +131,8 @@ function Dialogs() {
       return <PageLabelsDialog region={d.region} />;
     case 'columns':
       return <ColumnsDialog />;
+    case 'shapeTool':
+      return <ShapeToolDialog setId={d.setId} toolId={d.toolId} />;
     case 'toolEdit':
       return <ToolEditDialog setId={d.setId} toolId={d.toolId} fromMarkupId={d.fromMarkupId} />;
     case 'settings':
@@ -235,7 +199,7 @@ export function App() {
   }, [ui.theme]);
 
   useEffect(() => {
-    document.title = sheet ? `${sheetDisplayName(sheet)} · Takeoff Studio` : 'Takeoff Studio';
+    document.title = sheet ? `${sheetDisplayName(sheet)} · ${FULL_NAME}` : FULL_NAME;
   }, [sheet]);
 
   useEffect(() => {
@@ -305,77 +269,32 @@ export function App() {
   }, []);
 
   const st = getState;
-  const setLeft = (p: typeof ui.leftPanel) => st().setUI({ leftPanel: ui.leftPanel === p ? null : p });
-  const setRight = (p: typeof ui.rightPanel) => st().setUI({ rightPanel: ui.rightPanel === p ? null : p });
-  const setBottom = (p: typeof ui.bottomPanel) => st().setUI({ bottomPanel: p });
+  const layout = useStore((s) => s.layout);
+  const tb = layout.toolbar.dock;
 
   return (
-    <div className="app">
+    <div className={`app${layout.locked ? ' layout-locked' : ''}`}>
       <MenuBar />
-      <Toolbar />
+      {tb === 'top' && <Toolbar placement="top" />}
       <DocBar />
-      <div className="workspace">
-        <div className="side-tabs">
-          <SideTab active={ui.leftPanel === 'sheets'} title="Sheets" onClick={() => setLeft('sheets')}>
-            <Files size={17} />
-          </SideTab>
-        </div>
-        {ui.leftPanel && loaded && (
-          <>
-            <div className="side-panel left" style={{ width: ui.leftWidth, display: 'flex', minWidth: 0 }}>
-              <SheetsPanel />
-            </div>
-            <Splitter dir="v" onDrag={(d) => st().setUI({ leftWidth: Math.max(160, Math.min(520, st().ui.leftWidth + d)) })} />
-          </>
-        )}
-        <div className="center-col" style={{ position: 'relative' }}>
-          <Viewer />
-          {!loaded && !booting && <StartScreen />}
-        </div>
-        {ui.rightPanel && (
-          <>
-            <Splitter dir="v" onDrag={(d) => st().setUI({ rightWidth: Math.max(220, Math.min(620, st().ui.rightWidth - d)) })} />
-            <div className="side-panel right" style={{ width: ui.rightWidth, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              {ui.rightPanel === 'toolchest' && <ToolChestPanel />}
-              {ui.rightPanel === 'properties' && <PropertiesPanel />}
-              {ui.rightPanel === 'measurements' && <MeasurementsPanel />}
-              {ui.rightPanel === 'layers' && <LayersPanel />}
-            </div>
-          </>
-        )}
-        <div className="side-tabs right">
-          <SideTab active={ui.rightPanel === 'toolchest'} title="Tool Chest" onClick={() => setRight('toolchest')}>
-            <Wrench size={17} />
-          </SideTab>
-          <SideTab active={ui.rightPanel === 'properties'} title="Properties" onClick={() => setRight('properties')}>
-            <SlidersHorizontal size={17} />
-          </SideTab>
-          <SideTab active={ui.rightPanel === 'measurements'} title="Measurements" onClick={() => setRight('measurements')}>
-            <Ruler size={17} />
-          </SideTab>
-          <SideTab active={ui.rightPanel === 'layers'} title="Layers" onClick={() => setRight('layers')}>
-            <Layers size={17} />
-          </SideTab>
-        </div>
-      </div>
-      {loaded ? (
-        <div className="bottom" style={{ height: ui.bottomPanel ? ui.bottomHeight : 33 }}>
-          {ui.bottomPanel && <Splitter dir="h" onDrag={(d) => st().setUI({ bottomHeight: Math.max(120, Math.min(window.innerHeight - 220, st().ui.bottomHeight - d)) })} />}
-          <div className="bottom-tabs">
-            <button className={`bottom-tab${ui.bottomPanel === 'markups' ? ' active' : ''}`} onClick={() => setBottom(ui.bottomPanel === 'markups' ? null : 'markups')} data-testid="tab-markups">
-              <Table2 size={14} /> Markups List
-            </button>
-            <button className={`bottom-tab${ui.bottomPanel === 'summary' ? ' active' : ''}`} onClick={() => setBottom(ui.bottomPanel === 'summary' ? null : 'summary')} data-testid="tab-summary">
-              <Sigma size={14} /> Takeoff Summary
-            </button>
+      <div className="main-area">
+        {loaded && <EdgeDock side="top" />}
+        <div className="workspace">
+          {tb === 'left' && <Toolbar placement="left" />}
+          <SideDock side="left" />
+          <div className="center-col" style={{ position: 'relative' }}>
+            <PaneArea />
+            {!loaded && !booting && <StartScreen />}
           </div>
-          {ui.bottomPanel === 'markups' && <MarkupsList />}
-          {ui.bottomPanel === 'summary' && <SummaryPanel />}
+          <SideDock side="right" />
+          {tb === 'right' && <Toolbar placement="right" />}
         </div>
-      ) : (
-        <div />
-      )}
+        {loaded && <EdgeDock side="bottom" />}
+      </div>
       <StatusBar />
+      <FloatingPanels />
+      {tb === 'float' && <Toolbar placement="float" />}
+      <DropOverlay />
       <Dialogs />
       {dragOver && <div className="drop-hint">Drop PDF drawings to {loaded ? 'add them to the set' : 'open them'}</div>}
       {busy && (

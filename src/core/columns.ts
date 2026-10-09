@@ -15,7 +15,7 @@ import {
   volumeToReport,
 } from './units';
 
-export type ColumnEditor = 'text' | 'number' | 'choice' | 'status' | 'check' | 'color' | 'layer' | 'length' | 'none';
+export type ColumnEditor = 'text' | 'number' | 'choice' | 'status' | 'check' | 'color' | 'layer' | 'length' | 'count' | 'none';
 
 export interface ColumnSpec {
   id: string;
@@ -39,7 +39,7 @@ export const BUILTIN_COLUMNS: ColumnSpec[] = [
   { id: 'area', name: 'Area', builtin: true, editor: 'none', numeric: true, align: 'right', width: 105 },
   { id: 'perimeter', name: 'Perimeter', builtin: true, editor: 'none', numeric: true, align: 'right', width: 95 },
   { id: 'volume', name: 'Volume', builtin: true, editor: 'none', numeric: true, align: 'right', width: 95 },
-  { id: 'count', name: 'Count', builtin: true, editor: 'none', numeric: true, align: 'right', width: 72 },
+  { id: 'count', name: 'Count', builtin: true, editor: 'count', numeric: true, align: 'right', width: 72 },
   { id: 'depth', name: 'Depth', builtin: true, editor: 'length', numeric: true, align: 'right', width: 75 },
   { id: 'scale', name: 'Scale', builtin: true, editor: 'none', numeric: false, align: 'left', width: 110 },
   { id: 'layer', name: 'Layer', builtin: true, editor: 'layer', numeric: false, align: 'left', width: 100 },
@@ -132,7 +132,8 @@ export function buildRows(doc: DocState, markups: Markup[] = doc.markups): Row[]
     set('area', areaR, measure.area != null ? formatArea(measure.area, scale.unit, s) : '');
     set('perimeter', perimR, measure.perimeter != null ? formatLength(measure.perimeter, scale.unit, scale.precision) : '');
     set('volume', volR, measure.volume != null ? formatVolume(measure.volume, scale.unit, s) : '');
-    set('count', count, fmtNumber(count, 0));
+    // An asterisk marks a count that was typed in rather than counted on the drawing.
+    set('count', count, fmtNumber(count, 0) + (m.type === 'count' && m.countOverride != null ? '*' : ''));
     set('depth', depthR, m.type === 'volume' ? formatLength(m.depth ?? 0, scale.unit, scale.precision) : '');
     set('scale', info.measure ? scale.label : '');
     set('layer', layerById.get(m.layer)?.name ?? '');
