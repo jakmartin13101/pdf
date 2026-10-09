@@ -1,7 +1,7 @@
 import { useContext, useMemo, useState } from 'react';
 import { PanelContext, PanelHeader } from '../dock/PanelHeader';
 import type { CustomColumn, DocState } from '../../types';
-import { Download, Printer, Sigma } from 'lucide-react';
+import { Download, PackagePlus, Printer, Sigma } from 'lucide-react';
 import { getState, useStore } from '../../store/store';
 import { allColumns, customColId } from '../../core/columns';
 import { buildSummary, primaryQuantity, summableCustomColumns } from '../../core/summary';
@@ -20,6 +20,7 @@ export function SummaryPanel() {
   const { rows, filtered } = useFilteredRows();
   const [groupBy, setGroupBy] = useState<string | null>('c:category');
   const [useFilter, setUseFilter] = useState(false);
+  const showDetails = useStore((s) => s.list.showDetails);
   const source = useFilter ? filtered : rows;
   const validGroup = groupBy && allColumns(doc.columns).some((c) => c.id === groupBy) ? groupBy : null;
   const { groups, total } = useMemo(() => buildSummary(source, doc, validGroup), [source, doc, validGroup]);
@@ -32,8 +33,9 @@ export function SummaryPanel() {
 
   const selectIds = (ids: string[]) => {
     const st = getState();
-    st.setSelection(ids);
-    if (ids.length === 1) st.focusMarkup(ids[0]);
+    const unique = [...new Set(ids)];
+    st.setSelection(unique);
+    if (unique.length === 1) st.focusMarkup(unique[0]);
   };
 
   return (
@@ -92,6 +94,12 @@ export function SummaryPanel() {
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-dim)' }}>
           <input type="checkbox" checked={useFilter} onChange={(e) => setUseFilter(e.target.checked)} /> Use Markups List filters
         </label>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-dim)' }} title="Include the material standard details add">
+          <input type="checkbox" checked={showDetails} onChange={(e) => getState().setList({ showDetails: e.target.checked })} data-testid="summary-toggle-details" /> Standard detail material
+        </label>
+        <button className="btn sm" onClick={() => getState().setDialog({ kind: 'details' })} title="Rules that add material to matching markups">
+          <PackagePlus size={13} /> Standard Details
+        </button>
         <div style={{ flex: 1 }} />
         <button
           className="btn sm"
@@ -197,10 +205,17 @@ function SummaryGroupRows({
         </tr>
       )}
       {g.lines.map((l) => (
-        <tr key={l.subject} className="row" onClick={() => onSelect(l.ids)} title="Click to select these markups" data-testid="summary-row">
+        <tr
+          key={`${l.fromDetail ? 'd' : 'm'}:${l.subject}`}
+          className={`row${l.fromDetail ? ' detail-row' : ''}`}
+          onClick={() => onSelect(l.ids)}
+          title={l.fromDetail ? 'Added by standard details – click to select the markups it was added to' : 'Click to select these markups'}
+          data-testid="summary-row"
+        >
           <td>
             <span className="color-dot" style={{ background: l.color, marginRight: 7 }} />
             {l.subject}
+            {l.fromDetail && <span className="detail-badge">std. detail</span>}
           </td>
           <td className="num" style={{ fontWeight: 700 }}>
             {primaryQuantity(l, doc)}

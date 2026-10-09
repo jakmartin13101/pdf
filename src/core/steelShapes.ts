@@ -100,11 +100,17 @@ export function plf(shape: string): number {
     const table = m[2] && m[2] !== 'STD' ? PIPE_XS : PIPE_STD;
     return table[key] ?? 0;
   }
+  // Reinforcing bar: #5, #5 REBAR, #5 BAR
+  m = compact.match(/^#(\d{1,2})(?:REBAR|BAR)?$/);
+  if (m) return REBAR[Number(m[1])] ?? 0;
   // Joists
   m = compact.match(/^(\d+K\d+)$/);
   if (m) return K_JOISTS[m[1]] ?? 0;
   return 0;
 }
+
+/** ASTM A615 deformed bar weights, lb/ft. */
+const REBAR: Record<number, number> = { 3: 0.376, 4: 0.668, 5: 1.043, 6: 1.502, 7: 2.044, 8: 2.67, 9: 3.4, 10: 4.303, 11: 5.313, 14: 7.65, 18: 13.6 };
 
 /** Weight in lb per square foot for plate designations (PL1/2, 1/2" Plate, 1/2 PL). */
 export function psf(shape: string): number {

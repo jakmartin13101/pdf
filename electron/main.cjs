@@ -99,6 +99,8 @@ function serveDist(request) {
     .catch(() => new Response('Not found', { status: 404 }));
 }
 
+const devToolsKey = (input) => input.type === 'keyDown' && (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i'));
+
 function createWindow() {
   const win = new BrowserWindow({
     title: PRODUCT,
@@ -132,17 +134,35 @@ function createWindow() {
     e.preventDefault();
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
   });
-  webContents.setWindowOpenHandler(({ url }) => {
+  webContents.setWindowOpenHandler(({ url, frameName }) => {
+    // Detached split panes: blank same-origin windows the renderer draws into (see Panes.tsx).
+    if ((url === 'about:blank' || url === '') && frameName.startsWith('takeoff-pane-')) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          title: PRODUCT,
+          icon: ICON,
+          minWidth: 360,
+          minHeight: 260,
+          autoHideMenuBar: true,
+          backgroundColor: '#1b1f24',
+        },
+      };
+    }
     if (/^https?:\/\//.test(url) && !allowed(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
+  webContents.on('did-create-window', (child) => {
+    child.setMenu(null);
+    const wc = child.webContents;
+    wc.setVisualZoomLevelLimits(1, 1);
+    wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+    wc.on('will-navigate', (e) => e.preventDefault());
+    wc.on('before-input-event', (_e, input) => devToolsKey(input) && wc.toggleDevTools());
+  });
 
   // F12 / Ctrl+Shift+I open developer tools for troubleshooting.
-  webContents.on('before-input-event', (_e, input) => {
-    if (input.type === 'keyDown' && (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i'))) {
-      webContents.toggleDevTools();
-    }
-  });
+  webContents.on('before-input-event', (_e, input) => devToolsKey(input) && webContents.toggleDevTools());
 
   void win.loadURL(DEV_URL || `${ORIGIN}/index.html`);
   return win;
@@ -218,7 +238,11 @@ if (!app.requestSingleInstanceLock()) {
     protocol.handle('app', serveDist);
     Menu.setApplicationMenu(null); // the app draws its own menu bar
     mainWindow = createWindow();
-    mainWindow.on('closed', () => (mainWindow = null));
+    mainWindow.on('closed', () => {
+      mainWindow = null;
+      // Detached panes and report windows belong to the main window.
+      for (const w of BrowserWindow.getAllWindows()) w.destroy();
+    });
   });
 
   app.on('window-all-closed', () => app.quit());

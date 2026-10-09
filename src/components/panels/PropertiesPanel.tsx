@@ -3,7 +3,8 @@ import { Crosshair, Lock, PackagePlus, Pin, Play, Scissors, SlidersHorizontal } 
 import type { CountSymbol, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
-import { buildRows, customColId } from '../../core/columns';
+import { buildRows, customColId, type Row } from '../../core/columns';
+import { detailRows } from '../../core/details';
 import { TYPE_INFO, STAMP_TEXTS } from '../../core/markupTypes';
 import { CommitInput, CommitRange, ColorField } from '../fields';
 import { formatLength, parseLength } from '../../core/units';
@@ -141,6 +142,8 @@ export function PropertiesPanel() {
               {one.type === 'count' && <CountControls m={one} />}
             </>
           )}
+
+          {one && row && TYPE_INFO[one.type].measure && <DetailMaterial row={row} />}
 
           <div className={one && TYPE_INFO[one.type].measure ? 'form-section' : ''} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <h4>General</h4>
@@ -457,6 +460,40 @@ function CountControls({ m }: { m: Markup }) {
         </button>
         <button className="btn sm" disabled={counted < 2} onClick={() => st.splitCount(m.id, 'all')} data-testid="btn-split-all">
           <Scissors size={12} /> Split All ({counted})
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Material the standard details add to this markup. */
+function DetailMaterial({ row }: { row: Row }) {
+  const doc = useStore((s) => s.doc);
+  const lines = useMemo(() => detailRows(doc, [row]), [doc, row]);
+  const st = getState();
+  return (
+    <div className="form-section" style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-testid="prop-details">
+      <h4>
+        <PackagePlus size={12} /> Standard Details
+      </h4>
+      {lines.length ? (
+        lines.map((l) => (
+          <div key={l.markup.id} className="field" title={l.detail?.warning ?? `From “${l.detail?.detailName}”`}>
+            <label style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.detail?.summaryKey}</label>
+            <span className="readout" style={l.detail?.warning ? { color: 'var(--warn)' } : undefined}>
+              {l.display.measurement}
+            </span>
+          </div>
+        ))
+      ) : (
+        <div className="hint">No standard detail adds material to this markup.</div>
+      )}
+      <div className="field-row">
+        <button className="btn sm" onClick={() => st.setDialog({ kind: 'details', newForMarkupId: row.markup.id })} data-testid="btn-new-detail-for">
+          New Detail for This…
+        </button>
+        <button className="btn sm" onClick={() => st.setDialog({ kind: 'details', detailId: lines[0]?.detail?.detailId })}>
+          Standard Details…
         </button>
       </div>
     </div>

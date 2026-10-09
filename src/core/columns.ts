@@ -78,6 +78,27 @@ export interface Row {
   values: Record<string, FValue>;
   /** Display strings. */
   display: Record<string, string>;
+  /** Set on material rows added by a standard detail (see core/details.ts). */
+  detail?: DetailRowInfo;
+}
+
+export interface DetailRowInfo {
+  parentId: string;
+  detailId: string;
+  detailName: string;
+  itemId: string;
+  /** Summary line name, e.g. "Clip Angle – L4x4x3/8". */
+  summaryKey: string;
+  warning?: string;
+}
+
+/** Values that replace the geometry-derived ones (used for standard-detail material rows). */
+export interface RowOverrides {
+  measure: MeasureValues;
+  scale: Scale;
+  count: number;
+  type: string;
+  measurement: string;
 }
 
 function formatDate(ts: number): string {
@@ -98,15 +119,21 @@ export function sheetDisplayName(sheet: Sheet | undefined): string {
 
 /** Build list rows for markups, evaluating built-in and custom (incl. formula) columns. */
 export function buildRows(doc: DocState, markups: Markup[] = doc.markups): Row[] {
+  const make = rowBuilder(doc);
+  return markups.map((m) => make(m));
+}
+
+/** Returns a function that builds one row; `o` replaces the geometry-derived values. */
+export function rowBuilder(doc: DocState): (m: Markup, o?: RowOverrides) => Row {
   const sheetById = new Map(doc.sheets.map((s) => [s.id, s]));
   const layerById = new Map<string, Layer>(doc.layers.map((l) => [l.id, l]));
   const s = doc.settings;
   const customByNorm = new Map(doc.columns.map((c) => [normName(c.name), c]));
 
-  return markups.map((m) => {
+  return (m, o) => {
     const sheet = sheetById.get(m.sheetId);
-    const scale = scaleForMarkup(m, sheet);
-    const measure = computeMeasure(m, scale);
+    const scale = o?.scale ?? scaleForMarkup(m, sheet);
+    const measure = o?.measure ?? computeMeasure(m, scale);
     const info = TYPE_INFO[m.type];
     const values: Record<string, FValue> = {};
     const display: Record<string, string> = {};
@@ -115,7 +142,7 @@ export function buildRows(doc: DocState, markups: Markup[] = doc.markups): Row[]
     const areaR = measure.area != null ? areaToReport(measure.area, s) : 0;
     const perimR = measure.perimeter != null ? lengthToReport(measure.perimeter, s) : 0;
     const volR = measure.volume != null ? volumeToReport(measure.volume, s) : 0;
-    const count = m.type === 'count' ? measure.count ?? 0 : 1;
+    const count = o ? o.count : m.type === 'count' ? measure.count ?? 0 : 1;
     const depthR = m.depth != null ? lengthToReport(m.depth, s) : 0;
 
     const set = (id: string, v: FValue, d?: string) => {
@@ -123,17 +150,17 @@ export function buildRows(doc: DocState, markups: Markup[] = doc.markups): Row[]
       display[id] = d ?? (typeof v === 'number' ? fmtNumber(v, s.decimals) : v);
     };
     set('subject', m.subject);
-    set('type', info.listName);
+    set('type', o?.type ?? info.listName);
     set('label', m.label);
     set('page', sheetLabel(sheet));
     set('sheetTitle', sheet?.title ?? '');
-    set('measurement', info.measure ? measurementText(m, measure, scale, s) : '');
+    set('measurement', o ? o.measurement : info.measure ? measurementText(m, measure, scale, s) : '');
     set('length', lengthR, measure.length != null ? formatLength(measure.length, scale.unit, scale.precision) : '');
     set('area', areaR, measure.area != null ? formatArea(measure.area, scale.unit, s) : '');
     set('perimeter', perimR, measure.perimeter != null ? formatLength(measure.perimeter, scale.unit, scale.precision) : '');
     set('volume', volR, measure.volume != null ? formatVolume(measure.volume, scale.unit, s) : '');
     // An asterisk marks a count that was typed in rather than counted on the drawing.
-    set('count', count, fmtNumber(count, 0) + (m.type === 'count' && m.countOverride != null ? '*' : ''));
+    set('count', count, fmtNumber(count, 0) + (!o && m.type === 'count' && m.countOverride != null ? '*' : ''));
     set('depth', depthR, m.type === 'volume' ? formatLength(m.depth ?? 0, scale.unit, scale.precision) : '');
     set('scale', info.measure ? scale.label : '');
     set('layer', layerById.get(m.layer)?.name ?? '');
@@ -172,7 +199,7 @@ export function buildRows(doc: DocState, markups: Markup[] = doc.markups): Row[]
       page: values.page,
       sheet: values.page,
       pagelabel: values.page,
-      type: info.label,
+      type: o?.type ?? info.label,
       layer: values.layer,
       status: m.status,
       author: m.author,
@@ -209,7 +236,7 @@ export function buildRows(doc: DocState, markups: Markup[] = doc.markups): Row[]
     for (const c of formulaCols) evalFormula(c);
 
     return { markup: m, sheet, scale, measure, values, display };
-  });
+  };
 }
 
 /** Units suffix for numeric built-in columns. */

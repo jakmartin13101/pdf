@@ -13,6 +13,7 @@ import type {
   Rect,
   Scale,
   Sheet,
+  StandardDetail,
   ToolSet,
   Viewport,
 } from '../types';
@@ -40,6 +41,7 @@ export type DialogState =
   | { kind: 'scale'; sheetId: string }
   | { kind: 'pageLabels'; region?: { purpose: 'number' | 'title'; rect: Rect } }
   | { kind: 'columns' }
+  | { kind: 'details'; detailId?: string; newForMarkupId?: string }
   | { kind: 'toolEdit'; setId: string; toolId?: string; fromMarkupId?: string }
   | { kind: 'shapeTool'; setId?: string; toolId?: string }
   | { kind: 'terms' }
@@ -62,6 +64,8 @@ export interface ListState {
   scope: 'all' | 'page';
   columns: string[];
   widths: Record<string, number>;
+  /** Show material added by standard details in the list, summary and exports. */
+  showDetails: boolean;
 }
 
 export interface UIState {
@@ -119,9 +123,19 @@ export interface PanelDrag {
   zone: DockSide | 'float' | null;
 }
 
+/** A split pane taken out of the main window: a floating window inside the app, or its own OS window. */
+export interface PaneWindow {
+  mode: 'float' | 'window';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface Pane {
   id: string;
   sheetId: string | null;
+  detached?: PaneWindow;
 }
 
 export type PaneLayout = 'single' | 'vertical' | 'horizontal' | 'grid';
@@ -171,6 +185,8 @@ export interface AppState {
   panes: Pane[];
   paneLayout: PaneLayout;
   activePaneId: string;
+  /** Bumped whenever the active pane changes; a count never continues across a pane change. */
+  activeEpoch: number;
   paneSplit: { x: number; y: number };
   prefs: Prefs;
   toolChest: ToolSet[];
@@ -243,6 +259,7 @@ export interface AppState {
 
   // settings
   updateSettings: (patch: Partial<ProjectSettings>) => void;
+  setStandardDetails: (details: StandardDetail[]) => void;
   setUI: (patch: Partial<UIState>) => void;
 
   // workspace layout
@@ -263,6 +280,9 @@ export interface AppState {
   setPaneSheet: (paneId: string, sheetId: string) => void;
   setPaneSplit: (patch: Partial<{ x: number; y: number }>) => void;
   closePane: (id: string) => void;
+  detachPane: (id: string, mode?: PaneWindow['mode']) => void;
+  attachPane: (id: string) => void;
+  setPaneWindow: (id: string, patch: Partial<PaneWindow>) => void;
 
   // counts
   splitCount: (id: string, pointIndex: number | 'all') => void;
@@ -288,6 +308,7 @@ export const emptyDoc = (): DocState => ({
   columns: defaultColumns(),
   layers: defaultLayers(),
   settings: { ...DEFAULT_SETTINGS },
+  standardDetails: [],
 });
 
 const HISTORY_LIMIT = 200;
@@ -300,6 +321,7 @@ const defaultList: ListState = {
   scope: 'all',
   columns: DEFAULT_VISIBLE_COLUMNS,
   widths: {},
+  showDetails: true,
 };
 
 const defaultUI: UIState = {
@@ -349,6 +371,9 @@ function loadLayout(): LayoutState {
 }
 
 const PANE_COUNT: Record<PaneLayout, number> = { single: 1, vertical: 2, horizontal: 2, grid: 4 };
+const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
+/** Layout for the panes left in the main window (three attached panes use the grid: two over one). */
+const layoutFor = (n: number, prev: PaneLayout): PaneLayout => (n <= 1 ? 'single' : n === 2 ? (prev === 'horizontal' ? 'horizontal' : 'vertical') : 'grid');
 
 const defaultPrefs: Prefs = {
   author: 'Estimator',
@@ -387,6 +412,11 @@ export const useStore = create<AppState>()((set, get) => {
   };
 
   /** Keep every split pane pointing at an existing sheet. */
+  /** State change for a new active pane: its sheet becomes the current sheet, and counts start over. */
+  const activeChange = (id: string, panes: Pane[]) =>
+    id === get().activePaneId
+      ? { activePaneId: id }
+      : { activePaneId: id, activeEpoch: get().activeEpoch + 1, currentSheetId: panes.find((p) => p.id === id)?.sheetId ?? get().currentSheetId };
   const syncPanes = () => {
     const { panes, doc, currentSheetId, activePaneId } = get();
     const ids = new Set(doc.sheets.map((s) => s.id));
@@ -423,6 +453,7 @@ export const useStore = create<AppState>()((set, get) => {
     panes: [{ id: 'pane-1', sheetId: null }],
     paneLayout: 'single',
     activePaneId: 'pane-1',
+    activeEpoch: 0,
     paneSplit: { x: 0.5, y: 0.5 },
     prefs: { ...defaultPrefs, ...lsGet<Partial<Prefs>>('ts.prefs', {}) },
     toolChest: toolChestFromStorage ?? defaultToolChest(),
@@ -688,6 +719,7 @@ export const useStore = create<AppState>()((set, get) => {
       })),
 
     updateSettings: (patch) => commit((d) => ({ ...d, settings: { ...d.settings, ...patch } })),
+    setStandardDetails: (standardDetails) => commit((d) => ({ ...d, standardDetails })),
     setUI: (patch) => {
       const ui = { ...get().ui, ...patch };
       lsSet('ts.ui', ui);
@@ -755,17 +787,20 @@ export const useStore = create<AppState>()((set, get) => {
 
     setPaneLayout: (paneLayout) => {
       const { panes, activePaneId, currentSheetId } = get();
+      // The layout arranges the panes in the main window; detached windows stay as they are.
+      const attached = attachedPanes(panes);
       const n = PANE_COUNT[paneLayout];
-      let next = panes.slice(0, n);
-      if (!next.some((p) => p.id === activePaneId) && n === 1) next = [panes.find((p) => p.id === activePaneId) ?? panes[0]];
-      while (next.length < n) next.push({ id: uid('pane'), sheetId: currentSheetId });
-      const active = next.some((p) => p.id === activePaneId) ? activePaneId : next[0].id;
-      set({ paneLayout, panes: next, activePaneId: active, currentSheetId: next.find((p) => p.id === active)?.sheetId ?? currentSheetId, editingTextId: null });
+      let keep = attached.slice(0, n);
+      const act = attached.find((p) => p.id === activePaneId);
+      if (act && !keep.includes(act)) keep = [...keep.slice(0, n - 1), act];
+      while (keep.length < n) keep.push({ id: uid('pane'), sheetId: currentSheetId });
+      const next = [...keep, ...panes.filter((p) => p.detached)];
+      const active = next.some((p) => p.id === activePaneId) ? activePaneId : keep[0].id;
+      set({ paneLayout, panes: next, editingTextId: null, ...activeChange(active, next) });
     },
     setActivePane: (id) => {
-      const p = get().panes.find((x) => x.id === id);
-      if (!p || id === get().activePaneId) return;
-      set({ activePaneId: id, currentSheetId: p.sheetId, editingTextId: null });
+      if (!get().panes.some((x) => x.id === id) || id === get().activePaneId) return;
+      set({ editingTextId: null, ...activeChange(id, get().panes) });
     },
     setPaneSheet: (paneId, sheetId) => {
       set((s) => ({
@@ -776,14 +811,43 @@ export const useStore = create<AppState>()((set, get) => {
     setPaneSplit: (patch) => set((s) => ({ paneSplit: { ...s.paneSplit, ...patch } })),
     closePane: (id) => {
       const { panes, activePaneId, paneLayout } = get();
-      if (panes.length <= 1) return;
+      const target = panes.find((p) => p.id === id);
+      // The main window always keeps at least one pane.
+      if (!target || (!target.detached && attachedPanes(panes).length <= 1)) return;
       const rest = panes.filter((p) => p.id !== id);
-      // Closing one of four panes leaves a side-by-side pair; closing one of two leaves a single view.
-      const next = rest.length >= 2 ? rest.slice(0, 2) : rest;
-      const layout: PaneLayout = next.length === 1 ? 'single' : paneLayout === 'horizontal' ? 'horizontal' : 'vertical';
-      const active = next.some((p) => p.id === activePaneId) ? activePaneId : next[0].id;
-      set({ panes: next, paneLayout: layout, activePaneId: active, currentSheetId: next.find((p) => p.id === active)?.sheetId ?? null, editingTextId: null });
+      const layout = target.detached ? paneLayout : layoutFor(attachedPanes(rest).length, paneLayout);
+      const active = rest.some((p) => p.id === activePaneId) ? activePaneId : attachedPanes(rest)[0].id;
+      set({ panes: rest, paneLayout: layout, editingTextId: null, ...activeChange(active, rest) });
     },
+    detachPane: (id, mode = 'window') => {
+      const { panes, paneLayout } = get();
+      const target = panes.find((p) => p.id === id);
+      if (!target || target.detached) return;
+      if (attachedPanes(panes).length <= 1) {
+        get().toast('Split the view first, then detach one of the panes.');
+        return;
+      }
+      const k = panes.filter((p) => p.detached).length;
+      const w = Math.min(820, Math.round(window.innerWidth * 0.55));
+      const h = Math.min(600, Math.round(window.innerHeight * 0.6));
+      const geom: PaneWindow = { mode, x: Math.max(20, Math.round(window.innerWidth - w) / 2 + 30 * k), y: 90 + 30 * k, w, h };
+      const next = panes.map((p) => (p.id === id ? { ...p, detached: geom } : p));
+      set({ panes: next, paneLayout: layoutFor(attachedPanes(next).length, paneLayout) });
+    },
+    attachPane: (id) => {
+      const { panes, paneLayout } = get();
+      const target = panes.find((p) => p.id === id);
+      if (!target?.detached) return;
+      if (attachedPanes(panes).length >= 4) {
+        get().toast('The main window already shows four panes. Close one first.', 'error');
+        return;
+      }
+      const attached = [...attachedPanes(panes), { ...target, detached: undefined }];
+      const next = [...attached, ...panes.filter((p) => p.detached && p.id !== id)];
+      set({ panes: next, paneLayout: layoutFor(attached.length, paneLayout) });
+    },
+    setPaneWindow: (id, patch) =>
+      set((s) => ({ panes: s.panes.map((p) => (p.id === id && p.detached ? { ...p, detached: { ...p.detached, ...patch } } : p)) })),
 
     splitCount: (id, pointIndex) => {
       const m = get().doc.markups.find((x) => x.id === id);

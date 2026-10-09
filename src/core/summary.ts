@@ -13,6 +13,8 @@ export interface SummaryLine {
   extras: Record<string, number>;
   primary: 'count' | 'length' | 'area' | 'volume';
   ids: string[];
+  /** Material added by standard details (not drawn on the sheets). */
+  fromDetail?: boolean;
 }
 
 export interface SummaryGroup {
@@ -43,20 +45,24 @@ export function buildSummary(rows: Row[], doc: DocState, groupBy: string | null)
     const g = groupBy ? String(r.display[groupBy] ?? r.values[groupBy] ?? '') || '(none)' : '';
     let gm = groups.get(g);
     if (!gm) groups.set(g, (gm = new Map()));
-    const key = m.subject || '(no subject)';
-    let line = gm.get(key);
+    const key = r.detail ? r.detail.summaryKey : m.subject || '(no subject)';
+    // Material lines stay separate from drawn markups that happen to share the subject.
+    const mapKey = `${r.detail ? 'detail' : 'markup'}:${key}`;
+    let line = gm.get(mapKey);
     if (!line) {
-      gm.set(key, (line = emptyLine(key, m.style.color)));
+      gm.set(mapKey, (line = emptyLine(key, m.style.color)));
+      if (r.detail) line.fromDetail = true;
       typeCounts.set(line, {});
     }
     const add = (l: SummaryLine) => {
-      l.markups += 1;
+      // The overall total counts drawn markups; material rows are counted by their own lines.
+      if (!(r.detail && l === total)) l.markups += 1;
       l.count += Number(r.values.count) || 0;
       l.length += Number(r.values.length) || 0;
       l.area += Number(r.values.area) || 0;
       l.volume += Number(r.values.volume) || 0;
       for (const e of extras) l.extras[e] = (l.extras[e] ?? 0) + (Number(r.values[e]) || 0);
-      l.ids.push(m.id);
+      l.ids.push(r.detail ? r.detail.parentId : m.id);
     };
     add(line);
     add(total);
@@ -76,7 +82,8 @@ export function buildSummary(rows: Row[], doc: DocState, groupBy: string | null)
   const out: SummaryGroup[] = [...groups.entries()]
     .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
     .map(([name, lm]) => {
-      const lines = [...lm.values()].sort((a, b) => a.subject.localeCompare(b.subject, undefined, { numeric: true }));
+      // Drawn items first, then the material standard details add.
+      const lines = [...lm.values()].sort((a, b) => Number(!!a.fromDetail) - Number(!!b.fromDetail) || a.subject.localeCompare(b.subject, undefined, { numeric: true }));
       const t = emptyLine(name);
       for (const l of lines) {
         t.markups += l.markups;
@@ -87,6 +94,7 @@ export function buildSummary(rows: Row[], doc: DocState, groupBy: string | null)
         for (const [k, v] of Object.entries(l.extras)) t.extras[k] = (t.extras[k] ?? 0) + v;
         t.ids.push(...l.ids);
       }
+      t.ids = [...new Set(t.ids)];
       return { name, lines, total: t };
     });
   return { groups: out, total };

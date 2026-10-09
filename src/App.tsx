@@ -4,7 +4,8 @@ import { useStore, getState, currentSheet } from './store/store';
 import { MenuBar } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
 import { StatusBar } from './components/StatusBar';
-import { DropOverlay, EdgeDock, FloatingPanels, PaneArea, SideDock } from './components/dock/Workspace';
+import { DropOverlay, EdgeDock, FloatingPanels, SideDock } from './components/dock/Workspace';
+import { DetachedPanes, PaneArea } from './components/dock/Panes';
 import { ShapeToolDialog } from './components/dialogs/ShapeToolDialog';
 import { CalibrateDialog, ScaleDialog, ViewportDialog } from './components/dialogs/ScaleDialogs';
 import { PageLabelsDialog } from './components/dialogs/PageLabelsDialog';
@@ -12,8 +13,9 @@ import { ColumnsDialog } from './components/dialogs/ColumnsDialog';
 import { ToolEditDialog } from './components/dialogs/ToolEditDialog';
 import { AboutDialog, ConfirmDialog, SettingsDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
 import { TermsDialog } from './components/dialogs/TermsDialog';
+import { StandardDetailsDialog } from './components/dialogs/StandardDetailsDialog';
 import { openPdfFiles, openProjectFile, restoreAutosave, startAutosave } from './store/project';
-import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject } from './store/commands';
+import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, handleAppShortcut } from './store/commands';
 import { sheetDisplayName } from './core/columns';
 import { downloadsCapability } from './core/persistence';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME, desktop } from './brand';
@@ -127,6 +129,10 @@ async function openGivenFiles(files: File[]) {
 
 function Dialogs() {
   const d = useStore((s) => s.dialog);
+  // Dialogs open in the main window: bring it forward when a detached pane had the focus.
+  useEffect(() => {
+    if (d && !document.hasFocus()) window.focus();
+  }, [d]);
   if (!d) return null;
   switch (d.kind) {
     case 'calibrate':
@@ -139,6 +145,8 @@ function Dialogs() {
       return <PageLabelsDialog region={d.region} />;
     case 'columns':
       return <ColumnsDialog />;
+    case 'details':
+      return <StandardDetailsDialog detailId={d.detailId} newForMarkupId={d.newForMarkupId} />;
     case 'shapeTool':
       return <ShapeToolDialog setId={d.setId} toolId={d.toolId} />;
     case 'toolEdit':
@@ -229,21 +237,10 @@ export function App() {
     return desktop?.onOpenFiles((files) => void openGivenFiles(files.map((f) => new File([f.data], f.name))));
   }, []);
 
-  // Global shortcuts that are not tied to the drawing.
+  // Global shortcuts that are not tied to the drawing (detached panes bind the same handler).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const ctrl = e.ctrlKey || e.metaKey;
-      if (!ctrl) return;
-      if (e.key === 'o') {
-        e.preventDefault();
-        cmdOpenPdf();
-      } else if (e.key === 's') {
-        e.preventDefault();
-        if (getState().loaded) cmdSaveProject();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', handleAppShortcut);
+    return () => window.removeEventListener('keydown', handleAppShortcut);
   }, []);
 
   // Drag & drop PDFs / project files anywhere.
@@ -304,6 +301,7 @@ export function App() {
       </div>
       <StatusBar />
       <FloatingPanels />
+      <DetachedPanes />
       {tb === 'float' && <Toolbar placement="float" />}
       <DropOverlay />
       <Dialogs />

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { RenderTask } from 'pdfjs-dist';
 import type { Rect, Sheet } from '../../types';
 import { renderPage } from '../../core/pdf';
+import { useOwnerWindow } from '../ownerWindow';
 
 interface Props {
   sheet: Sheet;
@@ -23,7 +24,8 @@ export function PageCanvas({ sheet, zoom, visible }: Props) {
   const [detail, setDetail] = useState<{ rect: Rect; key: string } | null>(null);
   const baseTask = useRef<RenderTask | null>(null);
   const detailTask = useRef<RenderTask | null>(null);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // The pane's own window: a detached pane can sit on a monitor with a different pixel ratio.
+  const dpr = Math.min(useOwnerWindow().devicePixelRatio || 1, 2);
   const maxBase = Math.sqrt(MAX_BASE_PIXELS / (sheet.width * sheet.height));
   const wantBase = Math.min(maxBase, Math.max(0.25, zoom * dpr));
 

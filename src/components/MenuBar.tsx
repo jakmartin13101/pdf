@@ -5,7 +5,7 @@ import { dockMenuItems } from './dock/PanelHeader';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from '../brand';
 import { cmdAddPdf, cmdCloseProject, cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject, view } from '../store/commands';
 import { csvBlob, exportFlattenedPdf, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
-import { buildRows } from '../core/columns';
+import { buildTakeoffRows } from '../core/details';
 import { fileBytes, safeName } from '../store/project';
 import { offerFile } from '../store/files';
 import { MEASURE_TYPES, MARKUP_TYPES, TYPE_INFO } from '../core/markupTypes';
@@ -32,19 +32,19 @@ export async function exportPdf() {
 
 export function exportMarkupsCsv() {
   const st = getState();
-  const rows = buildRows(st.doc);
+  const rows = buildTakeoffRows(st.doc, st.list.showDetails);
   void offerFile(csvBlob(markupsCsv(rows, st.list.columns, st.doc)), `${safeName(st.projectName)}_markups.csv`, 'Markups list');
 }
 
 export function exportSummaryCsv(groupBy: string | null = 'c:category') {
   const st = getState();
-  const rows = buildRows(st.doc);
+  const rows = buildTakeoffRows(st.doc, st.list.showDetails);
   void offerFile(csvBlob(summaryCsv(rows, st.doc, groupBy)), `${safeName(st.projectName)}_summary.csv`, 'Takeoff summary');
 }
 
 export function printSummary(groupBy: string | null = 'c:category') {
   const st = getState();
-  const html = summaryReportHtml(st.projectName, buildRows(st.doc), st.doc, groupBy);
+  const html = summaryReportHtml(st.projectName, buildTakeoffRows(st.doc, st.list.showDetails), st.doc, groupBy);
   // Pop-ups are often blocked (always inside a published artifact): offer the report as a file instead.
   if (!openReport(html)) void offerFile(new Blob([html], { type: 'text/html' }), `${safeName(st.projectName)}_summary_report.html`, 'Summary report');
 }
@@ -61,6 +61,8 @@ export function MenuBar() {
   const ui = useStore((s) => s.ui);
   const layout = useStore((s) => s.layout);
   const paneLayout = useStore((s) => s.paneLayout);
+  const panes = useStore((s) => s.panes);
+  const activePaneId = useStore((s) => s.activePaneId);
   const prefs = useStore((s) => s.prefs);
 
   useEffect(() => {
@@ -170,6 +172,7 @@ export function MenuBar() {
       { label: 'Zoom Rectangle', shortcut: 'Z', onClick: () => st().setTool({ kind: 'zoomrect' }) },
       { sep: true },
       { label: 'Manage Columns…', onClick: () => st().setDialog({ kind: 'columns' }) },
+      { label: 'Standard Details…', onClick: () => st().setDialog({ kind: 'details' }) },
       { label: 'Tool Chest', onClick: () => st().showPanel('toolchest') },
       { label: 'New Steel Shape / Size Tool…', onClick: () => st().setDialog({ kind: 'shapeTool' }) },
     ],
@@ -178,6 +181,16 @@ export function MenuBar() {
       { label: 'Split Vertical', checked: paneLayout === 'vertical', disabled: !loaded, onClick: () => st().setPaneLayout('vertical') },
       { label: 'Split Horizontal', checked: paneLayout === 'horizontal', disabled: !loaded, onClick: () => st().setPaneLayout('horizontal') },
       { label: 'Split Four Ways', checked: paneLayout === 'grid', disabled: !loaded, onClick: () => st().setPaneLayout('grid') },
+      {
+        label: 'Detach Active Pane',
+        disabled: !loaded || panes.filter((p) => !p.detached).length < 2 || !!panes.find((p) => p.id === activePaneId)?.detached,
+        onClick: () => st().detachPane(activePaneId, 'window'),
+      },
+      {
+        label: 'Return Detached Panes to Main Window',
+        disabled: !panes.some((p) => p.detached),
+        onClick: () => panes.filter((p) => p.detached).forEach((p) => st().attachPane(p.id)),
+      },
       { sep: true },
       {
         label: 'Panel Position',

@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Files, Layers, Ruler, SlidersHorizontal, Sigma, Table2, Wrench, X } from 'lucide-react';
-import { getState, useStore, PANEL_IDS, PANEL_TITLES, type DockSide, type Pane, type PanelId } from '../../store/store';
+import { getState, useStore, PANEL_IDS, PANEL_TITLES, type DockSide, type PanelId } from '../../store/store';
 import { PanelContext, DockMenuButton } from './PanelHeader';
 import { beginDockDrag, consumeDragClick } from './dragging';
 import { SheetsPanel } from '../panels/SheetsPanel';
@@ -10,8 +10,6 @@ import { MeasurementsPanel } from '../panels/MeasurementsPanel';
 import { LayersPanel } from '../panels/LayersPanel';
 import { MarkupsList } from '../bottom/MarkupsList';
 import { SummaryPanel } from '../bottom/SummaryPanel';
-import { Viewer } from '../viewer/Viewer';
-import { sheetDisplayName } from '../../core/columns';
 
 export const PANEL_ICONS: Record<PanelId, (p: { size?: number }) => ReactNode> = {
   sheets: (p) => <Files {...p} />,
@@ -256,107 +254,6 @@ export function DropOverlay() {
       <div className={`drop-ghost${drag.zone === 'float' ? ' floating' : ''}`} style={{ left: drag.x - drag.dx, top: drag.y - drag.dy, width: Math.min(drag.w, 420), height: Math.min(drag.h, 300) }}>
         {title}
         <small>{drag.zone === 'float' ? 'Release to float here' : `Release to dock ${drag.zone}`}</small>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Split view
-
-function PaneHeader({ pane, index }: { pane: Pane; index: number }) {
-  const sheets = useStore((s) => s.doc.sheets);
-  const active = useStore((s) => s.activePaneId === pane.id);
-  const st = getState;
-  return (
-    <div className={`pane-head${active ? ' active' : ''}`} onPointerDown={() => st().setActivePane(pane.id)} data-testid="pane-head">
-      <span className="pane-num">{index + 1}</span>
-      <select value={pane.sheetId ?? ''} onChange={(e) => st().setPaneSheet(pane.id, e.target.value)} title="Sheet shown in this pane" data-testid="pane-sheet">
-        {sheets.map((s) => (
-          <option key={s.id} value={s.id}>
-            {sheetDisplayName(s)}
-          </option>
-        ))}
-      </select>
-      <div style={{ flex: 1 }} />
-      <button className="icon-btn" title="Close this pane" onClick={() => st().closePane(pane.id)}>
-        <X size={13} />
-      </button>
-    </div>
-  );
-}
-
-function PaneView({ pane, index, style }: { pane: Pane; index: number; style?: React.CSSProperties }) {
-  const multi = useStore((s) => s.panes.length > 1);
-  return (
-    <div className="pane" style={style} data-testid="pane">
-      {multi && <PaneHeader pane={pane} index={index} />}
-      <Viewer paneId={pane.id} />
-    </div>
-  );
-}
-
-function PaneDivider({ dir, container }: { dir: 'v' | 'h'; container: React.RefObject<HTMLDivElement> }) {
-  // Ratio-based: the split follows the pointer position within the container.
-  return (
-    <div
-      className={`splitter-${dir} pane-divider`}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        const rect = container.current?.getBoundingClientRect();
-        if (!rect) return;
-        const move = (ev: PointerEvent) => {
-          const r = dir === 'v' ? (ev.clientX - rect.left) / rect.width : (ev.clientY - rect.top) / rect.height;
-          getState().setPaneSplit(dir === 'v' ? { x: Math.min(0.85, Math.max(0.15, r)) } : { y: Math.min(0.85, Math.max(0.15, r)) });
-        };
-        const up = () => {
-          window.removeEventListener('pointermove', move);
-          window.removeEventListener('pointerup', up);
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-      }}
-    />
-  );
-}
-
-export function PaneArea() {
-  const panes = useStore((s) => s.panes);
-  const layout = useStore((s) => s.paneLayout);
-  const split = useStore((s) => s.paneSplit);
-  const ref = useRef<HTMLDivElement>(null);
-  const rowRef = useRef<HTMLDivElement>(null);
-  const row2Ref = useRef<HTMLDivElement>(null);
-  if (layout === 'single' || panes.length === 1) {
-    return (
-      <div className="pane-area" ref={ref}>
-        <PaneView pane={panes[0]} index={0} style={{ flex: 1 }} />
-      </div>
-    );
-  }
-  if (layout === 'vertical' || layout === 'horizontal') {
-    const dir = layout === 'vertical' ? 'v' : 'h';
-    const r = layout === 'vertical' ? split.x : split.y;
-    return (
-      <div className={`pane-area ${layout === 'vertical' ? 'row' : 'col'}`} ref={ref}>
-        <PaneView pane={panes[0]} index={0} style={{ flex: r }} />
-        <PaneDivider dir={dir} container={ref} />
-        <PaneView pane={panes[1]} index={1} style={{ flex: 1 - r }} />
-      </div>
-    );
-  }
-  return (
-    <div className="pane-area col" ref={ref}>
-      <div className="pane-row" ref={rowRef} style={{ flex: split.y }}>
-        <PaneView pane={panes[0]} index={0} style={{ flex: split.x }} />
-        <PaneDivider dir="v" container={rowRef} />
-        <PaneView pane={panes[1]} index={1} style={{ flex: 1 - split.x }} />
-      </div>
-      <PaneDivider dir="h" container={ref} />
-      <div className="pane-row" ref={row2Ref} style={{ flex: 1 - split.y }}>
-        <PaneView pane={panes[2]} index={2} style={{ flex: split.x }} />
-        <PaneDivider dir="v" container={row2Ref} />
-        <PaneView pane={panes[3]} index={3} style={{ flex: 1 - split.x }} />
       </div>
     </div>
   );

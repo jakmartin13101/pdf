@@ -10,6 +10,7 @@ import { calloutBox, markupRect, RECT_TYPES } from '../../core/shapes';
 import { querySnap, snapIndex, type SnapIndex } from '../../core/pdf';
 import { formatLength } from '../../core/units';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
+import { useOwnerWindow } from '../ownerWindow';
 import { useShallow } from 'zustand/react/shallow';
 
 interface View {
@@ -132,6 +133,7 @@ export function Viewer({ paneId }: { paneId: string }) {
   const flash = useStore((s) => s.flash);
   const editingTextId = useStore((s) => s.editingTextId);
   const loaded = useStore((s) => s.loaded);
+  const win = useOwnerWindow();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -160,7 +162,9 @@ export function Viewer({ paneId }: { paneId: string }) {
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const [panning, setPanning] = useState(false);
   const dragRef = useRef<Drag | null>(null);
-  const countRef = useRef<string | null>(null);
+  // The count markup that clicks add to, and the active-pane epoch it belongs to: switching panes
+  // (or windows) starts a new count, while other tools carry on in the newly active pane.
+  const countRef = useRef<{ id: string; epoch: number } | null>(null);
   const spaceDown = useRef(false);
   const snapIdx = useRef<SnapIndex | null>(null);
 
@@ -184,11 +188,13 @@ export function Viewer({ paneId }: { paneId: string }) {
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    // Observe with the pane's own window: detached panes live in another document.
+    const RO = (win as typeof window).ResizeObserver ?? ResizeObserver;
+    const ro = new RO(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
     ro.observe(el);
     setSize({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
-  }, []);
+  }, [win]);
 
   const fitView = useCallback(
     (s: Sheet, mode: 'fit' | 'fitWidth' = 'fit'): View => {
@@ -281,8 +287,16 @@ export function Viewer({ paneId }: { paneId: string }) {
     setRectPreview(null);
     setFreehand(null);
     // "Resume Count" continues an existing count markup; otherwise the next click starts a new one.
-    countRef.current = tool.kind === 'markup' && tool.resumeId ? tool.resumeId : null;
+    countRef.current = tool.kind === 'markup' && tool.resumeId ? { id: tool.resumeId, epoch: getState().activeEpoch } : null;
   }, [sheet?.id, tool]);
+
+  // An unfinished measurement stays with its pane: drop it when another pane becomes active.
+  useEffect(() => {
+    if (isActive) return;
+    setDraft(null);
+    setRectPreview(null);
+    setFreehand(null);
+  }, [isActive]);
 
   // ---- content snap index
   useEffect(() => {
@@ -377,6 +391,7 @@ export function Viewer({ paneId }: { paneId: string }) {
   const onPointerDown = (e: React.PointerEvent) => {
     if (!sheet) return;
     setMenu(null);
+    // Clicking a pane makes it the active one; the current tool keeps working there.
     if (getState().activePaneId !== paneId) getState().setActivePane(paneId);
     const el = containerRef.current!;
     if (e.button === 1 || (e.button === 0 && (spaceDown.current || tool.kind === 'pan'))) {
@@ -389,7 +404,7 @@ export function Viewer({ paneId }: { paneId: string }) {
     if (e.button !== 0) return;
     const st = getState();
     if (st.editingTextId) {
-      (document.activeElement as HTMLElement | null)?.blur();
+      (win.document.activeElement as HTMLElement | null)?.blur();
     }
     const raw = toPage(e.clientX, e.clientY);
     const target = e.target as Element;
@@ -406,7 +421,7 @@ export function Viewer({ paneId }: { paneId: string }) {
         }
         return;
       }
-      const id = pickMarkupAt(e.clientX, e.clientY, st.selection);
+      const id = pickMarkupAt(e.clientX, e.clientY, st.selection, win.document);
       if (id) {
         let sel = st.selection;
         if (e.shiftKey || e.ctrlKey || e.metaKey) {
@@ -460,11 +475,12 @@ export function Viewer({ paneId }: { paneId: string }) {
     const info = TYPE_INFO[tool.type];
     switch (info.input) {
       case 'click': {
-        const existing = countRef.current ? st.doc.markups.find((m) => m.id === countRef.current && m.sheetId === sheet.id) : undefined;
+        const cur = countRef.current;
+        const existing = cur && cur.epoch === st.activeEpoch ? st.doc.markups.find((m) => m.id === cur.id && m.sheetId === sheet.id) : undefined;
         if (existing) st.addPointsToMarkup(existing.id, [pt]);
         else {
           const m = st.createMarkup(tool.type, sheet.id, [pt]);
-          countRef.current = m.id;
+          countRef.current = { id: m.id, epoch: st.activeEpoch };
           st.setSelection([m.id]);
         }
         return;
@@ -675,7 +691,7 @@ export function Viewer({ paneId }: { paneId: string }) {
       return;
     }
     if (tool.kind === 'select') {
-      const id = pickMarkupAt(e.clientX, e.clientY, getState().selection);
+      const id = pickMarkupAt(e.clientX, e.clientY, getState().selection, win.document);
       const m = id ? getState().doc.markups.find((x) => x.id === id) : undefined;
       if (m && (m.type === 'text' || m.type === 'callout' || m.type === 'stamp')) getState().setEditingText(m.id);
     }
@@ -720,7 +736,7 @@ export function Viewer({ paneId }: { paneId: string }) {
       return;
     }
     const st = getState();
-    const id = pickMarkupAt(e.clientX, e.clientY, st.selection);
+    const id = pickMarkupAt(e.clientX, e.clientY, st.selection, win.document);
     const at = toPage(e.clientX, e.clientY);
     const items: MenuItem[] = [];
     if (id) {
@@ -910,14 +926,14 @@ export function Viewer({ paneId }: { paneId: string }) {
         containerRef.current?.classList.remove('space-pan');
       }
     };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('keyup', onKeyUp);
+    win.addEventListener('keydown', onKey);
+    win.addEventListener('keyup', onKeyUp);
     return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('keyup', onKeyUp);
+      win.removeEventListener('keydown', onKey);
+      win.removeEventListener('keyup', onKeyUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageMarkups, sheet]);
+  }, [pageMarkups, sheet, win]);
 
   // ---- derived overlay data
   const z = view.zoom;
@@ -1148,7 +1164,7 @@ function TextEditor({ m, zoom }: { m: Markup; zoom: number }) {
   const r = m.type === 'callout' ? calloutBox(m) : markupRect(m);
   const mountedAt = useRef(Date.now());
   const focus = () => {
-    if (ref.current && document.activeElement !== ref.current) {
+    if (ref.current && ref.current.ownerDocument.activeElement !== ref.current) {
       ref.current.focus();
       ref.current.setSelectionRange(ref.current.value.length, ref.current.value.length);
     }
@@ -1209,9 +1225,9 @@ const FILL_TYPES = new Set<MarkupType>(['area', 'volume', 'polygon', 'rectangle'
  * Markup under the pointer. Large filled markups (e.g. a deck area) often sit on top of beams and
  * counts, so lines/symbols/text win over filled shapes; within each group a selected markup wins.
  */
-function pickMarkupAt(clientX: number, clientY: number, selection: string[]): string | null {
+function pickMarkupAt(clientX: number, clientY: number, selection: string[], doc: Document = document): string | null {
   const ids: string[] = [];
-  for (const el of document.elementsFromPoint(clientX, clientY)) {
+  for (const el of doc.elementsFromPoint(clientX, clientY)) {
     const id = el.closest('[data-mid]')?.getAttribute('data-mid');
     if (id && !ids.includes(id)) ids.push(id);
   }

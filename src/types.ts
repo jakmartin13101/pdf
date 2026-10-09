@@ -166,6 +166,53 @@ export interface DocState {
   columns: CustomColumn[];
   layers: Layer[];
   settings: ProjectSettings;
+  /** Standard details: rules that add material to markups matching a condition. */
+  standardDetails?: StandardDetail[];
+}
+
+// ---------------------------------------------------------------------------
+// Standard details
+//
+// IF [column] = value  →  ADD material (subject, size, length) @ spacing OC, × quantity or full length.
+
+export type DetailOp = 'eq' | 'neq' | 'contains';
+
+export interface DetailCondition {
+  /** List column id ('subject', 'layer', 'c:<custom id>', …). */
+  column: string;
+  op: DetailOp;
+  value: string;
+}
+
+/**
+ * spacing – pieces along the measured length at a spacing on center (posts @ 48" OC)
+ * each    – a fixed number of pieces per markup, or per counted item (2 clip angles per beam)
+ * full    – one piece the full measured length, times the value (continuous members)
+ */
+export type DetailRule = 'spacing' | 'each' | 'full';
+
+export interface DetailItem {
+  id: string;
+  subject: string;
+  size: string;
+  /** Length of each piece, ft-in text (bare numbers are inches). Blank for items counted only. */
+  length: string;
+  rule: DetailRule;
+  /** Spacing (ft-in text, bare numbers are inches) for 'spacing'; a number for 'each' and 'full'. */
+  value: string;
+  /** Spacing rule: add one for the end piece (posts at both ends). */
+  addEnd: boolean;
+}
+
+export interface StandardDetail {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** All must match (AND). */
+  conditions: DetailCondition[];
+  items: DetailItem[];
+  /** Category for the added material; blank keeps the markup's own category. */
+  category: string;
 }
 
 /**

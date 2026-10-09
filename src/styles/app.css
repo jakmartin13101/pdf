@@ -2587,3 +2587,247 @@ kbd {
 .legal li {
   margin-bottom: 3px;
 }
+
+/* Standard details: material rows in the list and summary */
+.grid tbody tr.row.detail-row td {
+  color: var(--text-dim);
+  font-style: italic;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+.grid tbody tr.row.detail-row.parent-sel td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.grid tbody tr.row.detail-row.warn td[data-col='measurement'] {
+  color: var(--warn);
+}
+.detail-subject {
+  padding-left: 6px;
+}
+.detail-badge {
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-style: normal;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Standard details dialog */
+.details-dialog {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 420px;
+}
+.dd-list {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 62vh;
+  display: flex;
+  flex-direction: column;
+}
+.dd-list-head {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+}
+.dd-list-head .btn {
+  margin-right: auto;
+}
+.dd-entry {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.dd-entry:hover {
+  background: var(--bg-hover);
+}
+.dd-entry.on {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.dd-entry.off .grow {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.dd-entry small {
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+.dd-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.dd-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.dd-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.dd-section h4 {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.dd-kw {
+  display: inline-block;
+  min-width: 34px;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: center;
+}
+.dd-cond {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1.4fr) 26px;
+  gap: 6px;
+  align-items: center;
+  position: relative;
+}
+.dd-and {
+  position: absolute;
+  left: -2px;
+  top: -9px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.dd-value {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.dd-value input {
+  flex: 1;
+  min-width: 0;
+}
+.dd-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.05fr) minmax(0, 1fr) 40px 26px;
+  gap: 6px;
+  align-items: center;
+}
+.dd-item > * {
+  min-width: 0;
+}
+.dd-item-head span {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.dd-qty {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dd-qty input {
+  flex: 1;
+  min-width: 0;
+}
+.dd-prefix,
+.dd-suffix {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+.dd-end {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.dd-item input.bad,
+.dd-cond input.bad {
+  border-color: var(--danger);
+}
+.dd-formula {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-input, var(--bg-hover));
+  border: 1px dashed var(--border-strong);
+  word-break: break-word;
+}
+.dd-preview td,
+.dd-preview th {
+  font-size: 12px;
+}
+.dd-warn {
+  color: var(--warn);
+  font-size: 11px;
+}
+.dd-editor label.inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+}
+@media (max-width: 760px) {
+  .details-dialog {
+    grid-template-columns: 1fr;
+  }
+  .dd-list {
+    max-height: 160px;
+  }
+}
+
+/* Detached split panes */
+.pane-float {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-app);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.pane-float.active {
+  border-color: var(--accent);
+}
+.pane-float .pane {
+  height: 100%;
+}
+.pane-head.draggable {
+  cursor: move;
+}
+.pane-head.draggable select,
+.pane-head.draggable button {
+  cursor: default;
+}
+body.popout-body {
+  height: 100%;
+}
+.popout-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.popout-root > .pane {
+  flex: 1;
+}

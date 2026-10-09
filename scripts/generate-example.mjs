@@ -150,6 +150,12 @@ for (let i = 0; i < 6; i++)
   }
 await done();
 
+// Standard details: the built-in examples add clip angles, a deck edge angle, footing dowels and
+// column base plates to the matching markups.
+await page.getByTestId('btn-details').click();
+await page.getByTestId('detail-examples').click();
+await page.getByTestId('details-save').click();
+
 await sheet(2);
 await page.getByTestId('tb-select').click();
 await page.keyboard.press('Escape');

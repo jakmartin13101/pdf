@@ -7,7 +7,7 @@ import { computeMeasure, scaleForMarkup } from '../src/core/measure';
 import { buildRows, customColId } from '../src/core/columns';
 import { defaultColumns, defaultLayers } from '../src/core/defaults';
 import { defaultStyle } from '../src/core/markupTypes';
-import type { DocState, Markup, Sheet } from '../src/types';
+import type { DocState, Markup, Sheet, StandardDetail } from '../src/types';
 
 describe('length formatting', () => {
   it('formats feet-inches', () => {
@@ -218,5 +218,102 @@ describe('terms of service', () => {
     expect(txt).toMatch(/^BUILDSUITE TAKEOFF STUDIO/);
     expect(txt).toContain('12. DISCLAIMER OF WARRANTIES');
     expect(txt).not.toContain('**');
+  });
+});
+
+import { buildTakeoffRows, describeDetail, detailRows, itemQuantity, newDetail, newDetailItem, parseDetailLength } from '../src/core/details';
+
+describe('standard details', () => {
+  const scale = scaleFromPreset(findPreset(`1/8" = 1'-0"`)!);
+  const ptsPerFoot = 12 / scale.realPerPt;
+  const sheet: Sheet = { id: 's1', fileId: 'f', pageIndex: 0, number: 'S1.02', title: '', width: 2592, height: 1728, rotation: 0, scale, viewports: [] };
+  const mk = (id: string, type: Markup['type'], subject: string, pts: [number, number][], custom: Markup['custom'] = {}): Markup => ({
+    id,
+    sheetId: 's1',
+    type,
+    points: pts.map(([x, y]) => ({ x: 100 + x * ptsPerFoot, y: 100 + y * ptsPerFoot })),
+    subject,
+    label: '',
+    comments: '',
+    author: 't',
+    created: 0,
+    modified: 0,
+    status: 'None',
+    checked: false,
+    layer: '',
+    style: defaultStyle(type),
+    custom,
+  });
+  const beam = mk('b1', 'length', 'W24x55', [[0, 0], [23, 0]], { member_size: 'W24x55', qty: 1, category: 'Structural Steel' });
+  const rail = mk('r1', 'polylength', 'Handrail', [[0, 0], [100, 0]], { category: 'Misc Metals' });
+  const cols = mk('c1', 'count', 'HSS Column', [[0, 0], [25, 0], [50, 0]], { qty: 1 });
+  const base: DocState = { files: [], sheets: [sheet], markups: [beam, rail, cols], columns: defaultColumns(), layers: defaultLayers(), settings: DEFAULT_SETTINGS };
+
+  it('parses piece lengths and spacings (bare numbers are inches)', () => {
+    expect(parseDetailLength('48')).toBe(48);
+    expect(parseDetailLength(`4'-0"`)).toBe(48);
+    expect(parseDetailLength(`0'-11 1/2"`)).toBe(11.5);
+    expect(parseDetailLength('')).toBeNull();
+  });
+
+  it('adds material to markups whose column matches the selected value', () => {
+    const doc: DocState = {
+      ...base,
+      standardDetails: [
+        newDetail({
+          id: 'd1',
+          name: 'Beam clips',
+          conditions: [{ column: 'c:member_size', op: 'eq', value: 'w24×55' }],
+          items: [newDetailItem({ id: 'i1', subject: 'Clip Angle', size: 'L4x4x3/8', length: `0'-11 1/2"`, rule: 'each', value: '4' })],
+          category: 'Misc Metals',
+        }),
+      ],
+    };
+    const rows = buildTakeoffRows(doc, true);
+    expect(rows.map((r) => r.markup.subject)).toEqual(['W24x55', 'Clip Angle', 'Handrail', 'HSS Column']);
+    const clip = rows[1];
+    expect(clip.detail?.parentId).toBe('b1');
+    expect(clip.values.count).toBe(4);
+    expect(clip.values.length).toBeCloseTo((4 * 11.5) / 12);
+    expect(clip.values['c:member_size']).toBe('L4x4x3/8');
+    expect(clip.values['c:category']).toBe('Misc Metals');
+    // Weight formula runs on material rows: 3.833 LF × 9.73 plf
+    expect(Number(clip.values['c:weight'])).toBeCloseTo(((4 * 11.5) / 12) * 9.73, 1);
+    expect(clip.detail?.summaryKey).toBe('Clip Angle – L4x4x3/8');
+    expect(buildTakeoffRows(doc, false)).toHaveLength(3);
+    expect(describeDetail(doc.standardDetails![0], doc)).toBe(`IF [Member Size] = "w24×55" → ADD Clip Angle L4x4x3/8 × 0'-11 1/2" × 4 EA`);
+  });
+
+  it('spaces pieces along the measured length, per counted item, or full length', () => {
+    const rows = buildRows(base);
+    const railRow = rows.find((r) => r.markup.id === 'r1')!;
+    const colRow = rows.find((r) => r.markup.id === 'c1')!;
+    const beamRow = rows.find((r) => r.markup.id === 'b1')!;
+    // 100'-0" at 4'-0" OC with an end post = 26 posts of 3'-6"
+    const posts = itemQuantity(newDetailItem({ length: `3'-6"`, rule: 'spacing', value: `4'-0"`, addEnd: true }), railRow, 'c:qty');
+    expect(posts.pieces).toBe(26);
+    expect(posts.totalLength).toBeCloseTo(26 * 42);
+    expect(itemQuantity(newDetailItem({ rule: 'spacing', value: '48', addEnd: false }), railRow, 'c:qty').pieces).toBe(25);
+    // 4 anchor rods per column × 3 columns
+    expect(itemQuantity(newDetailItem({ rule: 'each', value: '4' }), colRow, 'c:qty').pieces).toBe(12);
+    // continuous member the length of the beam, twice
+    const full = itemQuantity(newDetailItem({ rule: 'full', value: '2' }), beamRow, 'c:qty');
+    expect(full.pieces).toBe(2);
+    expect(full.totalLength).toBeCloseTo(2 * 23 * 12);
+    // a beam drawn once with Qty 3 gets three times the material
+    const triple = buildRows({ ...base, markups: [{ ...beam, custom: { ...beam.custom, qty: 3 } }] })[0];
+    expect(itemQuantity(newDetailItem({ rule: 'each', value: '4' }), triple, 'c:qty').pieces).toBe(12);
+    // spacing on a count markup has nothing to run along
+    expect(itemQuantity(newDetailItem({ rule: 'spacing', value: '12' }), colRow, 'c:qty').warning).toBeTruthy();
+  });
+
+  it('supports not-equal and contains, requires a condition, and skips disabled details', () => {
+    const d = (patch: Partial<StandardDetail>) => newDetail({ items: [newDetailItem({ subject: 'X' })], ...patch });
+    const rows = buildRows(base);
+    const subjects = (detail: StandardDetail) => detailRows({ ...base, standardDetails: [detail] }, rows).map((r) => r.detail!.parentId);
+    expect(subjects(d({ conditions: [{ column: 'c:category', op: 'neq', value: 'Misc Metals' }] }))).toEqual(['b1', 'c1']);
+    expect(subjects(d({ conditions: [{ column: 'subject', op: 'contains', value: 'rail' }] }))).toEqual(['r1']);
+    expect(subjects(d({ conditions: [] }))).toEqual([]);
+    expect(subjects(d({ enabled: false, conditions: [{ column: 'subject', op: 'eq', value: 'Handrail' }] }))).toEqual([]);
   });
 });

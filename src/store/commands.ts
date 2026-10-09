@@ -29,6 +29,18 @@ export async function cmdOpenProject() {
 }
 
 export const cmdSaveProject = () => saveProjectFile();
+
+/** Shortcuts that work in every window: the main window and detached panes. */
+export function handleAppShortcut(e: KeyboardEvent) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.key === 'o') {
+    e.preventDefault();
+    void cmdOpenPdf();
+  } else if (e.key === 's') {
+    e.preventDefault();
+    if (getState().loaded) void cmdSaveProject();
+  }
+}
 export const cmdOpenSample = () => openSample();
 export const cmdOpenExample = () => openExampleTakeoff();
 

@@ -1,10 +1,11 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { PanelContext, PanelHeader } from '../dock/PanelHeader';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Columns3, Download, Filter, Search, Table2, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Columns3, Download, Filter, PackagePlus, Search, Table2, Trash2, X } from 'lucide-react';
 import type { Markup, MarkupStatus } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
-import { allColumns, buildRows, formatTotal, isSummable, type ColumnSpec, type Row } from '../../core/columns';
+import { allColumns, formatTotal, isSummable, type ColumnSpec, type Row } from '../../core/columns';
+import { buildTakeoffRows } from '../../core/details';
 import { TYPE_ICON } from '../icons';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { exportMarkupsCsv } from '../MenuBar';
@@ -24,7 +25,7 @@ export function useFilteredRows() {
   const doc = useStore((s) => s.doc);
   const list = useStore((s) => s.list);
   const currentSheetId = useStore((s) => s.currentSheetId);
-  const rows = useMemo(() => buildRows(doc), [doc]);
+  const rows = useMemo(() => buildTakeoffRows(doc, list.showDetails), [doc, list.showDetails]);
   const filtered = useMemo(() => {
     const q = list.search.trim().toLowerCase();
     const filters = Object.entries(list.filters).filter(([, v]) => v && v.length >= 0);
@@ -244,6 +245,13 @@ function Cell({ col, row, editing }: { col: ColumnSpec; row: Row; editing: boole
   if (editing) return null;
   switch (col.id) {
     case 'type': {
+      if (row.detail)
+        return (
+          <span className="type-cell" title={`Added by standard detail “${row.detail.detailName}”`}>
+            <PackagePlus size={13} color={m.style.color} />
+            {row.display.type}
+          </span>
+        );
       const Icon = TYPE_ICON[m.type];
       return (
         <span className="type-cell">
@@ -257,7 +265,9 @@ function Cell({ col, row, editing }: { col: ColumnSpec; row: Row; editing: boole
     case 'status':
       return m.status === 'None' ? <span style={{ color: 'var(--text-faint)' }}>None</span> : <span className={`status-pill ${m.status}`}>{m.status}</span>;
     case 'checkmark':
-      return <input type="checkbox" checked={m.checked} readOnly style={{ pointerEvents: 'none' }} />;
+      return row.detail ? null : <input type="checkbox" checked={m.checked} readOnly style={{ pointerEvents: 'none' }} />;
+    case 'subject':
+      return row.detail ? <span className="detail-subject">↳ {row.display.subject}</span> : <>{row.display.subject}</>;
     default:
       return <>{row.display[col.id] ?? ''}</>;
   }
@@ -301,7 +311,12 @@ export function MarkupsList() {
     return out;
   }, [filtered, list.groupBy, collapsed]);
 
-  const rowOrder = useMemo(() => items.filter((i) => i.kind === 'row').map((i) => (i as { row: Row }).row.markup.id), [items]);
+  // Material rows stand for their markup when selecting ranges.
+  const rowOrder = useMemo(
+    () => [...new Set(items.filter((i) => i.kind === 'row').map((i) => (i as { row: Row }).row).map((r) => r.detail?.parentId ?? r.markup.id))],
+    [items],
+  );
+  const markupCount = useMemo(() => rows.filter((r) => !r.detail).length, [rows]);
 
   // Keep the selected markup visible when it was selected on the drawing.
   useEffect(() => {
@@ -336,7 +351,7 @@ export function MarkupsList() {
   }, [filtered, visibleCols]);
 
   const onRowClick = (e: React.MouseEvent, r: Row) => {
-    const id = r.markup.id;
+    const id = r.detail?.parentId ?? r.markup.id;
     const s = st();
     if (e.shiftKey && anchorRef.current) {
       const a = rowOrder.indexOf(anchorRef.current);
@@ -359,6 +374,22 @@ export function MarkupsList() {
   const onRowContext = (e: React.MouseEvent, r: Row) => {
     e.preventDefault();
     const s = st();
+    if (r.detail) {
+      const { parentId, detailId, detailName } = r.detail;
+      s.setSelection([parentId]);
+      setMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          { label: 'Zoom To Markup', onClick: () => s.focusMarkup(parentId) },
+          { label: `Edit Standard Detail “${detailName}”…`, onClick: () => s.setDialog({ kind: 'details', detailId }) },
+          { label: 'Standard Details…', onClick: () => s.setDialog({ kind: 'details' }) },
+          { sep: true },
+          { label: 'Hide Standard Detail Material', onClick: () => s.setList({ showDetails: false }) },
+        ],
+      });
+      return;
+    }
     const ids = selection.includes(r.markup.id) ? selection : [r.markup.id];
     if (!selection.includes(r.markup.id)) s.setSelection(ids);
     const chestTools = s.toolChest.flatMap((t) => t.tools);
@@ -488,9 +519,17 @@ export function MarkupsList() {
         )}
         <div className="grow" />
         <span className="list-count" data-testid="list-count">
-          {filtered.length === rows.length ? `${rows.length} markups` : `Showing ${filtered.length} of ${rows.length}`}
+          {filtered.length === rows.length ? `${markupCount} markups` : `Showing ${filtered.length} of ${rows.length}`}
+          {filtered.length === rows.length && rows.length > markupCount ? ` + ${rows.length - markupCount} detail items` : ''}
           {selection.length ? ` · ${selection.length} selected` : ''}
         </span>
+        <label className="inline" title="Show the material standard details add (also in the summary and exports)">
+          <input type="checkbox" checked={list.showDetails} onChange={(e) => st().setList({ showDetails: e.target.checked })} data-testid="toggle-details" />
+          Detail material
+        </label>
+        <button className="icon-btn" title="Standard Details…" onClick={() => st().setDialog({ kind: 'details' })} data-testid="btn-details">
+          <PackagePlus size={14} />
+        </button>
         <button className="icon-btn" title="Delete selected markups" disabled={!selection.length} onClick={() => st().deleteMarkups(selection)}>
           <Trash2 size={14} />
         </button>
@@ -553,7 +592,7 @@ export function MarkupsList() {
                       else n.add(it.key);
                       setCollapsed(n);
                     }}
-                    onDoubleClick={() => st().setSelection(it.rows.map((r) => r.markup.id))}
+                    onDoubleClick={() => st().setSelection([...new Set(it.rows.map((r) => r.detail?.parentId ?? r.markup.id))])}
                     title="Click to expand/collapse, double-click to select the group"
                   >
                     {visibleCols.map((c, ci) => {
@@ -578,10 +617,11 @@ export function MarkupsList() {
               }
               const r = it.row;
               const sel = selSet.has(r.markup.id);
+              const parentSel = !!r.detail && selSet.has(r.detail.parentId);
               return (
                 <tr
                   key={r.markup.id}
-                  className={`row${sel ? ' sel' : ''}`}
+                  className={`row${sel ? ' sel' : ''}${r.detail ? ' detail-row' : ''}${parentSel ? ' parent-sel' : ''}${r.detail?.warning ? ' warn' : ''}`}
                   onClick={(e) => onRowClick(e, r)}
                   onContextMenu={(e) => onRowContext(e, r)}
                   data-testid="markup-row"
@@ -589,20 +629,26 @@ export function MarkupsList() {
                 >
                   {visibleCols.map((c) => {
                     const isEditing = editing?.id === r.markup.id && editing.col === c.id;
-                    const editable = c.editor !== 'none' && !(c.editor === 'length' && r.markup.type !== 'volume') && !(c.editor === 'count' && r.markup.type !== 'count');
+                    const editable =
+                      !r.detail && c.editor !== 'none' && !(c.editor === 'length' && r.markup.type !== 'volume') && !(c.editor === 'count' && r.markup.type !== 'count');
                     return (
                       <td
                         key={c.id}
                         className={`${c.align === 'right' ? 'num' : c.align === 'center' ? 'center' : ''}${editable ? ' editable' : ''}`}
                         title={r.display[c.id]}
                         onDoubleClick={(e) => {
+                          if (r.detail) {
+                            e.stopPropagation();
+                            st().setDialog({ kind: 'details', detailId: r.detail.detailId });
+                            return;
+                          }
                           if (!editable) return;
                           e.stopPropagation();
                           if (c.editor === 'check') return;
                           setEditing({ id: r.markup.id, col: c.id });
                         }}
                         onClick={(e) => {
-                          if (c.editor === 'check') {
+                          if (c.editor === 'check' && !r.detail) {
                             e.stopPropagation();
                             st().updateMarkup(r.markup.id, { checked: !r.markup.checked });
                           }

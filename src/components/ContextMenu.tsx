@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronRight } from 'lucide-react';
+import { useOwnerWindow } from './ownerWindow';
 
 export interface MenuItem {
   label?: string;
@@ -53,27 +54,30 @@ export function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () =>
 export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x, y });
+  // Menus open in the window they were invoked from (detached panes have their own window).
+  const win = useOwnerWindow();
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ x: Math.min(x, window.innerWidth - r.width - 6), y: Math.min(y, window.innerHeight - r.height - 6) });
-  }, [x, y]);
+    setPos({ x: Math.min(x, win.innerWidth - r.width - 6), y: Math.min(y, win.innerHeight - r.height - 6) });
+  }, [x, y, win]);
   useEffect(() => {
     const close = (e: Event) => {
-      if (ref.current && e.target instanceof Node && ref.current.contains(e.target)) return;
+      // No instanceof Node: events from another window come from another realm.
+      if (ref.current && e.target && ref.current.contains(e.target as Node)) return;
       onClose();
     };
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('pointerdown', close, true);
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('blur', onClose);
+    win.addEventListener('pointerdown', close, true);
+    win.addEventListener('keydown', onKey);
+    win.addEventListener('blur', onClose);
     return () => {
-      window.removeEventListener('pointerdown', close, true);
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('blur', onClose);
+      win.removeEventListener('pointerdown', close, true);
+      win.removeEventListener('keydown', onKey);
+      win.removeEventListener('blur', onClose);
     };
-  }, [onClose]);
+  }, [onClose, win]);
   return createPortal(
     // React portals bubble synthetic events to their React parents (e.g. the viewer), so stop them here.
     <div
@@ -92,6 +96,6 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
     >
       <MenuList items={items} onClose={onClose} />
     </div>,
-    document.body,
+    win.document.body,
   );
 }
