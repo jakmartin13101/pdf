@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Files, GitCompareArrows, Layers, Ruler, SlidersHorizontal, Sigma, Table2, Wrench, X } from 'lucide-react';
+import { Files, GitCompareArrows, Layers, Ruler, SlidersHorizontal, Sigma, Table2, Wand2, Wrench, X } from 'lucide-react';
 import { getState, useStore, PANEL_IDS, PANEL_TITLES, type DockSide, type PanelId } from '../../store/store';
 import { PanelContext, DockMenuButton } from './PanelHeader';
 import { beginDockDrag, consumeDragClick } from './dragging';
@@ -9,6 +9,7 @@ import { PropertiesPanel } from '../panels/PropertiesPanel';
 import { MeasurementsPanel } from '../panels/MeasurementsPanel';
 import { LayersPanel } from '../panels/LayersPanel';
 import { ComparePanel } from '../panels/ComparePanel';
+import { AutoTakeoffPanel } from '../panels/AutoTakeoffPanel';
 import { MarkupsList } from '../bottom/MarkupsList';
 import { SummaryPanel } from '../bottom/SummaryPanel';
 
@@ -19,12 +20,13 @@ export const PANEL_ICONS: Record<PanelId, (p: { size?: number }) => ReactNode> =
   measurements: (p) => <Ruler {...p} />,
   layers: (p) => <Layers {...p} />,
   compare: (p) => <GitCompareArrows {...p} />,
+  autotakeoff: (p) => <Wand2 {...p} />,
   markups: (p) => <Table2 {...p} />,
   summary: (p) => <Sigma {...p} />,
 };
 
 /** Panels that only make sense once drawings are open. */
-const NEEDS_DOCUMENT = new Set<PanelId>(['sheets', 'compare', 'markups', 'summary']);
+const NEEDS_DOCUMENT = new Set<PanelId>(['sheets', 'compare', 'autotakeoff', 'markups', 'summary']);
 
 function PanelBody({ id }: { id: PanelId }) {
   const loaded = useStore((s) => s.loaded);
@@ -42,6 +44,8 @@ function PanelBody({ id }: { id: PanelId }) {
       return <LayersPanel />;
     case 'compare':
       return <ComparePanel />;
+    case 'autotakeoff':
+      return <AutoTakeoffPanel />;
     case 'markups':
       return <MarkupsList />;
     case 'summary':

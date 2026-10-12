@@ -83,6 +83,19 @@ async function launch(extraArgs = []) {
   if (shots) await win.screenshot({ path: join(shots, 'desktop-overlay.png') });
   await win.getByTestId('compare-remove').click();
 
+  // Automatic takeoff: the labelled beams and tubing on S1.02 are found from the PDF's line work.
+  await win.getByTestId('tb-auto').click();
+  await win.getByTestId('auto-find').click();
+  const found = await win
+    .getByTestId('auto-status')
+    .filter({ hasText: '50 members in 5 sizes' })
+    .waitFor({ timeout: 30000 })
+    .then(() => true)
+    .catch(() => false);
+  check(found && (await win.getByTestId('auto-member').count()) === 50, 'automatic takeoff finds the labelled beams and tubing');
+  if (shots) await win.screenshot({ path: join(shots, 'desktop-auto-takeoff.png') });
+  await win.getByTestId('auto-clear').click();
+
   // Split the view and detach a pane into its own desktop window.
   await win.getByTestId('split-vertical').click();
   const paneOpened = app.waitForEvent('window');

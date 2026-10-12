@@ -3074,3 +3074,138 @@ body.popout-body {
   color: var(--text-dim);
   font-family: var(--mono);
 }
+
+/* Automatic takeoff panel */
+.auto-families {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.auto-families label,
+.auto-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.auto-families small {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 10.5px;
+  text-align: right;
+}
+.auto-opt input:not([type='checkbox']) {
+  margin-left: auto;
+  font-family: var(--mono);
+}
+.auto-opt input.bad {
+  border-color: var(--danger);
+}
+.warn-text {
+  color: var(--warn);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.auto-groups {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.auto-group + .auto-group {
+  border-top: 1px solid var(--border);
+}
+.auto-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 2px;
+  font-size: 12.5px;
+}
+.auto-group-head .swatch {
+  cursor: default;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+.auto-size {
+  font-weight: 600;
+}
+.auto-count,
+.auto-len {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.auto-count {
+  min-width: 26px;
+  text-align: right;
+}
+.auto-len {
+  min-width: 78px;
+  text-align: right;
+}
+.auto-members {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 6px 30px;
+  max-height: 220px;
+  overflow: auto;
+}
+.auto-member {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.auto-member.off .auto-zoom {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.auto-zoom {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.auto-zoom:hover {
+  background: var(--bg-hover);
+}
+.auto-zoom small {
+  color: var(--text-dim);
+}
+.auto-zoom em {
+  margin-left: auto;
+  font-family: var(--font, inherit);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.auto-total {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 0 8px;
+}
+.auto-total span:nth-child(2) {
+  margin-left: auto;
+  font-family: var(--mono);
+}
+.auto-total span:last-child {
+  min-width: 78px;
+  text-align: right;
+  font-family: var(--mono);
+}

@@ -20,6 +20,7 @@ import type {
 } from '../types';
 import { DEFAULT_SETTINGS } from '../core/units';
 import { applyDetailAssignments, type DetailAssignment } from '../core/details';
+import type { FoundMember } from '../core/autoTakeoff';
 import { DEFAULT_VISIBLE_COLUMNS, defaultColumns, defaultLayers, defaultToolChest } from '../core/defaults';
 import { defaultStyle, TYPE_INFO } from '../core/markupTypes';
 import { uid } from '../core/ids';
@@ -93,9 +94,9 @@ export interface UIState {
   showHiddenTools: boolean;
 }
 
-export type PanelId = 'sheets' | 'toolchest' | 'properties' | 'measurements' | 'layers' | 'compare' | 'markups' | 'summary';
+export type PanelId = 'sheets' | 'toolchest' | 'properties' | 'measurements' | 'layers' | 'compare' | 'autotakeoff' | 'markups' | 'summary';
 export type DockSide = 'left' | 'right' | 'top' | 'bottom';
-export const PANEL_IDS: PanelId[] = ['sheets', 'toolchest', 'properties', 'measurements', 'layers', 'compare', 'markups', 'summary'];
+export const PANEL_IDS: PanelId[] = ['sheets', 'toolchest', 'properties', 'measurements', 'layers', 'compare', 'autotakeoff', 'markups', 'summary'];
 export const PANEL_TITLES: Record<PanelId, string> = {
   sheets: 'Sheets',
   toolchest: 'Tool Chest',
@@ -103,6 +104,7 @@ export const PANEL_TITLES: Record<PanelId, string> = {
   measurements: 'Measurements',
   layers: 'Layers',
   compare: 'Compare',
+  autotakeoff: 'Auto Takeoff',
   markups: 'Markups List',
   summary: 'Takeoff Summary',
 };
@@ -210,6 +212,8 @@ export interface AppState {
   activeEpoch: number;
   /** Differences found between sheets and their overlays, by base sheet id (not saved). */
   compareChanges: Record<string, CompareChanges>;
+  /** Members found by the automatic takeoff, waiting to be reviewed and created (not saved). */
+  autoTakeoff: AutoTakeoffState | null;
   paneSplit: { x: number; y: number };
   prefs: Prefs;
   toolChest: ToolSet[];
@@ -295,6 +299,9 @@ export interface AppState {
   /** Change overlay settings; `live` skips undo history (wrap slider/drag sequences in beginChange/endChange). */
   updateCompare: (sheetId: string, patch: Partial<SheetCompare>, live?: boolean) => void;
   setCompareChanges: (sheetId: string, value: CompareChanges | null) => void;
+  setAutoTakeoff: (value: AutoTakeoffState | null) => void;
+  /** Add the auto takeoff's length markups and set missing sheet scales, as one undo step. */
+  applyAutoTakeoff: (items: { sheetId: string; points: Pt[]; extra: Partial<Markup> }[], scales: Record<string, Scale>) => Markup[];
   setUI: (patch: Partial<UIState>) => void;
 
   // workspace layout
@@ -348,6 +355,28 @@ export const emptyDoc = (): DocState => ({
 
 const HISTORY_LIMIT = 200;
 
+/** A member found by the automatic takeoff on a sheet. */
+export interface AutoMember extends FoundMember {
+  sheetId: string;
+}
+
+export interface AutoTakeoffState {
+  members: AutoMember[];
+  /** Members left out by hand (ids). */
+  excluded: string[];
+  /** Sizes left out. */
+  sizesOff: string[];
+  /** Sheets searched. */
+  sheetIds: string[];
+  /** Scales printed on searched sheets that have no scale set, most frequent first. */
+  printed: Record<string, string[]>;
+  /** Leave out members an existing length markup already covers. */
+  skipExisting: boolean;
+}
+
+/** Whether a found member will be created. */
+export const autoIncluded = (a: AutoTakeoffState, m: AutoMember) => !a.excluded.includes(m.id) && !a.sizesOff.includes(m.size) && !(a.skipExisting && m.existingId);
+
 const defaultList: ListState = {
   sort: null,
   filters: {},
@@ -377,8 +406,9 @@ export function defaultLayout(): LayoutState {
       measurements: place('right', 3),
       layers: place('right', 4),
       compare: place('right', 5),
-      markups: { ...place('bottom', 6), float: { x: 160, y: 220, w: 760, h: 320 } },
-      summary: { ...place('bottom', 7), float: { x: 190, y: 250, w: 760, h: 360 } },
+      autotakeoff: place('right', 6),
+      markups: { ...place('bottom', 7), float: { x: 160, y: 220, w: 760, h: 320 } },
+      summary: { ...place('bottom', 8), float: { x: 190, y: 250, w: 760, h: 360 } },
     },
     // Small screens start with the drawing visible; side panels open as overlays on demand.
     active: { left: narrow ? null : 'sheets', right: narrow ? null : 'toolchest', top: null, bottom: 'markups' },
@@ -538,6 +568,7 @@ export const useStore = create<AppState>()((set, get) => {
     activePaneId: 'pane-1',
     activeEpoch: 0,
     compareChanges: {},
+    autoTakeoff: null,
     paneSplit: { x: 0.5, y: 0.5 },
     prefs: { ...defaultPrefs, ...lsGet<Partial<Prefs>>('ts.prefs', {}) },
     toolChest: toolChestFromStorage ?? defaultToolChest(),
@@ -578,6 +609,7 @@ export const useStore = create<AppState>()((set, get) => {
         selection: [],
         currentSheetId: doc.sheets.find((x) => x.id === s.currentSheetId)?.id ?? doc.sheets[0]?.id ?? null,
         tool: { kind: 'select' },
+        autoTakeoff: opts?.keepHistory ? s.autoTakeoff : null,
       }));
       syncPanes();
     },
@@ -787,6 +819,16 @@ export const useStore = create<AppState>()((set, get) => {
       });
       if (live) set({ doc: fn(get().doc) });
       else commit(fn);
+    },
+    setAutoTakeoff: (autoTakeoff) => set({ autoTakeoff }),
+    applyAutoTakeoff: (items, scales) => {
+      const list = items.map((it) => buildMarkup('length', it.sheetId, it.points, it.extra));
+      commit((d) => ({
+        ...d,
+        sheets: d.sheets.map((x) => (scales[x.id] && !x.scale ? { ...x, scale: scales[x.id] } : x)),
+        markups: [...d.markups, ...list],
+      }));
+      return list;
     },
     setCompareChanges: (sheetId, value) => {
       const next = { ...get().compareChanges };

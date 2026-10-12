@@ -67,16 +67,13 @@ await tool('Anchor Bolts');
 for (let i = 0; i <= 6; i++) for (let j = 0; j <= 5; j++) await click(gx(i) + 1, gy(j) + 1);
 await done();
 
-// S1.02 roof framing
+// S1.02 roof framing: beams and tubing by automatic takeoff, the rest by hand
 await sheet(2);
-await tool('W24x55');
-for (let j = 1; j < 5; j++) for (let i = 0; i < 6; i++) { await click(gx(i) + 9, gy(j)); await click(gx(i + 1) - 9, gy(j)); }
-await tool('W18x35');
-for (const j of [0, 5]) for (let i = 0; i < 6; i++) { if (j === 0 && i === 1) continue; await click(gx(i) + 9, gy(j)); await click(gx(i + 1) - 9, gy(j)); }
-for (const i of [0, 6]) for (let j = 0; j < 5; j++) { await click(gx(i), gy(j) + 9); await click(gx(i), gy(j + 1) - 9); }
-await tool('W30x90');
-await click(gx(1) + 9, gy(0));
-await click(gx(2) - 9, gy(0));
+await page.getByTestId('tb-auto').click();
+await page.getByTestId('auto-find').click();
+await page.getByTestId('auto-status').filter({ hasText: 'members' }).waitFor();
+await page.getByTestId('auto-create').click();
+await page.getByTestId('tab-tool-chest').click();
 await tool('HSS6x6x3/8 Column');
 for (let i = 0; i <= 6; i++) for (let j = 0; j <= 5; j++) await click(gx(i), gy(j));
 await done();
@@ -192,9 +189,12 @@ for (const m of pf.doc.markups) {
   if (lvl) m.custom.level = lvl;
   if (sheetNo[m.sheetId] === 'S1.02' && m.type === 'length' && m.points.length === 2) {
     const [a, b] = m.points;
-    const col = (x) => letters[Math.round((x - 260) / 225)];
-    const row = (y) => Math.round((y - 300) / 180) + 1;
-    m.custom.grid = Math.abs(a.y - b.y) < 1 ? `${row(a.y)} / ${col(a.x)}-${col(b.x)}` : `${col(a.x)} / ${row(a.y)}-${row(b.y)}`;
+    const i = (x) => Math.round((x - 260) / 225);
+    const j = (y) => Math.round((y - 300) / 180);
+    const onGrid = (v, k, o, step) => Math.abs(v - (o + k * step)) < 12;
+    // Members on the grid get their grid reference (the canopy is off the grid).
+    if (Math.abs(a.y - b.y) < 1 && onGrid(a.y, j(a.y), 300, 180)) m.custom.grid = `${j(a.y) + 1} / ${letters[i(a.x)]}-${letters[i(b.x)]}`;
+    else if (Math.abs(a.x - b.x) < 1 && onGrid(a.x, i(a.x), 260, 225)) m.custom.grid = `${letters[i(a.x)]} / ${j(a.y) + 1}-${j(b.y) + 1}`;
   }
 }
 writeFileSync(out, JSON.stringify(pf));

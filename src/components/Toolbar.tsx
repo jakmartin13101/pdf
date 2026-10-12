@@ -1,4 +1,4 @@
-import { DraftingCompass, FileDown, FolderOpen, Frame, GitCompareArrows, GripVertical, Hand, Maximize, MousePointer2, Redo2, Save, Sigma, Table2, Undo2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react';
+import { DraftingCompass, FileDown, FolderOpen, Frame, GitCompareArrows, GripVertical, Hand, Maximize, MousePointer2, Redo2, Save, Sigma, Table2, Undo2, Wand2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react';
 import { useRef } from 'react';
 import { beginDockDrag } from './dock/dragging';
 import { DockMenuButton } from './dock/PanelHeader';
@@ -51,6 +51,7 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
   const markupsOpen = usePanelOpen('markups');
   const summaryOpen = usePanelOpen('summary');
   const compareOpen = usePanelOpen('compare');
+  const autoOpen = usePanelOpen('autotakeoff');
   const locked = useStore((s) => s.layout.locked);
   const pos = useStore((s) => s.layout.toolbar);
   const ref = useRef<HTMLDivElement>(null);
@@ -137,6 +138,7 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
           <TB icon={Table2} label="Markups" active={markupsOpen} onClick={() => st().togglePanel('markups')} title="Show or hide the Markups List" />
           <TB icon={Sigma} label="Summary" active={summaryOpen} onClick={() => st().togglePanel('summary')} title="Show or hide the Takeoff Summary" />
           <TB icon={GitCompareArrows} label="Compare" active={compareOpen} disabled={!loaded} onClick={() => st().togglePanel('compare')} title="Overlay and compare two sheets" />
+          <TB icon={Wand2} label="Auto" active={autoOpen} disabled={!loaded} onClick={() => st().togglePanel('autotakeoff')} title="Automatic takeoff: find labelled beams and tubing and measure them" />
         </div>
         <div className="tb-caption">Data</div>
       </div>

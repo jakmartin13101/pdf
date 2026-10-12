@@ -13,6 +13,7 @@ import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { useOwnerWindow } from '../ownerWindow';
 import { detailMenuItems } from '../detailMenu';
 import { AlignMarkers, ChangeBoxes, LayerA, LayerB, TintDefs } from './OverlayLayers';
+import { AutoTakeoffLayer } from './AutoTakeoffLayer';
 import { applySim, fitSimilarity, invertSim, type Similarity } from '../../core/align';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -142,6 +143,8 @@ export function Viewer({ paneId }: { paneId: string }) {
   const compareSheetId = sheet?.compare?.sheetId ?? null;
   const other = useStore((s) => (compareSheetId ? s.doc.sheets.find((x) => x.id === compareSheetId) : undefined));
   const changes = useStore((s) => (sheet ? s.compareChanges[sheet.id] : undefined));
+  const autoTakeoff = useStore((s) => s.autoTakeoff);
+  const autoHere = useMemo(() => (sheet && autoTakeoff ? autoTakeoff.members.filter((m) => m.sheetId === sheet.id) : []), [autoTakeoff, sheet]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -1161,6 +1164,7 @@ export function Viewer({ paneId }: { paneId: string }) {
         >
           <ViewportsLayer sheet={sheet} zoom={z} />
           <MarkupsLayer markups={pageMarkups} labels={labels} showLabels={prefs.showLabels} />
+          {autoTakeoff && autoHere.length > 0 && <AutoTakeoffLayer members={autoHere} state={autoTakeoff} zoom={z} clickable={tool.kind === 'select'} />}
           {draftMarkup && (
             <g className="draft">
               <MarkupShape m={draftMarkup} label="" showLabels={false} draft />

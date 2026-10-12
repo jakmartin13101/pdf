@@ -7,8 +7,9 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.2.0** adds overlay / compare for drawing revisions (1.1.0: Standard Details and detachable split
-> windows) – see the [changelog](CHANGELOG.md).
+> **Version 1.3.0** adds **automatic takeoff** of labelled beams and tubing, and standard details added **by hand** to
+> any selection of markups (1.2.0: overlay / compare; 1.1.0: Standard Details and detachable split windows) – see the
+> [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -81,7 +82,8 @@ A five-minute tour with the sample set:
 | **11. Takeoff summary** | Totals per subject grouped by Category (or any column): pieces (EA), length (LF), area (SF), volume (CY), Qty and every numeric/formula column (e.g. weight in lbs and tons). Click a line to select its markups. |
 | **12. Export / report** | Markups CSV, summary CSV, printable summary report (save as PDF from the print dialog), flattened PDF with markups and measurement labels burned in, and portable project files (`.takeoff.json`, drawings embedded). |
 | **Overlay / compare** | *Document → Compare / Overlay Sheets*: two sheets in their own colours, auto-aligned (text or image) or aligned by points / by hand, with change detection and revision clouds. See [Overlay / compare](#overlay--compare-sheets). |
-| **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length. See [Standard details](#standard-details). |
+| **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length – or add a detail by hand to any selected markups. See [Standard details](#standard-details). |
+| **Automatic takeoff** | *Auto* button (*Tools → Automatic Takeoff*): finds the member-size labels on a plan (W24x55, HSS8x4x1/4, Pipe 4 Std…), measures the line each one labels at the sheet's scale and creates labelled length measurements. See [Automatic takeoff](#automatic-takeoff-beams-and-tubing). |
 
 ### Tool Chest: size tools and hidden tools
 
@@ -126,12 +128,45 @@ IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
 * The added material appears under each matching markup in the Markups List (*Standard Detail*, read-only) and as its
   own lines in the Takeoff Summary and exports. The size fills Member Size, so Weight computes for it (steel shapes,
   plate, pipe, rod and rebar). *Detail material* in the list (or the summary) shows or hides it.
+* **By hand** – select any markups (Ctrl+click or box-select in the drawing or the Markups List), right-click →
+  **Standard Details**: tick a detail to add it to every selected markup (or untick to take it off), or choose
+  **New Detail for These N…** to make a detail for them. The Properties panel shows a checkbox per detail for the
+  selection, and the editor has **Add to Selected / Take off Selected**. A detail with *Apply automatically* off goes
+  only where you add it; one with a rule still lets you add it to other markups or take it off single ones by hand.
+  *Back to Rules Only* drops the by-hand changes.
 * The editor shows the rule as a formula and a live preview of pieces, length and weight. Details are saved with the
   project; export/import them as JSON to reuse on other jobs. The example takeoff includes four.
 
 <img src="docs/screenshot-standard-details.png" width="640" alt="Standard Details dialog">
 
+<img src="docs/screenshot-details-by-hand.png" width="640" alt="A standard detail added by hand to three selected tubes">
+
 ![Material added by standard details in the Markups List](docs/screenshot-detail-rows.png)
+
+### Automatic takeoff (beams and tubing)
+
+Open the **Auto** panel (toolbar, or *Tools → Automatic Takeoff (Beams & Tubing)…*) on a framing plan and click
+**Find Members**:
+
+![Automatic takeoff of the roof framing plan: members found, previewed by size](docs/screenshot-auto-takeoff.png)
+
+* It reads the PDF's own text and line work: every **member-size label** – W, S, M and HP beams, HSS (rectangular,
+  square and round), TS and Pipe tubing, C/MC channels, optionally L angles – and the **line it labels**: the line that
+  runs parallel to the text, right beside it, under the middle of the label. Solid lines win over dashed grid and hidden
+  lines, heavy ones over hairline dimension lines, and each label takes one line. Labels that name columns
+  (*HSS6x6x3/8 COLUMNS*) are skipped – columns are counted, not measured.
+* **Scale** – lengths use the sheet's scale (and viewport scales inside details). A sheet with no scale yet uses the
+  scale printed on the drawing (`SCALE: 1/8" = 1'-0"`) when there is exactly one, and that scale is set on the sheet
+  when you create the measurements; otherwise the panel asks you to calibrate.
+* **Review** – the members are previewed on the drawing in a colour per size with the label they were read from boxed.
+  The panel groups them by size with count and total length; untick a size, expand it to untick single members (click
+  one to zoom to it), or click a member on the drawing to leave it out. *Skip members already taken off* leaves out
+  members an existing length measurement covers, so it can be run again after more work. *Add to each end* lengthens
+  every member (e.g. to the grid lines or column centres).
+* **Create** – one length measurement per member in one undo step, labelled with its size, with the size as Subject and
+  Member Size (so Weight computes and standard details apply). When the Tool Chest has a length tool for the size
+  (e.g. *W24x55*), its colour, layer and column values are used.
+* Search one sheet or all sheets. The example takeoff's roof beams and canopy tubes were taken off this way.
 
 ### Overlay / compare sheets
 
@@ -223,7 +258,7 @@ tool active), **LABELS** (measurement labels on the drawing).
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff project (needs `npm run dev` running)
@@ -250,10 +285,11 @@ src/
     steelShapes.ts   PLF/PSF weight lookup
     columns.ts       built-in + custom column model, row building for the list
     summary.ts       takeoff summary aggregation
-    details.ts       standard details: matching rules and the material rows they add
+    details.ts       standard details: matching rules, by-hand assignments and the material rows they add
+    autoTakeoff.ts   automatic takeoff: line work and labels from the PDF, label-to-member matching, printed scales
     align.ts         overlay maths: similarity fits, text/RANSAC and image alignment, change finding
     compare.ts       overlay rendering helpers: tint matrices, auto-align and changes on rendered sheets
-    pdf.ts           pdf.js loading, rendering, title-block text, snap index
+    pdf.ts           pdf.js loading, rendering, title-block text, snap index, line work for automatic takeoff
     export.ts        CSV, printable report, flattened PDF
   store/           Zustand store (undo/redo history), project I/O, autosave, commands
   components/      viewer (canvas + SVG markup layer), panels, markups list, summary, dialogs,
@@ -297,4 +333,7 @@ GitHub release when a `v*` tag is pushed.
   hand and rely on markup snapping for scans.
 * Markups are stored in the project, not written back into the PDF as native annotations; use the flattened PDF export
   to share marked-up drawings.
-* Single user; there is no Studio-style real-time collaboration.
+* Automatic takeoff needs vector PDFs whose member labels are text placed beside the member, parallel to it. Labels
+  connected by a leader line, or one *TYP.* label meant for several members, give one member each; scans have no line
+  work or text to read.
+* Single user; there is no real-time collaboration.

@@ -38,14 +38,28 @@ export function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () =>
             <span className="menu-label">{it.label}</span>
             {it.shortcut && <span className="menu-shortcut">{it.shortcut}</span>}
             {it.children && <ChevronRight size={13} className="menu-arrow" />}
-            {it.children && open === i && (
-              <div className="submenu">
-                <MenuList items={it.children} onClose={onClose} />
-              </div>
-            )}
+            {it.children && open === i && <Submenu items={it.children} onClose={onClose} />}
           </div>
         ),
       )}
+    </div>
+  );
+}
+
+/** A submenu beside its item, moved up or to the other side when it would run off the window. */
+function Submenu({ items, onClose }: { items: MenuItem[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const win = useOwnerWindow();
+  const [fit, setFit] = useState({ dy: 0, flip: false });
+  useLayoutEffect(() => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const dy = Math.max(Math.min(0, win.innerHeight - 6 - r.bottom), 6 - r.top);
+    setFit({ dy, flip: r.right > win.innerWidth - 6 && r.left - r.width > 0 });
+  }, [win]);
+  return (
+    <div ref={ref} className="submenu" style={{ transform: fit.dy ? `translateY(${fit.dy}px)` : undefined, ...(fit.flip ? { left: 'auto', right: '100%' } : {}) }}>
+      <MenuList items={items} onClose={onClose} />
     </div>
   );
 }

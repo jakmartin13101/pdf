@@ -174,6 +174,7 @@ export function MenuBar() {
       { sep: true },
       { label: 'Manage Columns…', onClick: () => st().setDialog({ kind: 'columns' }) },
       { label: 'Standard Details…', onClick: () => st().setDialog({ kind: 'details' }) },
+      { label: 'Automatic Takeoff (Beams & Tubing)…', disabled: !loaded, onClick: () => st().showPanel('autotakeoff') },
       { label: 'Tool Chest', onClick: () => st().showPanel('toolchest') },
       { label: 'New Steel Shape / Size Tool…', onClick: () => st().setDialog({ kind: 'shapeTool' }) },
     ],

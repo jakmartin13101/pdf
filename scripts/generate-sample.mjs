@@ -313,6 +313,20 @@ function roofFramingPlan(s, rev = false) {
       s.rect(gx(i) - 9, gy(j) - 9, 18, 18, { w: 1.5, fill: rgb(0.2, 0.2, 0.2) });
     }
   s.text('HSS6x6x3/8 COLUMNS (TYP.)', gx(5) + 14, gy(4) + 24, 10, { bold: true });
+  // entrance canopy (tube steel) cantilevered off grid 6 between D-E
+  {
+    const y0 = gy(NY) + 9;
+    const y1 = gy(NY) + 8 * FT8;
+    const xa = gx(3) + 2 * FT8;
+    const xb = gx(4) - 2 * FT8;
+    for (const x of [xa, xb]) {
+      s.line(x, y0, x, y1, { w: 2.5 });
+      s.text('HSS8x4x1/4', x - 4, y1 - 5, 8, { bold: true, rotate: 90 });
+    }
+    s.line(xa, y1, xb, y1, { w: 2.5 });
+    s.text('HSS6x6x1/4', (xa + xb) / 2, y1 - 6, 8, { bold: true, align: 'center' });
+    s.text('ENTRANCE CANOPY', xb + 14, y1 + 4, 9, { bold: true });
+  }
   // roof opening (RTU) with angle frame
   const opening = (x, y, w, h, label) => {
     s.rect(x, y, w, h, { w: 1.5 });

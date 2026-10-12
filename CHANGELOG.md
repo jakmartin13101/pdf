@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.3.0 – 2026-10-12
+
+### Automatic takeoff (beams and tubing)
+- New **Auto Takeoff** panel (toolbar *Auto*, or *Tools → Automatic Takeoff (Beams & Tubing)…*): **Find Members**
+  reads the member-size labels on a plan – W, S, M, HP beams; HSS, TS and Pipe tubing; C/MC channels; optionally
+  angles – and finds the line each label names (parallel, beside it, under its middle; solid and heavy lines preferred
+  over dashed grid lines and hairline dimensions). Column labels are skipped.
+- Lengths use the sheet's scale (and viewport scales). Sheets without a scale use the scale printed on the drawing
+  (e.g. `SCALE: 1/8" = 1'-0"`), which is set on the sheet when the measurements are created.
+- Members are previewed on the drawing in a colour per size; the panel lists them by size with counts and total
+  lengths. Leave out sizes or single members (in the list or by clicking them on the drawing), skip members already
+  taken off, add a length to each end, search one sheet or all sheets.
+- **Create** adds one labelled length measurement per member (one undo step) with the size as Subject and Member Size,
+  using the Tool Chest tool for that size when there is one.
+- The sample roof framing plan has a tube-steel entrance canopy; the example takeoff's roof beams and tubes were made
+  with the automatic takeoff.
+
+### Standard details by hand
+- Select several markups and right-click → **Standard Details** to add a detail to all of them (or take it off), or
+  **New Detail for These N…**. The Properties panel shows a checkbox per detail for the selection.
+- A detail can be by-hand only (*Apply automatically* off). Details with a rule can still be added to other markups or
+  taken off single markups by hand; *Back to Rules Only* undoes that. The editor has *Add to / Take off Selected* and
+  shows how many markups each detail covers by rule and by hand.
+
+### Other
+- Submenus stay inside the window near the screen edges.
+- The Terms of Service, About box and documentation no longer name other companies' products.
+
 ## 1.2.0 – 2026-10-12
 
 ### Overlay / compare sheets
