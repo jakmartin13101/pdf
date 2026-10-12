@@ -2,7 +2,7 @@ import * as pdfjs from 'pdfjs-dist';
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { Pt, Rect } from '../types';
-import { extractStrokes, placeText, type PlacedText, type Stroke } from './autoTakeoff';
+import { extractVectors, placeText, type Box, type PlacedText, type Stroke } from './autoTakeoff';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -416,10 +416,10 @@ export function querySnap(idx: SnapIndex, p: Pt, radius: number): { pt: Pt; kind
 // ---------------------------------------------------------------------------
 // Line work and placed text for automatic takeoff
 
-const vectorCache = new Map<string, Promise<{ strokes: Stroke[]; texts: PlacedText[] }>>();
+const vectorCache = new Map<string, Promise<{ strokes: Stroke[]; boxes: Box[]; texts: PlacedText[] }>>();
 
-/** Straight strokes (with line weight and dash) and positioned text runs of a page. */
-export function pageVectors(fileId: string, pageIndex: number): Promise<{ strokes: Stroke[]; texts: PlacedText[] }> {
+/** Straight strokes (with line weight and dash), small closed shapes (column symbols) and positioned text runs of a page. */
+export function pageVectors(fileId: string, pageIndex: number): Promise<{ strokes: Stroke[]; boxes: Box[]; texts: PlacedText[] }> {
   const key = `${fileId}#${pageIndex}`;
   let p = vectorCache.get(key);
   if (!p) {
@@ -427,10 +427,10 @@ export function pageVectors(fileId: string, pageIndex: number): Promise<{ stroke
       const page = await getPage(fileId, pageIndex);
       const vp = page.getViewport({ scale: 1 });
       const [ops, tc] = await Promise.all([page.getOperatorList(), page.getTextContent()]);
-      const strokes = extractStrokes(ops.fnArray, ops.argsArray, pdfjs.OPS as unknown as Record<string, number>, vp.transform);
+      const { strokes, boxes } = extractVectors(ops.fnArray, ops.argsArray, pdfjs.OPS as unknown as Record<string, number>, vp.transform);
       const texts: PlacedText[] = [];
       for (const it of tc.items) if ('str' in it && it.str.trim()) texts.push(placeText(it.str, it.transform, it.width, vp.transform));
-      return { strokes, texts };
+      return { strokes, boxes, texts };
     })();
     vectorCache.set(key, p);
     p.catch(() => vectorCache.delete(key));

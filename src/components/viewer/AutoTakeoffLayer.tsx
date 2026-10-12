@@ -124,22 +124,29 @@ export function AutoTakeoffLayer({ members, state, zoom, clickable, sheet }: { m
             )}
             {clickable &&
               on &&
-              (['p1', 'p2'] as const).map((end) => (
-                <rect
-                  key={end}
-                  x={m[end].x - hs / 2}
-                  y={m[end].y - hs / 2}
-                  width={hs}
-                  height={hs}
-                  className="auto-handle"
-                  stroke={color}
-                  strokeWidth={1.5 / zoom}
-                  onPointerDown={(e) => startDrag(e, m, end)}
-                  data-testid={`auto-handle-${end}`}
-                >
-                  <title>Drag to adjust this end (snaps to the drawing; Alt: move freely, Ctrl: no snapping)</title>
-                </rect>
-              ))}
+              (['p1', 'p2'] as const).map((end, i) => {
+                const kind = m.orig ? 'end' : m.ends?.[i] ?? 'end';
+                return (
+                  <rect
+                    key={end}
+                    x={m[end].x - hs / 2}
+                    y={m[end].y - hs / 2}
+                    width={hs}
+                    height={hs}
+                    className={`auto-handle ${kind}`}
+                    stroke={color}
+                    strokeWidth={1.5 / zoom}
+                    onPointerDown={(e) => startDrag(e, m, end)}
+                    data-testid={`auto-handle-${end}`}
+                    data-end={kind}
+                  >
+                    <title>
+                      {kind === 'midpoint' ? 'Estimated end: halfway between two labels (no column found). ' : kind === 'column' ? 'Stops at a column. ' : ''}
+                      Drag to adjust this end (snaps to the drawing; Alt: move freely, Ctrl: no snapping)
+                    </title>
+                  </rect>
+                );
+              })}
           </g>
         );
       })}

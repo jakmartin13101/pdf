@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { existingMeasurements, extractStrokes, findMemberLabels, matchMembers, placeText, printedScales, type PlacedText } from '../src/core/autoTakeoff';
+import { COLUMNS, FT, GIRDER_X, LABELS, TOP, BOTTOM, girderPlan } from './fixtures/girderPlan';
+import { existingMeasurements, extractStrokes, extractVectors, findMemberLabels, matchMembers, placeText, printedScales, type PlacedText } from '../src/core/autoTakeoff';
 
 async function loadPage(file: string, pageIndex: number) {
   const data = new Uint8Array(readFileSync(file));
@@ -95,5 +96,75 @@ describe('automatic takeoff', () => {
     const frame = found.find((f) => f.size === 'W30x90')!;
     expect(frame.width).toBe(5);
     expect(found.every((f) => !f.dashed)).toBe(true);
+  });
+});
+
+describe('continuous member lines', () => {
+  const run = async (o: Parameters<typeof girderPlan>[0]) => {
+    const doc = await pdfjs.getDocument({ data: await girderPlan(o), verbosity: 0 }).promise;
+    const page = await doc.getPage(1);
+    const vp = page.getViewport({ scale: 1 });
+    const ops = await page.getOperatorList();
+    const { strokes, boxes } = extractVectors(ops.fnArray, ops.argsArray, pdfjs.OPS as unknown as Record<string, number>, vp.transform);
+    const tc = await page.getTextContent();
+    const texts: PlacedText[] = [];
+    for (const it of tc.items) if ('str' in it && it.str.trim()) texts.push(placeText(it.str, it.transform, it.width, vp.transform));
+    return matchMembers(findMemberLabels(texts, ['beam', 'tube', 'channel']), strokes, { boxes }).map((m) => ({
+      size: m.size,
+      x: Math.round(m.p1.x),
+      from: Math.round(m.p1.y * 10) / 10,
+      to: Math.round(m.p2.y * 10) / 10,
+      ends: m.ends,
+    }));
+  };
+  const [c1, c2, c3] = COLUMNS;
+
+  it('splits a girder drawn straight through its columns at the column squares', async () => {
+    expect(await run({})).toEqual([
+      { size: 'W18x40', x: GIRDER_X, from: TOP, to: c1, ends: ['end', 'column'] }, // 20'-0"
+      { size: 'W18x40', x: GIRDER_X, from: c1, to: c2, ends: ['column', 'column'] }, // 25'-0"
+      { size: 'W18x40', x: GIRDER_X, from: c2, to: c3, ends: ['column', 'column'] }, // 25'-0"
+    ]);
+    expect([(c1 - TOP) / FT, (c2 - c1) / FT, (c3 - c2) / FT]).toEqual([20, 25, 25]);
+  });
+
+  it('recognises filled, round and wide-flange column symbols', async () => {
+    for (const columnShape of ['filled', 'circle', 'wide-flange'] as const) {
+      const got = await run({ columnShape });
+      expect(got.map((m) => [m.from, m.to]), columnShape).toEqual([
+        [TOP, c1],
+        [c1, c2],
+        [c2, c3],
+      ]);
+    }
+  });
+
+  it('joins a line drawn in pieces (broken where beams frame in) before splitting it', async () => {
+    expect((await run({ pieces: true })).map((m) => [m.from, m.to])).toEqual([
+      [TOP, c1],
+      [c1, c2],
+      [c2, c3],
+    ]);
+  });
+
+  it('without columns, splits at the midpoint between labels; the last runs to the end of the line', async () => {
+    const m12 = (LABELS[0] + LABELS[1]) / 2;
+    const m23 = (LABELS[1] + LABELS[2]) / 2;
+    const got = await run({ columns: false });
+    expect(got.map((m) => m.ends)).toEqual([
+      ['end', 'midpoint'],
+      ['midpoint', 'midpoint'],
+      ['midpoint', 'end'],
+    ]);
+    const near = (a: number, b: number) => Math.abs(a - b) < 1;
+    expect(near(got[0].to, m12) && near(got[1].from, m12) && near(got[1].to, m23) && near(got[2].from, m23) && got[2].to === BOTTOM).toBe(true);
+  });
+
+  it('a small square at a beam connection does not split a span when a column is nearer the midpoint', async () => {
+    expect((await run({ falseMarks: [300] })).map((m) => [m.from, m.to])).toEqual([
+      [TOP, c1],
+      [c1, c2],
+      [c2, c3],
+    ]);
   });
 });

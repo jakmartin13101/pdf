@@ -3216,6 +3216,16 @@ body.popout-body {
 .auto-handle:hover {
   fill: #ffe9a8;
 }
+.auto-handle.midpoint {
+  fill: #ff9f1c;
+}
+.auto-handle.column {
+  fill: #d8f5e1;
+}
+.auto-zoom em.est {
+  color: var(--warn);
+  font-weight: 600;
+}
 .auto-member-wrap.focused {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border-radius: 4px;

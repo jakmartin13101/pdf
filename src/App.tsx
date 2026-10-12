@@ -57,7 +57,7 @@ function StartScreen() {
                 <small>7-sheet warehouse set: foundation, framing, details at mixed scales, arch, MEP</small>
               </span>
             </button>
-            <button className="start-action" onClick={cmdOpenPdf}>
+            <button className="start-action" onClick={cmdOpenPdf} data-testid="open-pdf">
               <span className="ico">
                 <FolderOpen size={20} />
               </span>

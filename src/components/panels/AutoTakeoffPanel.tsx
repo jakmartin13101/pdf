@@ -86,8 +86,8 @@ export function AutoTakeoffPanel() {
     try {
       for (const [i, sh] of sheets.entries()) {
         setBusy(`Reading ${sheetLongName(sh, doc)}${sheets.length > 1 ? ` (${i + 1} of ${sheets.length})` : ''}…`);
-        const { strokes, texts } = await pageVectors(sh.fileId, sh.pageIndex);
-        const found = matchMembers(findMemberLabels(texts, opts.families), strokes);
+        const { strokes, boxes, texts } = await pageVectors(sh.fileId, sh.pageIndex);
+        const found = matchMembers(findMemberLabels(texts, opts.families), strokes, { boxes });
         const taken = existingMeasurements(found, doc.markups.filter((m) => m.sheetId === sh.id));
         for (const f of found) members.push({ ...f, id: `${sh.id}:${f.id}`, sheetId: sh.id, existingId: taken.get(f.id) });
         if (!sh.scale) printed[sh.id] = printedScales(texts).map((p) => p.preset.label);
@@ -255,6 +255,18 @@ export function AutoTakeoffPanel() {
                     }`
                   : 'No labelled beams or tubing found. Labels must sit beside the member line, parallel to it.'}
               </div>
+              {(() => {
+                const est = result.members.filter((m) => !m.orig && m.ends?.includes('midpoint')).length;
+                const cols = result.members.filter((m) => m.ends?.includes('column')).length;
+                return est || cols ? (
+                  <div className="hint" data-testid="auto-ends-note">
+                    {cols ? `${cols} member${cols === 1 ? ' ends' : 's end'} at a column where the line runs on through it. ` : ''}
+                    {est
+                      ? `${est} member${est === 1 ? ' has' : 's have'} an estimated end (orange square): no column was found between two labels on the same line, so the line is split halfway between them – check those and drag the end if needed.`
+                      : ''}
+                  </div>
+                ) : null;
+              })()}
               {printedUsed.map((sh) => (
                 <div key={sh.id} className="hint" data-testid="auto-scale-note">
                   {sheetLongName(sh, doc)} has no scale yet: the drawing says <b>{result.printed[sh.id][0]}</b>, which will be set when you create the measurements.
@@ -340,7 +352,15 @@ export function AutoTakeoffPanel() {
                                   >
                                     {result.sheetIds.length > 1 && <small>{sh.number || sh.title}</small>}
                                     <span data-testid="auto-member-length">{l ? formatLength(l.inches, l.scale.unit, l.scale.precision) : 'no scale'}</span>
-                                    {m.orig && <em>adjusted</em>}
+                                    {m.orig ? (
+                                      <em>adjusted</em>
+                                    ) : m.ends?.includes('midpoint') ? (
+                                      <em className="est" title="No column between this label and the next on the same line: split halfway between the labels" data-testid="auto-member-estimated">
+                                        est. end
+                                      </em>
+                                    ) : m.ends?.includes('column') ? (
+                                      <em title="Stops at a column on a continuous line">to column</em>
+                                    ) : null}
                                     {m.existingId && <em>taken off</em>}
                                     {m.dashed && <em>dashed</em>}
                                   </button>

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.1 – 2026-10-12
+
+### Automatic takeoff: members on continuous lines
+- A member line that does not stop at its columns (a girder drawn straight through, one label per span) is now taken
+  off span by span: the line is split at the column symbols drawn on it – squares, filled squares, round and I-shaped
+  columns – using the nearest column on each side of each label.
+- Where no column is drawn between two labels on the same line, the line is split halfway between the labels. These
+  ends are marked *est. end* in the list and with an orange square on the drawing; the panel says how many to check.
+- Collinear pieces of a line that touch (broken where other beams frame in) are joined before splitting, so each
+  label measures its whole span instead of the piece beside it. Several labels can now share one line; before, the
+  first label took the whole line.
+
 ## 1.4.0 – 2026-10-12
 
 ### Settings menu

@@ -58,6 +58,8 @@ export interface MemberLabel {
   fh: number;
 }
 
+export type EndKind = 'end' | 'column' | 'midpoint';
+
 export interface FoundMember {
   id: string;
   size: string;
@@ -68,6 +70,11 @@ export interface FoundMember {
   /** Line weight of the member line. */
   width: number;
   dashed: boolean;
+  /**
+   * What each end (p1, p2) stops at: the end of the drawn line, a column symbol on the line, or – where
+   * a line carries on past several labels with nothing between them – the midpoint between two labels.
+   */
+  ends?: [EndKind, EndKind];
   /** Where the label is (axis-aligned box, page points). */
   labelBox: { x: number; y: number; w: number; h: number };
   /** An existing length markup already covers this member. */
@@ -88,45 +95,69 @@ const mul = (m: Mat, n: Mat): Mat => [
 ];
 
 const MAX_STROKES = 400_000;
+const MAX_BOXES = 50_000;
+
+/** A small closed shape (column symbol: square, rectangle, I-shape, circle), as its bounding box. */
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Column symbols are small and roughly square. */
+const BOX_MIN = 2.5;
+const BOX_MAX = 40;
+const BOX_ASPECT = 1.6;
 
 interface SubPath {
+  /** On-curve points in device space. */
   pts: Pt[];
+  /** straight[i]: the segment from pts[i] to pts[i + 1] is a straight line (not a curve). */
+  straight: boolean[];
   closed: boolean;
-  curved: boolean;
 }
 
 /**
- * Straight segments of a page's line work from its pdf.js operator list.
+ * The line work of a page from its pdf.js operator list: straight segments with their line weight
+ * and dash, and small closed shapes (column symbols).
  * `ops` is pdfjs.OPS; `base` the viewport transform (PDF space → page points, y down).
  */
-export function extractStrokes(fnArray: number[], argsArray: unknown[], ops: Record<string, number>, base: number[]): Stroke[] {
+export function extractVectors(fnArray: number[], argsArray: unknown[], ops: Record<string, number>, base: number[]): { strokes: Stroke[]; boxes: Box[] } {
   const out: Stroke[] = [];
+  const boxes: Box[] = [];
   let ctm = base.slice(0, 6) as Mat;
   let lw = 1;
   let dashed = false;
   const stack: { ctm: Mat; lw: number; dashed: boolean }[] = [];
-  // Current path: subpaths of device-space points (curves break a subpath into straight runs).
   let path: SubPath[] = [];
   const tp = (x: number, y: number): Pt => ({ x: ctm[0] * x + ctm[2] * y + ctm[4], y: ctm[1] * x + ctm[3] * y + ctm[5] });
   const scaleOf = (m: Mat) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+  const near = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y) < 0.5;
 
   const strokePath = () => {
     const w = lw * scaleOf(ctm);
     for (const sp of path) {
-      const pts = sp.closed ? [...sp.pts, sp.pts[0]] : sp.pts;
-      for (let i = 1; i < pts.length && out.length < MAX_STROKES; i++) {
-        const a = pts[i - 1];
-        const b = pts[i];
+      const n = sp.pts.length;
+      for (let i = 1; i < n && out.length < MAX_STROKES; i++) {
+        if (!sp.straight[i - 1]) continue;
+        const a = sp.pts[i - 1];
+        const b = sp.pts[i];
         if (Math.hypot(b.x - a.x, b.y - a.y) >= 1) out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, dashed });
+      }
+      if (sp.closed && n > 2) {
+        const a = sp.pts[n - 1];
+        const b = sp.pts[0];
+        if (Math.hypot(b.x - a.x, b.y - a.y) >= 1 && out.length < MAX_STROKES) out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: w, dashed });
       }
     }
   };
   // Filled long thin quadrilaterals are heavy lines drawn as shapes: use their centre line.
   const fillPath = () => {
     for (const sp of path) {
-      if (sp.curved) continue;
+      if (sp.straight.some((x) => !x)) continue;
       let pts = sp.pts;
-      if (pts.length === 5 && Math.hypot(pts[4].x - pts[0].x, pts[4].y - pts[0].y) < 0.5) pts = pts.slice(0, 4);
+      if (pts.length === 5 && near(pts[4], pts[0])) pts = pts.slice(0, 4);
       if (pts.length !== 4) continue;
       const e = [0, 1, 2, 3].map((i) => Math.hypot(pts[(i + 1) % 4].x - pts[i].x, pts[(i + 1) % 4].y - pts[i].y));
       // Opposite sides equal (a parallelogram), one pair much longer than the other.
@@ -140,6 +171,27 @@ export function extractStrokes(fnArray: number[], argsArray: unknown[], ops: Rec
       const a = long === 0 ? mid(pts[3], pts[0]) : mid(pts[0], pts[1]);
       const b = long === 0 ? mid(pts[1], pts[2]) : mid(pts[2], pts[3]);
       if (out.length < MAX_STROKES) out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: thick, dashed: false });
+    }
+  };
+  // Small closed, roughly square shapes, stroked or filled: candidate column symbols.
+  const collectBoxes = () => {
+    for (const sp of path) {
+      const n = sp.pts.length;
+      if (n < 3 || !(sp.closed || near(sp.pts[n - 1], sp.pts[0])) || boxes.length >= MAX_BOXES) continue;
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (const q of sp.pts) {
+        x0 = Math.min(x0, q.x);
+        y0 = Math.min(y0, q.y);
+        x1 = Math.max(x1, q.x);
+        y1 = Math.max(y1, q.y);
+      }
+      const w = x1 - x0;
+      const h = y1 - y0;
+      if (Math.min(w, h) < BOX_MIN || Math.max(w, h) > BOX_MAX || Math.max(w, h) > BOX_ASPECT * Math.min(w, h)) continue;
+      boxes.push({ x: x0, y: y0, w, h });
     }
   };
 
@@ -171,17 +223,20 @@ export function extractStrokes(fnArray: number[], argsArray: unknown[], ops: Rec
       const [subOps, coords] = args as [number[], number[]];
       let j = 0;
       let cur: SubPath | undefined = path[path.length - 1];
-      const start = (p: Pt, curved = false): SubPath => {
-        const sp: SubPath = { pts: [p], closed: false, curved };
+      const start = (p: Pt): SubPath => {
+        const sp: SubPath = { pts: [p], straight: [], closed: false };
         path.push(sp);
         return sp;
       };
+      // After closepath a new segment starts a new subpath at the closed one's start.
+      const open = () => (cur && !cur.closed ? cur : (cur = start(cur ? cur.pts[0] : { x: 0, y: 0 })));
       for (const op of subOps) {
         if (op === O.moveTo) cur = start(tp(coords[j++], coords[j++]));
         else if (op === O.lineTo) {
           const p = tp(coords[j++], coords[j++]);
-          if (cur && !cur.closed) cur.pts.push(p);
-          else cur = start(p);
+          const sp = open();
+          sp.pts.push(p);
+          sp.straight.push(true);
         } else if (op === O.rectangle) {
           const x = coords[j++];
           const y = coords[j++];
@@ -189,13 +244,15 @@ export function extractStrokes(fnArray: number[], argsArray: unknown[], ops: Rec
           const h = coords[j++];
           const r = start(tp(x, y));
           r.pts.push(tp(x + w, y), tp(x + w, y + h), tp(x, y + h));
+          r.straight.push(true, true, true);
           r.closed = true;
-          cur = undefined;
+          cur = r;
         } else if (op === O.curveTo || op === O.curveTo2 || op === O.curveTo3) {
           j += op === O.curveTo ? 4 : 2;
-          if (cur) cur.curved = true;
-          // A curve ends the straight run; carry on from its end point.
-          cur = start(tp(coords[j++], coords[j++]), true);
+          const p = tp(coords[j++], coords[j++]);
+          const sp = open();
+          sp.pts.push(p);
+          sp.straight.push(false);
         } else if (op === O.closePath) {
           if (cur) cur.closed = true;
         }
@@ -203,13 +260,20 @@ export function extractStrokes(fnArray: number[], argsArray: unknown[], ops: Rec
     } else if (STROKES.has(fn)) {
       strokePath();
       if (fn !== O.stroke && fn !== O.closeStroke) fillPath();
+      collectBoxes();
       path = [];
     } else if (FILLS.has(fn)) {
       fillPath();
+      collectBoxes();
       path = [];
     } else if (fn === O.endPath) path = [];
   }
-  return out;
+  return { strokes: out, boxes };
+}
+
+/** Straight segments of a page's line work (see extractVectors). */
+export function extractStrokes(fnArray: number[], argsArray: unknown[], ops: Record<string, number>, base: number[]): Stroke[] {
+  return extractVectors(fnArray, argsArray, ops, base).strokes;
 }
 
 /** A pdf.js text item placed on the page (viewport transform `base`). */
@@ -291,6 +355,8 @@ export interface MatchOptions {
   maxGap?: number;
   /** Lines shorter than this (page points) are not members. */
   minLength?: number;
+  /** Small closed shapes on the page (column symbols): a member line running through one stops there. */
+  boxes?: Box[];
 }
 
 const dot = (a: Pt, b: Pt) => a.x * b.x + a.y * b.y;
@@ -341,15 +407,134 @@ function labelCorners(l: MemberLabel): Pt[] {
   return [at(l.s0, lo), at(l.s1, lo), at(l.s1, hi), at(l.s0, hi)];
 }
 
-/** Pair each label with the member line it names. */
+// A continuous line: direction u, normal n, offset d (= p·n) and extent [t0, t1] along u (= p·u).
+interface Run {
+  u: Pt;
+  n: Pt;
+  d: number;
+  t0: number;
+  t1: number;
+  width: number;
+  dashed: boolean;
+}
+const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+const runPoint = (r: Run, t: number): Pt => ({ x: r4(r.u.x * t + r.n.x * r.d), y: r4(r.u.y * t + r.n.y * r.d) });
+
+/** Line directions are grouped in [WRAP, WRAP + π): away from the common 0° and 90°. */
+const WRAP = -1.27;
+
+/**
+ * Collinear strokes that touch or nearly touch, joined into continuous lines: a beam drawn in pieces
+ * (broken where other members frame in, or running through the columns) becomes one line.
+ */
+export function joinCollinear(strokes: Stroke[]): { p1: Pt; p2: Pt; width: number; dashed: boolean }[] {
+  return buildRuns(strokes).map((r) => ({ p1: runPoint(r, r.t0), p2: runPoint(r, r.t1), width: r.width, dashed: r.dashed }));
+}
+
+function buildRuns(strokes: Stroke[]): Run[] {
+  const TH = 0.012;
+  const items = strokes.map((s) => {
+    let th = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+    while (th < WRAP) th += Math.PI;
+    while (th >= WRAP + Math.PI) th -= Math.PI;
+    const u = { x: Math.cos(th), y: Math.sin(th) };
+    const n = { x: -u.y, y: u.x };
+    const ta = s.x1 * u.x + s.y1 * u.y;
+    const tb = s.x2 * u.x + s.y2 * u.y;
+    const d = ((s.x1 + s.x2) / 2) * n.x + ((s.y1 + s.y2) / 2) * n.y;
+    return { s, th, u, n, d, t0: Math.min(ta, tb), t1: Math.max(ta, tb), len: Math.abs(tb - ta) };
+  });
+  // Union pieces with the same direction, the same offset, and the same look.
+  const parent = items.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const bins = new Map<string, number[]>();
+  items.forEach((it, i) => {
+    const kt = Math.round(it.th / TH);
+    const kd = Math.round(it.d);
+    for (let a = kt - 1; a <= kt + 1; a++)
+      for (let b = kd - 1; b <= kd + 1; b++)
+        for (const j of bins.get(`${a},${b}`) ?? []) {
+          const o = items[j];
+          const w = Math.max(it.s.width, o.s.width);
+          if (o.s.dashed !== it.s.dashed || Math.abs(o.th - it.th) > TH || Math.abs(o.d - it.d) > Math.max(0.6, 0.35 * w)) continue;
+          if (w > 1.8 * Math.max(0.1, Math.min(it.s.width, o.s.width))) continue;
+          parent[find(i)] = find(j);
+        }
+    const key = `${kt},${kd}`;
+    const list = bins.get(key);
+    if (list) list.push(i);
+    else bins.set(key, [i]);
+  });
+  const groups = new Map<number, typeof items>();
+  items.forEach((it, i) => {
+    const g = find(i);
+    const list = groups.get(g);
+    if (list) list.push(it);
+    else groups.set(g, [it]);
+  });
+  // Within each group, pieces whose gaps are small are one line.
+  const runs: Run[] = [];
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.t0 - b.t0);
+    let cur: (typeof list)[number][] = [];
+    let end = -Infinity;
+    const flush = () => {
+      if (!cur.length) return;
+      const total = cur.reduce((n, x) => n + x.len, 0) || 1;
+      const ref = cur.reduce((a, b) => (b.len > a.len ? b : a));
+      runs.push({
+        u: ref.u,
+        n: ref.n,
+        d: cur.reduce((n, x) => n + x.d * x.len, 0) / total,
+        t0: Math.min(...cur.map((x) => x.t0)),
+        t1: Math.max(...cur.map((x) => x.t1)),
+        width: Math.max(...cur.map((x) => x.s.width)),
+        dashed: ref.s.dashed,
+      });
+      cur = [];
+    };
+    for (const it of list) {
+      const gapTol = Math.max(2, 2 * it.s.width);
+      if (cur.length && it.t0 > end + gapTol) flush();
+      cur.push(it);
+      end = Math.max(end, it.t1);
+    }
+    flush();
+  }
+  return runs;
+}
+
+/** Positions (along the run) of the column symbols the run passes through, inside the run. */
+function columnsOn(r: Run, boxes: Box[]): number[] {
+  const ts: number[] = [];
+  for (const b of boxes) {
+    const c = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    const off = Math.abs(dot(c, r.n) - r.d);
+    if (off > Math.max(Math.min(b.w, b.h) / 2, 1.5) + r.width / 2 + 0.5) continue;
+    const t = dot(c, r.u);
+    if (t > r.t0 + 0.5 && t < r.t1 - 0.5) ts.push(t);
+  }
+  ts.sort((a, b) => a - b);
+  // The same column drawn twice (outline and fill) counts once.
+  return ts.filter((t, i) => i === 0 || t - ts[i - 1] > 1);
+}
+
+/** Pair each label with the member line it names, and find where that member starts and stops. */
 export function matchMembers(labels: MemberLabel[], strokes: Stroke[], opts: MatchOptions = {}): FoundMember[] {
   const maxGapK = opts.maxGap ?? 1.6;
   const minLength = opts.minLength ?? 12;
-  const lines = dedupe(strokes).filter((s) => Math.hypot(s.x2 - s.x1, s.y2 - s.y1) >= minLength);
+  const boxes = opts.boxes ?? [];
+  const runs = buildRuns(dedupe(strokes)).filter((r) => r.t1 - r.t0 >= minLength);
+  const lines: Stroke[] = runs.map((r) => {
+    const a = runPoint(r, r.t0);
+    const b = runPoint(r, r.t1);
+    return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: r.width, dashed: r.dashed };
+  });
   const near = strokeGrid(lines, 48);
   const sinTol = Math.sin((8 * Math.PI) / 180);
 
-  const cands: { li: number; si: number; score: number }[] = [];
+  // Each label takes the line it sits beside; a long line can carry several labels.
+  const onRun = new Map<number, { li: number; tm: number; ta: number; tb: number }[]>();
   labels.forEach((l, li) => {
     const corners = labelCorners(l);
     const maxGap = maxGapK * l.fh + 3;
@@ -358,6 +543,7 @@ export function matchMembers(labels: MemberLabel[], strokes: Stroke[], opts: Mat
     const pad = maxGap + 8;
     const mid = (l.s0 + l.s1) / 2;
     const labelLen = l.s1 - l.s0;
+    let best: { si: number; score: number } | null = null;
     for (const si of near(Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad)) {
       const s = lines[si];
       const len = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
@@ -380,34 +566,65 @@ export function matchMembers(labels: MemberLabel[], strokes: Stroke[], opts: Mat
       if (gap > maxGap) continue;
       // Grid lines, hidden lines and hairline dimension lines are rarely the member.
       const score = gap + (s.dashed ? 40 : 0) + (s.width < 0.9 ? 6 : 0) - Math.min(s.width, 6) * 0.25;
-      cands.push({ li, si, score });
+      if (!best || score < best.score) best = { si, score };
     }
+    if (!best) return;
+    const r = runs[best.si];
+    const along = corners.map((c) => dot(c, r.u));
+    const middle = { x: l.o.x + l.u.x * mid + l.v.x * 0.28 * l.fh, y: l.o.y + l.u.y * mid + l.v.y * 0.28 * l.fh };
+    const list = onRun.get(best.si) ?? [];
+    list.push({ li, tm: dot(middle, r.u), ta: Math.min(...along), tb: Math.max(...along) });
+    onRun.set(best.si, list);
   });
-  cands.sort((a, b) => a.score - b.score);
-  const usedL = new Set<number>();
-  const usedS = new Set<number>();
+
   const out: FoundMember[] = [];
-  for (const c of cands) {
-    if (usedL.has(c.li) || usedS.has(c.si)) continue;
-    usedL.add(c.li);
-    usedS.add(c.si);
-    const l = labels[c.li];
-    const s = lines[c.si];
-    const box = labelCorners(l);
-    const xs = box.map((p) => p.x);
-    const ys = box.map((p) => p.y);
-    // Measure left to right (top to bottom for vertical members).
-    const flip = s.x1 > s.x2 + 0.5 || (Math.abs(s.x1 - s.x2) <= 0.5 && s.y1 > s.y2);
-    out.push({
-      id: `am${out.length + 1}`,
-      size: l.size,
-      family: l.family,
-      text: l.text,
-      p1: flip ? { x: s.x2, y: s.y2 } : { x: s.x1, y: s.y1 },
-      p2: flip ? { x: s.x1, y: s.y1 } : { x: s.x2, y: s.y2 },
-      width: s.width,
-      dashed: s.dashed,
-      labelBox: { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) },
+  for (const [si, found] of onRun) {
+    const r = runs[si];
+    found.sort((a, b) => a.tm - b.tm);
+    // The same size written twice at one spot (both sides of the line) is one member.
+    const list = found.filter((x, i) => i === 0 || !(labels[x.li].size === labels[found[i - 1].li].size && x.ta < found[i - 1].tb));
+    const cols = columnsOn(r, boxes);
+    // Boundaries between consecutive members: a column between their labels (the one nearest the
+    // midpoint), else the midpoint between the labels. The outer ends: the nearest column beyond the
+    // label, else the end of the line.
+    const bounds: { t: number; kind: EndKind }[] = [];
+    for (let k = 0; k <= list.length; k++) {
+      if (k === 0) {
+        const c = cols.filter((t) => t < list[0].ta);
+        bounds.push(c.length ? { t: c[c.length - 1], kind: 'column' } : { t: r.t0, kind: 'end' });
+      } else if (k === list.length) {
+        const c = cols.filter((t) => t > list[k - 1].tb);
+        bounds.push(c.length ? { t: c[0], kind: 'column' } : { t: r.t1, kind: 'end' });
+      } else {
+        const m = (list[k - 1].tm + list[k].tm) / 2;
+        const c = cols.filter((t) => t > list[k - 1].tb && t < list[k].ta);
+        bounds.push(c.length ? { t: c.reduce((a, b) => (Math.abs(b - m) < Math.abs(a - m) ? b : a)), kind: 'column' } : { t: m, kind: 'midpoint' });
+      }
+    }
+    list.forEach((x, k) => {
+      const lo = bounds[k];
+      const hi = bounds[k + 1];
+      if (hi.t - lo.t < 1) return;
+      const l = labels[x.li];
+      const box = labelCorners(l);
+      const xs = box.map((p) => p.x);
+      const ys = box.map((p) => p.y);
+      const a = runPoint(r, lo.t);
+      const b = runPoint(r, hi.t);
+      // Measure left to right (top to bottom for vertical members).
+      const flip = a.x > b.x + 0.5 || (Math.abs(a.x - b.x) <= 0.5 && a.y > b.y);
+      out.push({
+        id: '',
+        size: l.size,
+        family: l.family,
+        text: l.text,
+        p1: flip ? b : a,
+        p2: flip ? a : b,
+        width: r.width,
+        dashed: r.dashed,
+        ends: flip ? [hi.kind, lo.kind] : [lo.kind, hi.kind],
+        labelBox: { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) },
+      });
     });
   }
   // Reading order: top to bottom, left to right.

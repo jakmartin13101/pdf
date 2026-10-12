@@ -7,7 +7,8 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.4.0** adds a **Settings** menu (settings & preferences in one dialog), **line styles by subject** for
+> **Version 1.4.1**: the automatic takeoff splits a member line that runs on through its columns at the column
+> symbols (or halfway between labels). **Version 1.4.0** adds a **Settings** menu (settings & preferences in one dialog), **line styles by subject** for
 > automatic takeoff measurements (e.g. W beams as a green line) and **fine adjustment** of measured lines (1.3.0:
 > automatic takeoff of beams and tubing, standard details by hand; 1.2.0: overlay / compare) – see the
 > [changelog](CHANGELOG.md).
@@ -155,8 +156,13 @@ Open the **Auto** panel (toolbar, or *Tools → Automatic Takeoff (Beams & Tubin
 * It reads the PDF's own text and line work: every **member-size label** – W, S, M and HP beams, HSS (rectangular,
   square and round), TS and Pipe tubing, C/MC channels, optionally L angles – and the **line it labels**: the line that
   runs parallel to the text, right beside it, under the middle of the label. Solid lines win over dashed grid and hidden
-  lines, heavy ones over hairline dimension lines, and each label takes one line. Labels that name columns
-  (*HSS6x6x3/8 COLUMNS*) are skipped – columns are counted, not measured.
+  lines, heavy ones over hairline dimension lines. Labels that name columns (*HSS6x6x3/8 COLUMNS*) are skipped –
+  columns are counted, not measured.
+* **Where a member starts and stops** – collinear pieces that touch (a girder broken where beams frame in) are joined
+  into one line first. A line that ends is a member end. When a line runs on through its columns with one label per
+  span, it is split **at the column symbols drawn on it** (squares, filled squares, round or I-shaped columns) – the
+  nearest column on each side of each label. Where no column is drawn between two labels on the same line, it is split
+  **halfway between the labels**; those ends are marked *est. end* (orange square on the drawing) to check.
 * **Scale** – lengths use the sheet's scale (and viewport scales inside details). A sheet with no scale yet uses the
   scale printed on the drawing (`SCALE: 1/8" = 1'-0"`) when there is exactly one, and that scale is set on the sheet
   when you create the measurements; otherwise the panel asks you to calibrate.
