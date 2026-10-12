@@ -11,6 +11,7 @@ import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { exportMarkupsCsv } from '../MenuBar';
 import { formatLength, parseLength } from '../../core/units';
 import { applyToolToSelection } from '../panels/ToolChestPanel';
+import { detailMenuItems } from '../detailMenu';
 
 const ROW_H = 25;
 
@@ -429,6 +430,7 @@ export function MarkupsList() {
             : [{ label: '(no tools)', disabled: true }],
         },
         { label: 'Add to Tool Chest…', onClick: () => s.setDialog({ kind: 'toolEdit', setId: s.toolChest[0]?.id ?? '', fromMarkupId: r.markup.id }) },
+        { label: ids.length > 1 ? `Standard Details (${ids.length} selected)` : 'Standard Details', children: detailMenuItems(ids) },
         { sep: true },
         { label: 'Copy', onClick: () => s.copySelection() },
         { label: `Delete ${ids.length > 1 ? `${ids.length} Markups` : ''}`, danger: true, onClick: () => s.deleteMarkups(ids) },

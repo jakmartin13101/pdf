@@ -3,12 +3,10 @@
 <img src="branding/takeoff-icon.svg" width="72" align="right" alt="">
 
 A Windows desktop program (with a web version for testing) for construction-drawing **measurement, markup and quantity
-takeoff**, modelled closely on the Bluebeam Revu Extreme estimating workflow. Drop in a PDF drawing set, label the
+takeoff**, built for the way estimators work through a drawing set. Drop in a PDF drawing set, label the
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> Independent implementation inspired by the Revu workflow. Not affiliated with or endorsed by Bluebeam, Inc.
->
 > **Version 1.2.0** adds overlay / compare for drawing revisions (1.1.0: Standard Details and detachable split
 > windows) – see the [changelog](CHANGELOG.md).
 
@@ -137,7 +135,7 @@ IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
 
 ### Overlay / compare sheets
 
-Compare two versions of a drawing the way Revu's Overlay Pages does: *Document → Compare / Overlay Sheets…* (or the
+Compare two versions of a drawing: *Document → Compare / Overlay Sheets…* (or the
 **Compare** button). Add the revised PDF to the set first (*File → Add PDF to Set…*); the revision of the same sheet
 number is suggested as the overlay.
 
@@ -162,7 +160,7 @@ number is suggested as the overlay.
 
 ### Split view and workspace layout
 
-* **Split the document** like Revu: *Window → Split Vertical / Split Horizontal / Four Ways* or the status-bar
+* **Split the document**: *Window → Split Vertical / Split Horizontal / Four Ways* or the status-bar
   buttons. Each pane has its own sheet selector, zoom and pan; the active pane is outlined and receives tools.
   Drag the divider to resize; close a pane with its ×.
 * **Detach a pane** with the ↗ button in its header (or *Window → Detach Active Pane*). In the desktop app it becomes

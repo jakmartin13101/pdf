@@ -4,7 +4,7 @@ import type { CountSymbol, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus,
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { buildRows, customColId, type Row } from '../../core/columns';
-import { detailRows } from '../../core/details';
+import { detailApplies, detailRows } from '../../core/details';
 import { TYPE_INFO, STAMP_TEXTS } from '../../core/markupTypes';
 import { CommitInput, CommitRange, ColorField } from '../fields';
 import { formatLength, parseLength } from '../../core/units';
@@ -143,7 +143,7 @@ export function PropertiesPanel() {
             </>
           )}
 
-          {one && row && TYPE_INFO[one.type].measure && <DetailMaterial row={row} />}
+          <DetailSection items={items} rows={rows} />
 
           <div className={one && TYPE_INFO[one.type].measure ? 'form-section' : ''} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <h4>General</h4>
@@ -466,32 +466,64 @@ function CountControls({ m }: { m: Markup }) {
   );
 }
 
-/** Material the standard details add to this markup. */
-function DetailMaterial({ row }: { row: Row }) {
+/**
+ * Standard details on the selected markups: tick a detail to add it by hand to every selected markup,
+ * untick to take it off. With one markup selected, the material it gets is listed.
+ */
+function DetailSection({ items, rows }: { items: Markup[]; rows: Row[] }) {
   const doc = useStore((s) => s.doc);
-  const lines = useMemo(() => detailRows(doc, [row]), [doc, row]);
+  const details = (doc.standardDetails ?? []).filter((d) => d.enabled);
+  const lines = useMemo(() => (rows.length === 1 ? detailRows(doc, rows) : []), [doc, rows]);
   const st = getState();
+  const ids = items.map((m) => m.id);
+  const handChanged = items.some((m) => m.details?.length || m.detailsOff?.length);
   return (
     <div className="form-section" style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-testid="prop-details">
       <h4>
         <PackagePlus size={12} /> Standard Details
       </h4>
-      {lines.length ? (
-        lines.map((l) => (
-          <div key={l.markup.id} className="field" title={l.detail?.warning ?? `From “${l.detail?.detailName}”`}>
-            <label style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.detail?.summaryKey}</label>
-            <span className="readout" style={l.detail?.warning ? { color: 'var(--warn)' } : undefined}>
-              {l.display.measurement}
-            </span>
-          </div>
-        ))
-      ) : (
-        <div className="hint">No standard detail adds material to this markup.</div>
-      )}
-      <div className="field-row">
-        <button className="btn sm" onClick={() => st.setDialog({ kind: 'details', newForMarkupId: row.markup.id })} data-testid="btn-new-detail-for">
-          New Detail for This…
+      {details.map((d) => {
+        const how = rows.map((r) => detailApplies(r, d));
+        const applied = how.filter(Boolean).length;
+        const byHand = how.filter((h) => h === 'manual').length;
+        return (
+          <label key={d.id} className="detail-check" title={d.auto === false ? 'Applies only where added by hand' : 'Applies by its rule; tick or untick to change it by hand'}>
+            <input
+              type="checkbox"
+              checked={applied === rows.length}
+              ref={(el) => {
+                if (el) el.indeterminate = applied > 0 && applied < rows.length;
+              }}
+              onChange={() => st.setMarkupDetail(d.id, ids, applied < rows.length)}
+              data-testid="prop-detail-check"
+            />
+            <span className="grow">{d.name}</span>
+            <small>{rows.length > 1 ? `${applied}/${rows.length}` : byHand ? 'by hand' : applied ? 'by rule' : ''}</small>
+          </label>
+        );
+      })}
+      {!details.length && <div className="hint">No standard details yet.</div>}
+      {lines.map((l) => (
+        <div key={l.markup.id} className="field" title={l.detail?.warning ?? `From “${l.detail?.detailName}”`}>
+          <label style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.detail?.summaryKey}</label>
+          <span className="readout" style={l.detail?.warning ? { color: 'var(--warn)' } : undefined}>
+            {l.display.measurement}
+          </span>
+        </div>
+      ))}
+      <div className="field-row" style={{ flexWrap: 'wrap' }}>
+        <button
+          className="btn sm"
+          onClick={() => st.setDialog(ids.length === 1 ? { kind: 'details', newForMarkupId: ids[0] } : { kind: 'details', newForMarkupIds: ids })}
+          data-testid="btn-new-detail-for"
+        >
+          {ids.length === 1 ? 'New Detail for This…' : `New Detail for These ${ids.length}…`}
         </button>
+        {handChanged && (
+          <button className="btn sm" onClick={() => st.resetMarkupDetails(ids)} title="Drop the details added or taken off by hand">
+            Back to Rules
+          </button>
+        )}
         <button className="btn sm" onClick={() => st.setDialog({ kind: 'details', detailId: lines[0]?.detail?.detailId })}>
           Standard Details…
         </button>

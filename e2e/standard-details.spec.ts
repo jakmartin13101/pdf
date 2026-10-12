@@ -70,3 +70,79 @@ test('the example takeoff ships with standard details', async ({ page }) => {
   await page.getByTestId('detail-entry').filter({ hasText: 'Footing dowels' }).click();
   await expect(page.getByTestId('detail-preview')).toContainText('251');
 });
+
+test('details are added by hand to several selected markups', async ({ page }) => {
+  await openSample(page);
+  await calibrateFoundationPlan(page);
+  await gotoSheet(page, 2);
+  // Two W24x55 beams and a W18x35.
+  await page.getByTestId('chest-tool').filter({ hasText: 'W24x55' }).first().click();
+  for (let i = 0; i < 2; i++) {
+    await clickAt(page, gx(i) + 9, gy(1));
+    await clickAt(page, gx(i + 1) - 9, gy(1));
+  }
+  await page.getByTestId('chest-tool').filter({ hasText: 'W18x35' }).first().click();
+  await clickAt(page, gx(0) + 9, gy(2));
+  await clickAt(page, gx(1) - 9, gy(2));
+  await page.keyboard.press('Escape');
+  const rows = page.getByTestId('markup-row');
+  await expect(rows).toHaveCount(3);
+  const subjects = () => rows.locator('[data-col=subject]');
+
+  // Select the first W24x55 and the W18x35, right-click → Standard Details → New Detail for These 2.
+  await rows.nth(0).click();
+  await rows.nth(2).click({ modifiers: ['Control'] });
+  await rows.nth(2).click({ button: 'right' });
+  await page.locator('.menu-item', { hasText: 'Standard Details (2 selected)' }).hover();
+  await page.locator('.submenu .menu-item', { hasText: 'New Detail for These 2…' }).click();
+  // A by-hand detail: the rule is filled in but not used.
+  await expect(page.getByTestId('detail-auto')).not.toBeChecked();
+  await expect(page.getByTestId('detail-matches')).toHaveText('Rule not used + 2 added by hand');
+  await expect(page.getByTestId('detail-selected')).toHaveText('2 markups selected – all have this detail');
+  await page.getByTestId('detail-name').fill('Bearing plates');
+  await page.getByTestId('item-subject').fill('Bearing Plate');
+  await page.getByTestId('item-size').fill('PL1/2x8');
+  await page.getByTestId('item-length').fill(`0'-10"`);
+  await page.getByTestId('item-rule').selectOption('each');
+  await page.getByTestId('item-value').fill('2');
+  await expect(page.getByTestId('detail-formula')).toHaveText(`BY HAND → ADD Bearing Plate PL1/2x8 × 0'-10" × 2 EA`);
+  await expect(page.getByTestId('detail-preview').locator('tbody tr td').nth(1)).toHaveText('4');
+  await page.getByTestId('details-save').click();
+  await expect(subjects()).toHaveText(['W24x55', '↳ Bearing Plate', 'W24x55', 'W18x35', '↳ Bearing Plate']);
+
+  // Add it to the other W24x55 from its right-click menu.
+  await rows.nth(2).click();
+  await rows.nth(2).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Standard Details', exact: true }).hover();
+  await page.locator('.submenu .menu-item', { hasText: 'Bearing plates' }).click();
+  await expect(subjects()).toHaveText(['W24x55', '↳ Bearing Plate', 'W24x55', '↳ Bearing Plate', 'W18x35', '↳ Bearing Plate']);
+
+  // Properties of all three: ticked; untick takes it off every one of them. One undo puts it back.
+  await page.keyboard.press('Control+a');
+  await page.getByTestId('tab-properties').click();
+  const check = page.getByTestId('prop-detail-check');
+  await expect(check).toBeChecked();
+  await check.uncheck();
+  await expect(rows).toHaveCount(3);
+  await page.getByTitle('Undo (Ctrl+Z)').click();
+  await expect(rows).toHaveCount(6);
+
+  // Switch the rule on (Member Size = W24x55, filled in from the markups), then take one beam off by hand.
+  await page.getByTestId('btn-details').click();
+  await page.getByTestId('detail-auto').check();
+  await expect(page.getByTestId('detail-matches')).toHaveText('Matches 2 markups + 1 added by hand');
+  await expect(page.getByTestId('detail-formula')).toHaveText(`IF [Member Size] = "W24x55" → ADD Bearing Plate PL1/2x8 × 0'-10" × 2 EA`);
+  await page.getByTestId('details-save').click();
+  await rows.nth(0).click();
+  await rows.nth(0).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Standard Details', exact: true }).hover();
+  await page.locator('.submenu .menu-item', { hasText: 'Bearing plates' }).click();
+  await expect(subjects()).toHaveText(['W24x55', 'W24x55', '↳ Bearing Plate', 'W18x35', '↳ Bearing Plate']);
+  await expect(page.getByTestId('prop-details')).toContainText('Bearing plates');
+  await expect(check).not.toBeChecked();
+  // Back to Rules Only drops the by-hand change.
+  await rows.nth(0).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Standard Details', exact: true }).hover();
+  await page.locator('.submenu .menu-item', { hasText: 'Back to Rules Only' }).click();
+  await expect(rows).toHaveCount(6);
+});

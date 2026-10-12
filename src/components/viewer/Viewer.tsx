@@ -11,6 +11,7 @@ import { querySnap, snapIndex, type SnapIndex } from '../../core/pdf';
 import { formatLength } from '../../core/units';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { useOwnerWindow } from '../ownerWindow';
+import { detailMenuItems } from '../detailMenu';
 import { AlignMarkers, ChangeBoxes, LayerA, LayerB, TintDefs } from './OverlayLayers';
 import { applySim, fitSimilarity, invertSim, type Similarity } from '../../core/align';
 import { useShallow } from 'zustand/react/shallow';
@@ -862,6 +863,8 @@ export function Viewer({ paneId }: { paneId: string }) {
       }
       items.push({ label: 'Properties', onClick: () => st.showPanel('properties') });
       items.push({ label: 'Add to Tool Chest…', onClick: () => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: id }) });
+      const forDetails = getState().selection.includes(id) ? getState().selection : [id];
+      items.push({ label: forDetails.length > 1 ? `Standard Details (${forDetails.length} selected)` : 'Standard Details', children: detailMenuItems(forDetails) });
       items.push({ label: 'Set as Default for Tool', onClick: () => st.setTypeDefault(m.type, { style: m.style, subject: m.subject }) });
       items.push({ sep: true });
       items.push({

@@ -435,3 +435,56 @@ describe('overlay alignment', () => {
     expect(merged.filter((m) => m.kind === 'changed')).toHaveLength(2);
   });
 });
+
+import { assignDetail, detailApplies } from '../src/core/details';
+
+describe('standard details added by hand', () => {
+  const scale = scaleFromPreset(findPreset(`1/8" = 1'-0"`)!);
+  const sheet: Sheet = { id: 's1', fileId: 'f', pageIndex: 0, number: 'S1.02', title: '', width: 2592, height: 1728, rotation: 0, scale, viewports: [] };
+  const beam = (id: string, size: string, extra: Partial<Markup> = {}): Markup => ({
+    id,
+    sheetId: 's1',
+    type: 'length',
+    points: [{ x: 100, y: 100 }, { x: 100 + 23 * 9, y: 100 }],
+    subject: size,
+    label: '',
+    comments: '',
+    author: 't',
+    created: 0,
+    modified: 0,
+    status: 'None',
+    checked: false,
+    layer: '',
+    style: defaultStyle('length'),
+    custom: { member_size: size, qty: 1 },
+    ...extra,
+  });
+  const rule = newDetail({ id: 'clips', conditions: [{ column: 'c:member_size', op: 'eq', value: 'W24x55' }], items: [newDetailItem({ subject: 'Clip', rule: 'each', value: '2' })] });
+  const handOnly = newDetail({ id: 'stiff', auto: false, conditions: [{ column: 'subject', op: 'eq', value: 'W24x55' }], items: [newDetailItem({ subject: 'Stiffener', rule: 'each', value: '4' })] });
+
+  it('applies by rule, by hand, or not at all', () => {
+    const doc: DocState = {
+      files: [],
+      sheets: [sheet],
+      markups: [beam('a', 'W24x55'), beam('b', 'W18x35', { details: ['clips', 'stiff'] }), beam('c', 'W24x55', { detailsOff: ['clips'] })],
+      columns: defaultColumns(),
+      layers: defaultLayers(),
+      settings: DEFAULT_SETTINGS,
+      standardDetails: [rule, handOnly],
+    };
+    const rows = buildRows(doc);
+    expect(rows.map((r) => detailApplies(r, rule))).toEqual(['rule', 'manual', null]);
+    // A by-hand-only detail never applies through its rule, even when the rule would match.
+    expect(rows.map((r) => detailApplies(r, handOnly))).toEqual([null, 'manual', null]);
+    expect(detailApplies(rows[1], { ...rule, enabled: false })).toBeNull();
+    const material = detailRows(doc, rows);
+    expect(material.map((m) => `${m.detail!.parentId}:${m.markup.subject}:${m.detail!.manual ? 'hand' : 'rule'}`)).toEqual(['a:Clip:rule', 'b:Clip:hand', 'b:Stiffener:hand']);
+  });
+
+  it('records an opt-out when a rule-picked detail is taken off by hand', () => {
+    const m = beam('a', 'W24x55');
+    expect(assignDetail(m, rule, false, true)).toEqual({ details: undefined, detailsOff: ['clips'] });
+    expect(assignDetail({ ...m, detailsOff: ['clips'] }, rule, true, true)).toEqual({ details: ['clips'], detailsOff: undefined });
+    expect(assignDetail({ ...m, details: ['stiff'] }, handOnly, false, false)).toEqual({ details: undefined, detailsOff: undefined });
+  });
+});

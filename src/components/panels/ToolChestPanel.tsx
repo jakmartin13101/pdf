@@ -311,7 +311,7 @@ export function ToolChestPanel() {
   );
 }
 
-/** Re-style selected markups with a tool's properties (Bluebeam "Apply Tool Properties"). */
+/** Re-style selected markups with a tool's properties ("Apply Tool Properties"). */
 export function applyToolToSelection(t: ChestTool) {
   const st = getState();
   const cols = new Map(st.doc.columns.map((c) => [c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c.id]));

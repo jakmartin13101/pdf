@@ -2780,6 +2780,34 @@ kbd {
   color: var(--warn);
   font-size: 11px;
 }
+.dd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dd-auto {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+.dd-dim .dd-cond,
+.dd-dim .dd-cond + .field-row .btn {
+  opacity: 0.45;
+}
+.dd-hand {
+  color: var(--accent);
+  flex: none;
+}
+.dd-hand-row .grow {
+  font-size: 12px;
+}
+.dd-kw svg {
+  vertical-align: -1px;
+}
 .dd-editor label.inline {
   display: flex;
   align-items: center;
@@ -3035,4 +3063,14 @@ body.popout-body {
   display: inline-grid;
   place-items: center;
   padding: 1px 4px;
+}
+.detail-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+}
+.detail-check small {
+  color: var(--text-dim);
+  font-family: var(--mono);
 }

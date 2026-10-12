@@ -4,7 +4,7 @@
 
 ### Overlay / compare sheets
 - **Document → Compare / Overlay Sheets…** (or the **Compare** toolbar button and panel) draws one sheet over
-  another, Bluebeam-style: each sheet's line work in its own colour, multiplied, so unchanged work shows dark and
+  another: each sheet's line work in its own colour, multiplied, so unchanged work shows dark and
   anything that differs shows in sheet A's or sheet B's colour. The revision of the same sheet number in another PDF
   is suggested automatically.
 - **Colour and intensity per sheet** (colour picker, intensity slider, presets, swap), show/hide either sheet, and

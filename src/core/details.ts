@@ -46,10 +46,59 @@ export function conditionMatches(r: Row, c: DetailCondition): boolean {
   return v === t;
 }
 
-/** A detail applies when it is enabled, has at least one condition, and every condition matches. */
+/** The detail's rule picks this markup: enabled, automatic, at least one condition, all conditions match. */
 export function detailMatches(r: Row, d: StandardDetail): boolean {
   const conds = d.conditions.filter((c) => c.column);
-  return d.enabled && conds.length > 0 && conds.every((c) => conditionMatches(r, c));
+  return d.enabled && d.auto !== false && conds.length > 0 && conds.every((c) => conditionMatches(r, c));
+}
+
+/**
+ * Whether a detail adds material to a markup: added by hand ('manual'), or picked by its rule and not
+ * taken off by hand ('rule').
+ */
+export function detailApplies(r: Row, d: StandardDetail): 'manual' | 'rule' | null {
+  if (!d.enabled) return null;
+  const m = r.markup;
+  if (m.details?.includes(d.id)) return 'manual';
+  if (m.detailsOff?.includes(d.id)) return null;
+  return detailMatches(r, d) ? 'rule' : null;
+}
+
+/**
+ * Markup changes for adding (on) or taking off a detail by hand. Taking off a detail whose rule picks
+ * the markup records an opt-out, so the rule no longer applies there.
+ */
+export function assignDetail(m: Markup, d: StandardDetail, on: boolean, ruleMatch: boolean): Pick<Markup, 'details' | 'detailsOff'> {
+  const details = (m.details ?? []).filter((x) => x !== d.id);
+  const off = (m.detailsOff ?? []).filter((x) => x !== d.id);
+  if (on) details.push(d.id);
+  else if (ruleMatch) off.push(d.id);
+  return { details: details.length ? details : undefined, detailsOff: off.length ? off : undefined };
+}
+
+/** A detail added to (on) or taken off (off) some markups by hand. */
+export interface DetailAssignment {
+  detailId: string;
+  markupIds: string[];
+  on: boolean;
+}
+
+/** Apply by-hand standard detail assignments to the markups (rule matches decide opt-outs). */
+export function applyDetailAssignments(doc: DocState, assignments: DetailAssignment[]): DocState {
+  if (!assignments.length) return doc;
+  let markups = doc.markups;
+  for (const a of assignments) {
+    const d = doc.standardDetails?.find((x) => x.id === a.detailId);
+    if (!d) continue;
+    const ids = new Set(a.markupIds);
+    const targets = markups.filter((m) => ids.has(m.id));
+    const rows = new Map(buildRows({ ...doc, markups }, targets).map((r) => [r.markup.id, r]));
+    markups = markups.map((m) => {
+      const r = rows.get(m.id);
+      return r ? { ...m, ...assignDetail(m, d, a.on, detailMatches(r, d)), modified: Date.now() } : m;
+    });
+  }
+  return { ...doc, markups };
 }
 
 /** Distinct values of a column across the takeoff, most common first, for the value drop-down. */
@@ -153,7 +202,8 @@ export function describeDetail(d: StandardDetail, doc: DocState): string {
     }
     return parts.join(' ');
   });
-  return `IF ${cond || '(no condition)'} → ADD ${adds.join(' + ') || '(nothing)'}`;
+  const when = d.auto === false ? 'BY HAND' : `IF ${cond || '(no condition)'}`;
+  return `${when} → ADD ${adds.join(' + ') || '(nothing)'}`;
 }
 
 /** Material rows for every matching markup row, in the same order as the markups. */
@@ -170,7 +220,8 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
   for (const r of rows) {
     if (r.detail) continue;
     for (const d of details) {
-      if (!detailMatches(r, d)) continue;
+      const how = detailApplies(r, d);
+      if (!how) continue;
       for (const it of d.items) {
         const q = itemQuantity(it, r, qtyCol);
         const size = it.size.trim();
@@ -186,7 +237,7 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
           type: q.pieceLength > 0 ? 'length' : 'count',
           subject,
           label: size,
-          comments: `Standard detail “${d.name}” on ${r.markup.subject || 'markup'}`,
+          comments: `Standard detail “${d.name}” ${how === 'manual' ? 'added by hand to' : 'on'} ${r.markup.subject || 'markup'}`,
           custom,
         };
         const measurement = `${fmtNumber(q.pieces, q.pieces % 1 ? 2 : 0)} EA${q.pieceLength && it.rule !== 'full' ? ` × ${ftIn(q.pieceLength)}` : ''} ${q.basis}`.trim();
@@ -209,6 +260,7 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
           itemId: it.id,
           summaryKey: size && normName(size) !== normName(subject) ? `${subject} – ${size}` : subject,
           warning: q.warning,
+          manual: how === 'manual',
         };
         out.push(row);
       }

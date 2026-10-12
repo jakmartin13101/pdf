@@ -19,6 +19,7 @@ import type {
   Viewport,
 } from '../types';
 import { DEFAULT_SETTINGS } from '../core/units';
+import { applyDetailAssignments, type DetailAssignment } from '../core/details';
 import { DEFAULT_VISIBLE_COLUMNS, defaultColumns, defaultLayers, defaultToolChest } from '../core/defaults';
 import { defaultStyle, TYPE_INFO } from '../core/markupTypes';
 import { uid } from '../core/ids';
@@ -59,7 +60,7 @@ export type DialogState =
   | { kind: 'scale'; sheetId: string }
   | { kind: 'pageLabels'; region?: { purpose: 'number' | 'title'; rect: Rect } }
   | { kind: 'columns' }
-  | { kind: 'details'; detailId?: string; newForMarkupId?: string }
+  | { kind: 'details'; detailId?: string; newForMarkupId?: string; newForMarkupIds?: string[] }
   | { kind: 'compare'; sheetId?: string }
   | { kind: 'toolEdit'; setId: string; toolId?: string; fromMarkupId?: string }
   | { kind: 'shapeTool'; setId?: string; toolId?: string }
@@ -283,7 +284,12 @@ export interface AppState {
 
   // settings
   updateSettings: (patch: Partial<ProjectSettings>) => void;
-  setStandardDetails: (details: StandardDetail[]) => void;
+  /** Save the standard details, plus any by-hand assignments made in the editor, as one undo step. */
+  setStandardDetails: (details: StandardDetail[], assignments?: DetailAssignment[]) => void;
+  /** Add (on) or take off a standard detail by hand on markups. */
+  setMarkupDetail: (detailId: string, markupIds: string[], on: boolean) => void;
+  /** Drop by-hand detail changes on markups: back to what the rules pick. */
+  resetMarkupDetails: (markupIds: string[]) => void;
   /** Overlay another sheet on a sheet (null removes it). */
   setCompare: (sheetId: string, compare: SheetCompare | null) => void;
   /** Change overlay settings; `live` skips undo history (wrap slider/drag sequences in beginChange/endChange). */
@@ -761,7 +767,15 @@ export const useStore = create<AppState>()((set, get) => {
       })),
 
     updateSettings: (patch) => commit((d) => ({ ...d, settings: { ...d.settings, ...patch } })),
-    setStandardDetails: (standardDetails) => commit((d) => ({ ...d, standardDetails })),
+    setStandardDetails: (standardDetails, assignments = []) => commit((d) => applyDetailAssignments({ ...d, standardDetails }, assignments)),
+    setMarkupDetail: (detailId, markupIds, on) => commit((d) => applyDetailAssignments(d, [{ detailId, markupIds, on }])),
+    resetMarkupDetails: (markupIds) => {
+      const ids = new Set(markupIds);
+      commit((d) => ({
+        ...d,
+        markups: d.markups.map((m) => (ids.has(m.id) && (m.details || m.detailsOff) ? { ...m, details: undefined, detailsOff: undefined, modified: Date.now() } : m)),
+      }));
+    },
     setCompare: (sheetId, compare) => {
       commit((d) => ({ ...d, sheets: d.sheets.map((x) => (x.id === sheetId ? { ...x, compare: compare ?? undefined } : x)) }));
       if (!compare) get().setCompareChanges(sheetId, null);

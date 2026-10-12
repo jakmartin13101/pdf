@@ -131,8 +131,7 @@ export function AboutDialog() {
       <p style={{ margin: 0 }} className="hint">
         {isDesktop
           ? 'All processing happens locally on this computer. Projects autosave between sessions; use File → Save Project to keep a portable copy.'
-          : 'All processing happens locally in your browser. Projects autosave to this browser; use File → Save Project to keep a portable copy.'}{' '}
-        Not affiliated with Bluebeam, Inc.
+          : 'All processing happens locally in your browser. Projects autosave to this browser; use File → Save Project to keep a portable copy.'}
       </p>
       <p style={{ margin: 0 }} className="hint">
         Version {APP_VERSION} ·{' '}

@@ -149,7 +149,7 @@ function Dialogs() {
     case 'compare':
       return <CompareDialog sheetId={d.sheetId} />;
     case 'details':
-      return <StandardDetailsDialog detailId={d.detailId} newForMarkupId={d.newForMarkupId} />;
+      return <StandardDetailsDialog detailId={d.detailId} newForMarkupId={d.newForMarkupId} newForMarkupIds={d.newForMarkupIds} />;
     case 'shapeTool':
       return <ShapeToolDialog setId={d.setId} toolId={d.toolId} />;
     case 'toolEdit':

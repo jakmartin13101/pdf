@@ -74,7 +74,7 @@ You will not, and will not allow others to:
 
 9.1 The Software includes open-source components that are licensed under their own terms, including Electron and Chromium, PDF.js (Apache License 2.0), pdf-lib (MIT License), React (MIT License), Zustand (MIT License) and Lucide icons (ISC License). Those licenses govern your use of the respective components, and nothing in these Terms limits rights you have under them. Copies of the applicable notices are included with the Software.
 
-9.2 Bluebeam and Revu are trademarks of Bluebeam, Inc. All other product names, company names and trademarks mentioned in the Software or Documentation belong to their respective owners. BuildSuite is not affiliated with, endorsed by or sponsored by those owners.
+9.2 Product names, company names and trademarks of others mentioned in the Software or Documentation belong to their respective owners. BuildSuite is not affiliated with, endorsed by or sponsored by those owners.
 
 ## 10. Fees
 

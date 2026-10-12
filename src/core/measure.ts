@@ -3,7 +3,7 @@ import { angleAt, centroid, pointInRect, polygonArea, polygonPerimeter, polyline
 import { TYPE_INFO } from './markupTypes';
 import { DEFAULT_SCALE, fmtNumber, formatArea, formatLength, formatVolume } from './units';
 
-/** Viewport containing a point, last-defined wins (Bluebeam behaviour for overlapping viewports). */
+/** Viewport containing a point; for overlapping viewports the last-defined wins. */
 export function viewportAt(sheet: Sheet, p: Pt): Viewport | undefined {
   for (let i = sheet.viewports.length - 1; i >= 0; i--) {
     if (pointInRect(p, sheet.viewports[i].rect)) return sheet.viewports[i];

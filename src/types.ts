@@ -151,6 +151,10 @@ export interface Markup {
   /** Count markups: a manually entered quantity that replaces the number of symbols. */
   countOverride?: number;
   custom: Record<string, CustomValue>;
+  /** Standard details added to this markup by hand (ids), whether or not their rule picks it. */
+  details?: string[];
+  /** Standard details whose rule picks this markup but that were taken off it by hand. */
+  detailsOff?: string[];
   toolId?: string;
   locked?: boolean;
 }
@@ -235,6 +239,8 @@ export interface StandardDetail {
   id: string;
   name: string;
   enabled: boolean;
+  /** false: the rule is not used – the detail applies only where it is added by hand. Default true. */
+  auto?: boolean;
   /** All must match (AND). */
   conditions: DetailCondition[];
   items: DetailItem[];

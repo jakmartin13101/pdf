@@ -55,8 +55,6 @@ const header = [
   'with the application; their licenses are in LICENSE.electron.txt and LICENSES.chromium.html in',
   'the installation folder.',
   '',
-  'Bluebeam and Revu are trademarks of Bluebeam, Inc. BuildSuite is not affiliated with Bluebeam, Inc.',
-  '',
 ].join('\n');
 writeFileSync(join(out, 'THIRD-PARTY-NOTICES.txt'), windowsText(header + '\n' + sections.join('\n')));
 

@@ -2,7 +2,7 @@ import type { MarkupStyle, MarkupType } from '../types';
 
 export interface TypeInfo {
   label: string;
-  /** Text shown in the markups list "Type" column (Bluebeam style). */
+  /** Text shown in the markups list "Type" column. */
   listName: string;
   measure: boolean;
   /** How points are captured. */

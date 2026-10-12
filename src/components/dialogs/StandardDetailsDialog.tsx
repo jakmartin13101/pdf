@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Copy, Download, PackagePlus, Plus, Trash2, Upload, X } from 'lucide-react';
+import { Copy, Download, Hand, Minus, PackagePlus, Plus, Trash2, Upload, X } from 'lucide-react';
 import type { DetailCondition, DetailItem, DocState, StandardDetail } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { buildRows, customColId, type Row } from '../../core/columns';
@@ -7,9 +7,11 @@ import { normName } from '../../core/formula';
 import {
   DETAIL_OPS,
   DETAIL_RULES,
+  applyDetailAssignments,
   columnValues,
   conditionColumns,
   describeDetail,
+  detailApplies,
   detailMatches,
   detailRows,
   detailUid,
@@ -17,6 +19,7 @@ import {
   newDetail,
   newDetailItem,
   parseDetailLength,
+  type DetailAssignment,
 } from '../../core/details';
 import { normalizeSize, plf } from '../../core/steelShapes';
 import { fmtNumber, formatLength, LENGTH_SUFFIX } from '../../core/units';
@@ -162,38 +165,88 @@ function Preview({ detail, doc, rows }: { detail: StandardDetail; doc: DocState;
   );
 }
 
-/** Condition for a new detail made from a markup: its Member Size when it has one, else its Subject. */
-function conditionFor(doc: DocState, markupId?: string): DetailCondition | null {
-  const m = markupId ? doc.markups.find((x) => x.id === markupId) : undefined;
+/** Condition for a markup: its Member Size when it has one, else its Subject. */
+function conditionOf(doc: DocState, markupId: string): DetailCondition | null {
+  const m = doc.markups.find((x) => x.id === markupId);
   if (!m) return null;
   const size = doc.columns.find((c) => normName(c.name) === 'membersize');
   const v = size ? String(m.custom[size.id] ?? '').trim() : '';
   return v ? { column: customColId(size!), op: 'eq', value: v } : { column: 'subject', op: 'eq', value: m.subject };
 }
 
-export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?: string; newForMarkupId?: string }) {
+/**
+ * A new detail for some markups: added to them by hand. Its IF rule is filled in from the markups
+ * (their shared Member Size or Subject), so switching on "Apply automatically" covers the rest.
+ */
+function detailForMarkups(doc: DocState, ids: string[]): StandardDetail {
+  const conds = ids.map((id) => conditionOf(doc, id)).filter((c): c is DetailCondition => !!c);
+  const same = conds.length > 0 && conds.every((c) => c.column === conds[0].column && c.value === conds[0].value);
+  const name = same && conds[0].value ? `${conds[0].value} detail` : `Detail for ${ids.length} markups`;
+  return newDetail({ name, auto: false, ...(conds[0] ? { conditions: [conds[0]] } : {}) });
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+export function StandardDetailsDialog({ detailId, newForMarkupId, newForMarkupIds }: { detailId?: string; newForMarkupId?: string; newForMarkupIds?: string[] }) {
   const doc = useStore((s) => s.doc);
+  const selection = useStore((s) => s.selection);
   const st = getState();
-  const rows = useMemo(() => buildRows(doc), [doc]);
+  const baseRows = useMemo(() => buildRows(doc), [doc]);
   const columns = useMemo(() => conditionColumns(doc), [doc]);
   const catCol = doc.columns.find((c) => normName(c.name) === 'category');
   const saved = doc.standardDetails ?? [];
-  const [draft, setDraft] = useState<StandardDetail[]>(() => {
+  const [start] = useState(() => {
+    const ids = (newForMarkupIds ?? (newForMarkupId ? [newForMarkupId] : [])).filter((id) => doc.markups.some((m) => m.id === id));
     const list = structuredClone(saved);
-    const cond = conditionFor(doc, newForMarkupId);
-    if (cond) list.push(newDetail({ name: `${cond.value} detail`, conditions: [cond] }));
-    return list;
+    const pending: DetailAssignment[] = [];
+    if (ids.length) {
+      const d = detailForMarkups(doc, ids);
+      list.push(d);
+      pending.push({ detailId: d.id, markupIds: ids, on: true });
+    }
+    return { list, pending, selId: (ids.length ? list[list.length - 1]?.id : detailId ?? list[0]?.id) ?? null };
   });
-  const [selId, setSelId] = useState<string | null>(() => (newForMarkupId ? draft[draft.length - 1]?.id : detailId ?? draft[0]?.id) ?? null);
+  const [draft, setDraft] = useState<StandardDetail[]>(start.list);
+  // Details added to / taken off markups by hand in this dialog; applied on Save.
+  const [pending, setPending] = useState<DetailAssignment[]>(start.pending);
+  const [selId, setSelId] = useState<string | null>(start.selId);
   const fileRef = useRef<HTMLInputElement>(null);
   const sel = draft.find((d) => d.id === selId) ?? null;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const dirty = pending.length > 0 || JSON.stringify(draft) !== JSON.stringify(saved);
+
+  // The takeoff as it will be after Save: markups carry the pending by-hand changes.
+  const rows = useMemo(() => {
+    if (!pending.length) return baseRows;
+    const next = applyDetailAssignments({ ...doc, standardDetails: draft }, pending);
+    const byId = new Map(next.markups.map((m) => [m.id, m]));
+    return baseRows.map((r) => ({ ...r, markup: byId.get(r.markup.id) ?? r.markup }));
+  }, [baseRows, doc, draft, pending]);
+  const previewDoc = useMemo(() => (pending.length ? { ...doc, markups: rows.map((r) => r.markup) } : doc), [doc, rows, pending.length]);
 
   const update = (id: string, fn: (d: StandardDetail) => StandardDetail) => setDraft((all) => all.map((d) => (d.id === id ? fn(d) : d)));
   const patch = (p: Partial<StandardDetail>) => sel && update(sel.id, (d) => ({ ...d, ...p }));
   const setCond = (i: number, p: Partial<DetailCondition>) => sel && patch({ conditions: sel.conditions.map((c, j) => (j === i ? { ...c, ...p } : c)) });
   const setItem = (id: string, p: Partial<DetailItem>) => sel && patch({ items: sel.items.map((it) => (it.id === id ? { ...it, ...p } : it)) });
-  const matchCount = (d: StandardDetail) => rows.filter((r) => detailMatches(r, { ...d, enabled: true })).length;
+  /** Markups a detail applies to: by its rule, and by hand only. */
+  const coverage = (d: StandardDetail, among: Row[] = rows) => {
+    const on = { ...d, enabled: true };
+    let rule = 0;
+    let hand = 0;
+    for (const r of among) {
+      if (!detailApplies(r, on)) continue;
+      if (detailMatches(r, on)) rule++;
+      else hand++;
+    }
+    return { rule, hand, total: rule + hand };
+  };
+  const selectedRows = useMemo(() => {
+    const ids = new Set(selection);
+    return rows.filter((r) => ids.has(r.markup.id));
+  }, [rows, selection]);
+  const assign = (on: boolean) => {
+    if (!sel || !selectedRows.length) return;
+    setPending((p) => [...p, { detailId: sel.id, markupIds: selectedRows.map((r) => r.markup.id), on }]);
+  };
 
   const add = (d: StandardDetail) => {
     setDraft((all) => [...all, d]);
@@ -212,8 +265,8 @@ export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?:
   };
   const save = () => {
     const clean = draft.map((d) => ({ ...d, name: d.name.trim() || 'Standard Detail', conditions: d.conditions.filter((c) => c.column) }));
-    st.setStandardDetails(clean);
-    st.toast(`Saved ${clean.length} standard detail${clean.length === 1 ? '' : 's'}`, 'success');
+    st.setStandardDetails(clean, pending);
+    st.toast(`Saved ${plural(clean.length, 'standard detail')}`, 'success');
     st.setDialog(null);
   };
 
@@ -253,7 +306,7 @@ export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?:
       onClose={close}
       footer={
         <>
-          <div className="left hint">Material is added to every markup that matches, and updates as the takeoff changes.</div>
+          <div className="left hint">Material is added to every markup that matches or that it was added to by hand, and updates as the takeoff changes.</div>
           <button className="btn" onClick={() => st.setDialog(null)}>
             Cancel
           </button>
@@ -288,12 +341,14 @@ export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?:
             />
           </div>
           {draft.map((d) => {
-            const n = matchCount(d);
+            const c = coverage(d);
+            const tip = [d.auto === false ? 'Added by hand only' : `${plural(c.rule, 'markup')} by rule`, c.hand ? `${c.hand} by hand` : ''].filter(Boolean).join(', ');
             return (
               <div key={d.id} className={`dd-entry${d.id === selId ? ' on' : ''}${d.enabled ? '' : ' off'}`} onClick={() => setSelId(d.id)} data-testid="detail-entry">
                 <input type="checkbox" checked={d.enabled} title={d.enabled ? 'On – click to turn off' : 'Off – click to turn on'} onClick={(e) => e.stopPropagation()} onChange={(e) => update(d.id, (x) => ({ ...x, enabled: e.target.checked }))} />
                 <span className="grow">{d.name || 'Untitled'}</span>
-                <small title={`${n} matching markup${n === 1 ? '' : 's'}`}>{n}</small>
+                {d.auto === false && <Hand size={12} className="dd-hand" aria-label="By hand" />}
+                <small title={tip}>{c.total}</small>
               </div>
             );
           })}
@@ -328,9 +383,15 @@ export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?:
               </button>
             </div>
 
-            <div className="dd-section">
-              <h4>
-                <span className="dd-kw">IF</span> the markup's
+            <div className={`dd-section${sel.auto === false ? ' dd-dim' : ''}`}>
+              <h4 className="dd-head">
+                <span>
+                  <span className="dd-kw">IF</span> the markup's
+                </span>
+                <label className="dd-auto" title="Off: the rule is not used – the detail goes only on the markups you add it to by hand">
+                  <input type="checkbox" checked={sel.auto !== false} onChange={(e) => patch({ auto: e.target.checked ? undefined : false })} data-testid="detail-auto" />
+                  Apply automatically
+                </label>
               </h4>
               {sel.conditions.map((c, i) => (
                 <div className="dd-cond" key={i} data-testid="detail-condition">
@@ -349,7 +410,7 @@ export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?:
                       </option>
                     ))}
                   </select>
-                  <ValuePicker key={`${c.column}:${c.op}`} cond={c} rows={rows} onChange={(value) => setCond(i, { value })} />
+                  <ValuePicker key={`${c.column}:${c.op}`} cond={c} rows={baseRows} onChange={(value) => setCond(i, { value })} />
                   <button className="icon-btn" title="Remove condition" disabled={sel.conditions.length < 2} onClick={() => patch({ conditions: sel.conditions.filter((_, j) => j !== i) })}>
                     <X size={13} />
                   </button>
@@ -360,9 +421,40 @@ export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?:
                   <Plus size={12} /> AND condition
                 </button>
                 <span className="hint narrow" data-testid="detail-matches">
-                  Matches {matchCount(sel)} markup{matchCount(sel) === 1 ? '' : 's'}
+                  {(() => {
+                    const c = coverage(sel);
+                    const byRule = sel.auto === false ? 'Rule not used' : `Matches ${plural(c.rule, 'markup')}`;
+                    return c.hand ? `${byRule} + ${c.hand} added by hand` : byRule;
+                  })()}
                 </span>
               </div>
+            </div>
+
+            <div className="dd-section" data-testid="detail-by-hand">
+              <h4>
+                <span className="dd-kw">
+                  <Hand size={11} />
+                </span>
+                By hand – the selected markups
+              </h4>
+              {selectedRows.length ? (
+                <div className="field-row dd-hand-row">
+                  <span className="grow" data-testid="detail-selected">
+                    {(() => {
+                      const c = coverage(sel, selectedRows);
+                      return `${plural(selectedRows.length, 'markup')} selected – ${c.total === selectedRows.length ? (c.total === 1 ? 'it has' : 'all have') : `${c.total} ${c.total === 1 ? 'has' : 'have'}`} this detail`;
+                    })()}
+                  </span>
+                  <button className="btn sm narrow" onClick={() => assign(true)} data-testid="detail-add-selected">
+                    <Plus size={12} /> Add to Selected
+                  </button>
+                  <button className="btn sm narrow" onClick={() => assign(false)} data-testid="detail-remove-selected">
+                    <Minus size={12} /> Take off Selected
+                  </button>
+                </div>
+              ) : (
+                <div className="hint">Select markups in the drawing or the Markups List (Ctrl+click or drag a box for several), then right-click them → Standard Details, or open this dialog to add a detail to them by hand.</div>
+              )}
             </div>
 
             <div className="dd-section">
@@ -403,7 +495,7 @@ export function StandardDetailsDialog({ detailId, newForMarkupId }: { detailId?:
             <div className="dd-formula" data-testid="detail-formula">
               {describeDetail(sel, doc)}
             </div>
-            <Preview detail={sel} doc={doc} rows={rows} />
+            <Preview detail={sel} doc={previewDoc} rows={rows} />
           </div>
         ) : (
           <div className="dd-editor empty-note">Create a standard detail, or add the examples to start from.</div>

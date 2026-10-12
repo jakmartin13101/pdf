@@ -90,6 +90,8 @@ export interface DetailRowInfo {
   /** Summary line name, e.g. "Clip Angle – L4x4x3/8". */
   summaryKey: string;
   warning?: string;
+  /** Added to the markup by hand rather than by the detail's rule. */
+  manual?: boolean;
 }
 
 /** Values that replace the geometry-derived ones (used for standard-detail material rows). */
