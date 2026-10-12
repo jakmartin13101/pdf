@@ -7,8 +7,10 @@ import { buildRows, customColId, type Row } from '../../core/columns';
 import { detailApplies, detailRows } from '../../core/details';
 import { TYPE_INFO, STAMP_TEXTS } from '../../core/markupTypes';
 import { CommitInput, CommitRange, ColorField } from '../fields';
-import { formatLength, parseLength } from '../../core/units';
-import { viewportAt } from '../../core/measure';
+import { formatLength, isMetric, parseLength } from '../../core/units';
+import { scaleForMarkup, viewportAt } from '../../core/measure';
+import { extendSegment } from '../../core/geometry';
+import { EndAdjuster, endNames } from '../EndAdjuster';
 import { TYPE_ICON } from '../icons';
 import { COMMON_SHAPES } from '../../core/steelShapes';
 import { PanelHeader } from '../dock/PanelHeader';
@@ -142,6 +144,8 @@ export function PropertiesPanel() {
               {one.type === 'count' && <CountControls m={one} />}
             </>
           )}
+
+          {items.every((m) => m.type === 'length' && m.points.length === 2) && <AdjustEnds items={items} />}
 
           <DetailSection items={items} rows={rows} />
 
@@ -528,6 +532,60 @@ function DetailSection({ items, rows }: { items: Markup[]; rows: Row[] }) {
           Standard Details…
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Fine adjustment of straight length measurements (one or several): lengthen or shorten either end by
+ * a step along the line, or type an exact length.
+ */
+function AdjustEnds({ items }: { items: Markup[] }) {
+  const doc = useStore((s) => s.doc);
+  const st = getState();
+  const locked = items.some((m) => m.locked);
+  const one = items.length === 1 ? items[0] : null;
+  const sheetOf = (m: Markup) => doc.sheets.find((x) => x.id === m.sheetId);
+  const scale = scaleForMarkup(items[0], sheetOf(items[0]));
+  const names: [string, string] = one ? endNames(one.points[0], one.points[1]) : ['Start', 'End'];
+  const adjust = (dStart: number, dEnd: number) =>
+    st.updateMarkups(
+      items.map((m) => m.id),
+      (m) => {
+        const k = scaleForMarkup(m, sheetOf(m)).realPerPt;
+        return m.locked ? m : { ...m, points: extendSegment(m.points[0], m.points[1], dStart / k, dEnd / k) };
+      },
+    );
+  const len = one ? Math.hypot(one.points[1].x - one.points[0].x, one.points[1].y - one.points[0].y) * scale.realPerPt : 0;
+  return (
+    <div className="form-section" data-testid="prop-adjust">
+      <h4>Adjust Ends{items.length > 1 ? ` (${items.length} lines)` : ''}</h4>
+      {locked ? (
+        <div className="hint">Unlock the markup to adjust it.</div>
+      ) : (
+        <>
+          <EndAdjuster names={names} metric={isMetric(scale.unit)} onAdjust={adjust} testId="prop-adjust" />
+          {one && (
+            <div className="field">
+              <label>Length</label>
+              <CommitInput
+                value={formatLength(len, scale.unit, scale.precision)}
+                onCommit={(v) => {
+                  const want = parseLength(v, scale.unit === 'ft-in' || scale.unit === 'ft' ? 'ft-in' : scale.unit);
+                  if (want == null || want <= 0) {
+                    st.toast(`Could not read that length. Try 23'-6" or 23.5'`, 'error');
+                    return;
+                  }
+                  // The start stays where it is.
+                  adjust(0, want - len);
+                }}
+                data-testid="prop-adjust-length"
+              />
+            </div>
+          )}
+          <div className="hint">Drag the end squares on the drawing for a free adjustment. Ends move along the line; the {names[0].toLowerCase()} end stays put when you type a length.</div>
+        </>
+      )}
     </div>
   );
 }

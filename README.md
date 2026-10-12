@@ -7,8 +7,9 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.3.0** adds **automatic takeoff** of labelled beams and tubing, and standard details added **by hand** to
-> any selection of markups (1.2.0: overlay / compare; 1.1.0: Standard Details and detachable split windows) – see the
+> **Version 1.4.0** adds a **Settings** menu (settings & preferences in one dialog), **line styles by subject** for
+> automatic takeoff measurements (e.g. W beams as a green line) and **fine adjustment** of measured lines (1.3.0:
+> automatic takeoff of beams and tubing, standard details by hand; 1.2.0: overlay / compare) – see the
 > [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
@@ -83,7 +84,8 @@ A five-minute tour with the sample set:
 | **12. Export / report** | Markups CSV, summary CSV, printable summary report (save as PDF from the print dialog), flattened PDF with markups and measurement labels burned in, and portable project files (`.takeoff.json`, drawings embedded). |
 | **Overlay / compare** | *Document → Compare / Overlay Sheets*: two sheets in their own colours, auto-aligned (text or image) or aligned by points / by hand, with change detection and revision clouds. See [Overlay / compare](#overlay--compare-sheets). |
 | **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length – or add a detail by hand to any selected markups. See [Standard details](#standard-details). |
-| **Automatic takeoff** | *Auto* button (*Tools → Automatic Takeoff*): finds the member-size labels on a plan (W24x55, HSS8x4x1/4, Pipe 4 Std…), measures the line each one labels at the sheet's scale and creates labelled length measurements. See [Automatic takeoff](#automatic-takeoff-beams-and-tubing). |
+| **Automatic takeoff** | *Auto* button (*Tools → Automatic Takeoff*): finds the member-size labels on a plan (W24x55, HSS8x4x1/4, Pipe 4 Std…), measures the line each one labels at the sheet's scale and creates labelled length measurements, drawn by line style rules (*Settings → Auto Takeoff Line Styles*). See [Automatic takeoff](#automatic-takeoff-beams-and-tubing). |
+| **Settings & preferences** | *Settings* menu (`Ctrl+,`): general preferences, the project's units and totals, snapping and fine adjustment, auto takeoff line styles, workspace. See [Settings](#settings--preferences). |
 
 ### Tool Chest: size tools and hidden tools
 
@@ -158,15 +160,45 @@ Open the **Auto** panel (toolbar, or *Tools → Automatic Takeoff (Beams & Tubin
 * **Scale** – lengths use the sheet's scale (and viewport scales inside details). A sheet with no scale yet uses the
   scale printed on the drawing (`SCALE: 1/8" = 1'-0"`) when there is exactly one, and that scale is set on the sheet
   when you create the measurements; otherwise the panel asks you to calibrate.
-* **Review** – the members are previewed on the drawing in a colour per size with the label they were read from boxed.
-  The panel groups them by size with count and total length; untick a size, expand it to untick single members (click
-  one to zoom to it), or click a member on the drawing to leave it out. *Skip members already taken off* leaves out
-  members an existing length measurement covers, so it can be run again after more work. *Add to each end* lengthens
-  every member (e.g. to the grid lines or column centres).
+* **Review** – the members are previewed on the drawing with the line they will get and the label they were read from
+  boxed. The panel groups them by size with count and total length; untick a size, expand it to untick single members,
+  or click a member on the drawing to leave it out. *Skip members already taken off* leaves out members an existing
+  length measurement covers, so it can be run again after more work. *Add to each end* lengthens every member (e.g. to
+  the grid lines or column centres).
+* **Fine adjustment** – drag the square at either end of a member: it slides along the member and snaps to the drawing
+  (grid lines, column corners), so a beam drawn short of the grid can be taken to the grid line; hold Alt to move the
+  end freely, Ctrl to turn snapping off. Pick a member in the list to zoom to it and get **− / +** buttons for the left /
+  right (or top / bottom) end and both ends, with a step from 1/16" to 1'-0". Adjusted members are marked and can be
+  put back as found.
+* **Line styles** – *Settings → Auto Takeoff Line Styles* sets the line by subject: rules such as *starts with* **W** →
+  green solid, *starts with* **HSS** → blue dashed (colour, width, solid/dashed/dotted, opacity). The first matching rule
+  wins; without one, the Tool Chest tool for the size (e.g. *W24x55*) or a colour per size is used. *Apply to Existing
+  Auto Measurements* restyles the ones already made.
 * **Create** – one length measurement per member in one undo step, labelled with its size, with the size as Subject and
-  Member Size (so Weight computes and standard details apply). When the Tool Chest has a length tool for the size
-  (e.g. *W24x55*), its colour, layer and column values are used.
+  Member Size (so Weight computes and standard details apply). When the Tool Chest has a length tool for the size, its
+  layer and column values are used. Afterwards, any straight length measurement (or several at once) can be adjusted in
+  **Properties → Adjust Ends**: − / + per end by the step, or type an exact length.
+
+![Fine-adjusting a member: the left end dragged to the grid line, − / + buttons in the panel](docs/screenshot-auto-adjust.png)
 * Search one sheet or all sheets. The example takeoff's roof beams and canopy tubes were taken off this way.
+
+### Settings & preferences
+
+The **Settings** menu opens *Settings & Preferences* (also `Ctrl+,` and *Edit → Settings & Preferences…*) and has quick
+switches for snapping, ortho, reuse, labels, theme and the workspace layout:
+
+<img src="docs/screenshot-settings.png" width="640" alt="Settings: auto takeoff line styles by subject">
+
+* **General** – author name for new markups, theme, mouse wheel (zoom or scroll), measurement labels on the drawing,
+  keep tools active, show hidden Tool Chest tools.
+* **Units & Totals** – the project's units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area
+  labels; saved with the project.
+* **Drawing & Editing** – snapping to the drawing and to markups, ortho; what the arrow keys move a selection by (screen
+  pixels, or a drawing length such as 1" at each markup's own scale – Shift ×10); the step for adjusting ends.
+* **Auto Takeoff** – line styles by subject (above) and the defaults for finding members.
+* **Workspace** – lock the layout, toolbar position, reset the layout.
+
+Preferences are kept on the computer and apply to every project; the units belong to the project.
 
 ### Overlay / compare sheets
 
@@ -239,7 +271,8 @@ Report units (LF/in/m, SF/SY/m², CY/CF/m³) and decimals are set in the **Measu
 | `T Q C R E L A N G P H` | Text, Callout, Cloud, Rectangle, Ellipse, Line, Arrow, Polyline, Polygon, Pen, Highlight |
 | `Enter` / double-click / right-click | Finish a multi-point markup; `Backspace` removes the last point; `Esc` cancels |
 | `Ctrl+Z` `Ctrl+Y` `Ctrl+C` `Ctrl+V` `Ctrl+D` `Del` | Undo, redo, copy, paste, duplicate, delete |
-| Arrow keys (`Shift` ×10) | Nudge selection |
+| Arrow keys (`Shift` ×10) | Nudge selection (pixels or a drawing length – *Settings → Drawing & Editing*) |
+| `Ctrl+,` | Settings & Preferences |
 
 Status-bar toggles: **CONTENT** (snap to PDF geometry), **MARKUP** (snap to markup vertices), **ORTHO**, **REUSE** (keep the
 tool active), **LABELS** (measurement labels on the drawing).
@@ -258,7 +291,7 @@ tool active), **LABELS** (measurement labels on the drawing).
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff project (needs `npm run dev` running)
@@ -287,6 +320,7 @@ src/
     summary.ts       takeoff summary aggregation
     details.ts       standard details: matching rules, by-hand assignments and the material rows they add
     autoTakeoff.ts   automatic takeoff: line work and labels from the PDF, label-to-member matching, printed scales
+    autoStyles.ts    automatic takeoff line styles: rules by subject, Tool Chest look, colour per size
     align.ts         overlay maths: similarity fits, text/RANSAC and image alignment, change finding
     compare.ts       overlay rendering helpers: tint matrices, auto-align and changes on rendered sheets
     pdf.ts           pdf.js loading, rendering, title-block text, snap index, line work for automatic takeoff

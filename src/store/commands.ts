@@ -39,6 +39,9 @@ export function handleAppShortcut(e: KeyboardEvent) {
   } else if (e.key === 's') {
     e.preventDefault();
     if (getState().loaded) void cmdSaveProject();
+  } else if (e.key === ',') {
+    e.preventDefault();
+    getState().setDialog({ kind: 'settings' });
   }
 }
 export const cmdOpenSample = () => openSample();

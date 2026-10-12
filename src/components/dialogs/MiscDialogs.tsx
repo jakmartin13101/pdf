@@ -1,5 +1,5 @@
-import { Info, Keyboard, Settings } from 'lucide-react';
-import { getState, useStore } from '../../store/store';
+import { Info, Keyboard } from 'lucide-react';
+import { getState } from '../../store/store';
 import { Modal } from './Modal';
 import { APP_VERSION, FULL_NAME, SUITE_NAME, isDesktop } from '../../brand';
 
@@ -34,41 +34,6 @@ export function ConfirmDialog({ title, message, onConfirm }: { title: string; me
   );
 }
 
-export function SettingsDialog() {
-  const prefs = useStore((s) => s.prefs);
-  const ui = useStore((s) => s.ui);
-  const st = getState();
-  return (
-    <Modal title="Preferences" icon={<Settings size={16} />} onClose={() => st.setDialog(null)} footer={<button className="btn primary" onClick={() => st.setDialog(null)}>Done</button>}>
-      <div className="field">
-        <label>Author name</label>
-        <input value={prefs.author} onChange={(e) => st.setPrefs({ author: e.target.value })} />
-      </div>
-      <div className="field">
-        <label>Mouse wheel</label>
-        <select value={prefs.wheelZoom ? 'zoom' : 'scroll'} onChange={(e) => st.setPrefs({ wheelZoom: e.target.value === 'zoom' })}>
-          <option value="zoom">Zoom (Ctrl+wheel also zooms)</option>
-          <option value="scroll">Scroll / pan (Ctrl+wheel zooms)</option>
-        </select>
-      </div>
-      <div className="field">
-        <label>Theme</label>
-        <select value={ui.theme} onChange={(e) => st.setUI({ theme: e.target.value as 'dark' | 'light' | 'system' })}>
-          <option value="system">Match system</option>
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-        </select>
-      </div>
-      <div className="field">
-        <label>Tool behaviour</label>
-        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="checkbox" checked={prefs.reuse} onChange={(e) => st.setPrefs({ reuse: e.target.checked })} /> Keep tool active after placing (Reuse)
-        </label>
-      </div>
-    </Modal>
-  );
-}
-
 const SHORTCUTS: [string, string][] = [
   ['V', 'Select tool'],
   ['Space (hold) / middle mouse', 'Pan'],
@@ -93,7 +58,8 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
   ['Ctrl+C / Ctrl+V / Ctrl+D', 'Copy / paste / duplicate'],
   ['Delete', 'Delete selected markups'],
-  ['Arrow keys (Shift)', 'Nudge selected markups'],
+  ['Arrow keys (Shift)', 'Nudge selected markups (step in Settings → Drawing & Editing)'],
+  ['Ctrl+,', 'Settings & Preferences'],
   ['Ctrl+O / Ctrl+S', 'Open PDF / save project'],
 ];
 

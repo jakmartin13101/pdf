@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type {
+  AutoStyleRule,
   ChestTool,
   CustomColumn,
   CustomValue,
@@ -20,7 +21,8 @@ import type {
 } from '../types';
 import { DEFAULT_SETTINGS } from '../core/units';
 import { applyDetailAssignments, type DetailAssignment } from '../core/details';
-import type { FoundMember } from '../core/autoTakeoff';
+import { MEMBER_FAMILIES, type FoundMember, type MemberFamily } from '../core/autoTakeoff';
+import { defaultAutoStyles } from '../core/autoStyles';
 import { DEFAULT_VISIBLE_COLUMNS, defaultColumns, defaultLayers, defaultToolChest } from '../core/defaults';
 import { defaultStyle, TYPE_INFO } from '../core/markupTypes';
 import { uid } from '../core/ids';
@@ -66,7 +68,7 @@ export type DialogState =
   | { kind: 'toolEdit'; setId: string; toolId?: string; fromMarkupId?: string }
   | { kind: 'shapeTool'; setId?: string; toolId?: string }
   | { kind: 'terms' }
-  | { kind: 'settings' }
+  | { kind: 'settings'; tab?: SettingsTab }
   | { kind: 'shortcuts' }
   | { kind: 'about' }
   | { kind: 'confirm'; title: string; message: string; onConfirm: () => void };
@@ -171,7 +173,29 @@ export interface Prefs {
   ortho: boolean;
   wheelZoom: boolean;
   showLabels: boolean;
+  /** Line style rules for automatic takeoff measurements, by subject (first match wins). */
+  autoStyles: AutoStyleRule[];
+  /** Without a matching rule: use the Tool Chest tool's look for the size (else a colour per size). */
+  autoUseToolStyle: boolean;
+  /** Automatic takeoff options (also in the Auto Takeoff panel). */
+  auto: AutoOptions;
+  /** Arrow keys move selected markups by screen pixels, or by a drawing length (real inches). */
+  nudge: { unit: 'px' | 'real'; px: number; real: number };
+  /** Step for fine adjustment of measurement ends, in real inches. */
+  adjustStep: number;
 }
+
+export interface AutoOptions {
+  families: MemberFamily[];
+  scope: 'sheet' | 'all';
+  skipExisting: boolean;
+  /** Added to each end, e.g. to reach the grid lines (a length like 0'-6"). */
+  extend: string;
+  /** Set a sheet's scale from the one printed on it when it has none. */
+  useprinted: boolean;
+}
+
+export type SettingsTab = 'general' | 'units' | 'editing' | 'auto' | 'workspace';
 
 interface TypeDefault {
   style: MarkupStyle;
@@ -358,6 +382,8 @@ const HISTORY_LIMIT = 200;
 /** A member found by the automatic takeoff on a sheet. */
 export interface AutoMember extends FoundMember {
   sheetId: string;
+  /** Where it was found, when its ends were adjusted by hand. */
+  orig?: { p1: Pt; p2: Pt };
 }
 
 export interface AutoTakeoffState {
@@ -372,6 +398,8 @@ export interface AutoTakeoffState {
   printed: Record<string, string[]>;
   /** Leave out members an existing length markup already covers. */
   skipExisting: boolean;
+  /** The member picked for fine adjustment. */
+  focusId?: string;
 }
 
 /** Whether a found member will be created. */
@@ -441,7 +469,7 @@ const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
 /** Layout for the panes left in the main window (three attached panes use the grid: two over one). */
 const layoutFor = (n: number, prev: PaneLayout): PaneLayout => (n <= 1 ? 'single' : n === 2 ? (prev === 'horizontal' ? 'horizontal' : 'vertical') : 'grid');
 
-const defaultPrefs: Prefs = {
+const defaultPrefs = (): Prefs => ({
   author: 'Estimator',
   reuse: true,
   snapContent: true,
@@ -449,7 +477,28 @@ const defaultPrefs: Prefs = {
   ortho: false,
   wheelZoom: true,
   showLabels: true,
-};
+  autoStyles: defaultAutoStyles(),
+  autoUseToolStyle: true,
+  auto: { families: MEMBER_FAMILIES.filter((f) => f.on).map((f) => f.id), scope: 'sheet', skipExisting: true, extend: '', useprinted: true },
+  nudge: { unit: 'px', px: 1, real: 1 },
+  adjustStep: 1,
+});
+
+/** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
+function loadPrefs(): Prefs {
+  const d = defaultPrefs();
+  const saved = lsGet<Partial<Prefs>>('ts.prefs', {});
+  // Auto takeoff options used to be stored on their own.
+  const oldAuto = lsGet<Partial<AutoOptions>>('ts.autoTakeoff', {});
+  return {
+    ...d,
+    ...saved,
+    auto: { ...d.auto, ...oldAuto, ...saved.auto },
+    nudge: { ...d.nudge, ...saved.nudge },
+    autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
+  };
+}
+
 
 let clipboard: Markup[] = [];
 
@@ -570,7 +619,7 @@ export const useStore = create<AppState>()((set, get) => {
     compareChanges: {},
     autoTakeoff: null,
     paneSplit: { x: 0.5, y: 0.5 },
-    prefs: { ...defaultPrefs, ...lsGet<Partial<Prefs>>('ts.prefs', {}) },
+    prefs: loadPrefs(),
     toolChest: toolChestFromStorage ?? defaultToolChest(),
     typeDefaults: lsGet('ts.typeDefaults', {}),
     toasts: [],

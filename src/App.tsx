@@ -11,7 +11,8 @@ import { CalibrateDialog, ScaleDialog, ViewportDialog } from './components/dialo
 import { PageLabelsDialog } from './components/dialogs/PageLabelsDialog';
 import { ColumnsDialog } from './components/dialogs/ColumnsDialog';
 import { ToolEditDialog } from './components/dialogs/ToolEditDialog';
-import { AboutDialog, ConfirmDialog, SettingsDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
+import { AboutDialog, ConfirmDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
+import { SettingsDialog } from './components/dialogs/SettingsDialog';
 import { TermsDialog } from './components/dialogs/TermsDialog';
 import { StandardDetailsDialog } from './components/dialogs/StandardDetailsDialog';
 import { CompareDialog } from './components/dialogs/CompareDialog';
@@ -155,7 +156,7 @@ function Dialogs() {
     case 'toolEdit':
       return <ToolEditDialog setId={d.setId} toolId={d.toolId} fromMarkupId={d.fromMarkupId} />;
     case 'settings':
-      return <SettingsDialog />;
+      return <SettingsDialog tab={d.tab} />;
     case 'shortcuts':
       return <ShortcutsDialog />;
     case 'terms':

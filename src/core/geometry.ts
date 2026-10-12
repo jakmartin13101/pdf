@@ -208,3 +208,34 @@ export function simplify(pts: Pt[], tolerance: number): Pt[] {
 export function expandRect(r: Rect, m: number): Rect {
   return { x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m };
 }
+
+/**
+ * A straight segment lengthened (positive) or shortened (negative) at each end along its own
+ * direction, in page points. It never shrinks below `minLen`.
+ */
+export function extendSegment(a: Pt, b: Pt, dStart: number, dEnd: number, minLen = 1): [Pt, Pt] {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (!len) return [a, b];
+  const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+  // Keep at least minLen: scale back the shortening if it would cross over.
+  const total = len + dStart + dEnd;
+  if (total < minLen && dStart + dEnd < 0) {
+    const k = (len - minLen) / Math.max(1e-9, -(dStart + dEnd));
+    dStart *= k;
+    dEnd *= k;
+  }
+  return [
+    { x: a.x - u.x * dStart, y: a.y - u.y * dStart },
+    { x: b.x + u.x * dEnd, y: b.y + u.y * dEnd },
+  ];
+}
+
+/** Point `p` projected onto the line through `a` and `b`. */
+export function projectOnLine(p: Pt, a: Pt, b: Pt): Pt {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  if (!l2) return a;
+  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2;
+  return { x: a.x + dx * t, y: a.y + dy * t };
+}

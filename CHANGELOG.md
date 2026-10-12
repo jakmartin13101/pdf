@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.4.0 – 2026-10-12
+
+### Settings menu
+- New **Settings** menu in the menu bar: *Settings & Preferences…* (`Ctrl+,`, also under Edit) opens one dialog with
+  **General** (author, theme, mouse wheel, labels, reuse, hidden tools), **Units & Totals** (the project's units and
+  decimals), **Drawing & Editing** (snapping, ortho, arrow-key step, end adjustment step), **Auto Takeoff** (line styles,
+  finding defaults) and **Workspace** (lock, toolbar position, reset). Quick switches for snapping, ortho, reuse,
+  labels, theme and the layout are in the menu itself.
+- Arrow keys can move a selection by a drawing length (e.g. 1" at each markup's own scale) instead of screen pixels.
+
+### Auto takeoff line styles by subject
+- Rules set the line of automatic takeoff measurements by subject: *starts with*, *contains* or *is* a text → colour,
+  width, solid/dashed/dotted and opacity, e.g. **W** → green solid line. The first matching rule wins; rules can be
+  reordered, switched off, tried on a subject, and reset to the defaults (W green, HSS blue dashed, Pipe teal dashed,
+  MC/C purple, L orange dotted). Without a matching rule the Tool Chest tool for the size, or a colour per size, is
+  used.
+- The preview on the drawing uses the same lines. *Apply to Existing Auto Measurements* restyles measurements already
+  made (one undo step); measurements made by the automatic takeoff are marked as such.
+
+### Fine adjustment
+- Auto Takeoff preview: drag the square at either end of a member – it slides along the member and snaps to the
+  drawing (Alt: free, Ctrl: no snapping). Pick a member in the list for − / + buttons per end and both ends with a step
+  from 1/16" to 1'-0" (or mm). Adjusted members are marked and can be put back as found.
+- **Properties → Adjust Ends** for straight length measurements, one or many at once: − / + per end by the step, or
+  type an exact length.
+
 ## 1.3.0 – 2026-10-12
 
 ### Automatic takeoff (beams and tubing)

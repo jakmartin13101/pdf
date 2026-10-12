@@ -96,6 +96,12 @@ async function launch(extraArgs = []) {
   if (shots) await win.screenshot({ path: join(shots, 'desktop-auto-takeoff.png') });
   await win.getByTestId('auto-clear').click();
 
+  // Settings & Preferences from the Settings menu.
+  await win.locator('.menu-btn', { hasText: /^Settings$/ }).click();
+  await win.locator('.dropdown .menu-item', { hasText: 'Auto Takeoff Line Styles' }).click();
+  check((await win.getByTestId('style-rule').count()) === 6, 'Settings menu opens settings with the auto takeoff line styles');
+  await win.getByTestId('settings-done').click();
+
   // Split the view and detach a pane into its own desktop window.
   await win.getByTestId('split-vertical').click();
   const paneOpened = app.waitForEvent('window');

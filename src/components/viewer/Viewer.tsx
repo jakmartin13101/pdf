@@ -1001,10 +1001,18 @@ export function Viewer({ paneId }: { paneId: string }) {
         return;
       }
       if (!ctrl && st.selection.length && k.startsWith('Arrow')) {
-        const step = (e.shiftKey ? 10 : 1) / viewRef.current.zoom;
-        const dx = k === 'ArrowLeft' ? -step : k === 'ArrowRight' ? step : 0;
-        const dy = k === 'ArrowUp' ? -step : k === 'ArrowDown' ? step : 0;
-        st.updateMarkups(st.selection, (m) => (m.locked ? m : { ...m, points: translate(m.points, dx, dy), cutouts: m.cutouts?.map((c) => translate(c, dx, dy)) }));
+        // Step: screen pixels, or a drawing length at each markup's own scale (Settings → Drawing & Editing).
+        const { nudge } = st.prefs;
+        const times = e.shiftKey ? 10 : 1;
+        const sx = k === 'ArrowLeft' ? -1 : k === 'ArrowRight' ? 1 : 0;
+        const sy = k === 'ArrowUp' ? -1 : k === 'ArrowDown' ? 1 : 0;
+        st.updateMarkups(st.selection, (m) => {
+          if (m.locked) return m;
+          const step = nudge.unit === 'real' ? (nudge.real * times) / scaleForMarkup(m, st.doc.sheets.find((x) => x.id === m.sheetId)).realPerPt : (nudge.px * times) / viewRef.current.zoom;
+          const dx = sx * step;
+          const dy = sy * step;
+          return { ...m, points: translate(m.points, dx, dy), cutouts: m.cutouts?.map((c) => translate(c, dx, dy)) };
+        });
         e.preventDefault();
         return;
       }
@@ -1164,7 +1172,7 @@ export function Viewer({ paneId }: { paneId: string }) {
         >
           <ViewportsLayer sheet={sheet} zoom={z} />
           <MarkupsLayer markups={pageMarkups} labels={labels} showLabels={prefs.showLabels} />
-          {autoTakeoff && autoHere.length > 0 && <AutoTakeoffLayer members={autoHere} state={autoTakeoff} zoom={z} clickable={tool.kind === 'select'} />}
+          {autoTakeoff && autoHere.length > 0 && <AutoTakeoffLayer members={autoHere} state={autoTakeoff} zoom={z} clickable={tool.kind === 'select'} sheet={sheet} />}
           {draftMarkup && (
             <g className="draft">
               <MarkupShape m={draftMarkup} label="" showLabels={false} draft />

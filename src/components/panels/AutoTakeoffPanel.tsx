@@ -1,49 +1,22 @@
 // Automatic takeoff: find the labelled beams and tubing on a sheet, review them on the drawing, and
 // create length measurements for them in one step.
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Loader2, ScanLine, Trash2, Wand2 } from 'lucide-react';
-import type { ChestTool, CustomValue, DocState, Markup, Scale, Sheet, ToolSet } from '../../types';
-import { autoIncluded, currentSheet, getState, useStore, type AutoMember, type AutoTakeoffState } from '../../store/store';
+import { ChevronDown, ChevronRight, Loader2, RotateCcw, ScanLine, Trash2, Wand2 } from 'lucide-react';
+import type { ChestTool, CustomValue, DocState, Markup, MarkupStyle, Scale, Sheet } from '../../types';
+import { autoIncluded, currentSheet, getState, useStore, type AutoMember, type AutoOptions, type AutoTakeoffState } from '../../store/store';
+import { EndAdjuster, LineSample, endNames } from '../EndAdjuster';
+import { autoLook, autoSubject } from '../../core/autoStyles';
+import { extendSegment } from '../../core/geometry';
 import { PanelHeader } from '../dock/PanelHeader';
 import { sheetLongName } from '../../core/columns';
 import { normName } from '../../core/formula';
-import { defaultStyle } from '../../core/markupTypes';
 import { scaleAt, viewportAt } from '../../core/measure';
 import { pageVectors } from '../../core/pdf';
-import { lsGet, lsSet } from '../../core/persistence';
-import { MEMBER_FAMILIES, existingMeasurements, extendMember, findMemberLabels, matchMembers, printedScales, sizeColor, type MemberFamily } from '../../core/autoTakeoff';
-import { findPreset, fmtNumber, formatLength, lengthToReport, parseLength, scaleFromPreset, LENGTH_SUFFIX } from '../../core/units';
-
-interface Options {
-  families: MemberFamily[];
-  scope: 'sheet' | 'all';
-  skipExisting: boolean;
-  /** Added to each end, e.g. to reach the grid lines (a length like 0'-6"). */
-  extend: string;
-  /** Set a sheet's scale from the one printed on it when it has none. */
-  useprinted: boolean;
-}
-
-const DEFAULTS: Options = {
-  families: MEMBER_FAMILIES.filter((f) => f.on).map((f) => f.id),
-  scope: 'sheet',
-  skipExisting: true,
-  extend: '',
-  useprinted: true,
-};
-
-const same = (a: string, b: string) => normName(a) === normName(b);
-
-/** The Tool Chest tool that takes off this size as a length, if there is one. */
-export function chestToolForSize(chest: ToolSet[], size: string): ChestTool | undefined {
-  const tools = chest.flatMap((s) => s.tools).filter((t) => t.type === 'length' || t.type === 'polylength');
-  const memberSize = (t: ChestTool) => Object.entries(t.custom).find(([k]) => normName(k) === 'membersize')?.[1];
-  const hits = tools.filter((t) => same(String(memberSize(t) ?? ''), size) || (t.sizeTool && same(t.sizeTool.value, size)) || same(t.subject, size));
-  return hits.find((t) => t.type === 'length') ?? hits[0];
-}
+import { MEMBER_FAMILIES, existingMeasurements, extendMember, findMemberLabels, matchMembers, printedScales } from '../../core/autoTakeoff';
+import { findPreset, fmtNumber, formatLength, isMetric, lengthToReport, parseLength, scaleFromPreset, LENGTH_SUFFIX } from '../../core/units';
 
 /** Markup fields for a member: from its Tool Chest tool when there is one, else plain steel. */
-function markupFields(doc: DocState, tool: ChestTool | undefined, m: AutoMember): Partial<Markup> {
+function markupFields(doc: DocState, tool: ChestTool | undefined, style: MarkupStyle, m: AutoMember): Partial<Markup> {
   const byName = new Map(doc.columns.map((c) => [normName(c.name), c]));
   const custom: Record<string, CustomValue> = {};
   const put = (name: string, v: CustomValue) => {
@@ -60,14 +33,15 @@ function markupFields(doc: DocState, tool: ChestTool | undefined, m: AutoMember)
   const layers = new Set(doc.layers.map((l) => l.id));
   const layer = tool?.layer && layers.has(tool.layer) ? tool.layer : layers.has('layer-takeoff') ? 'layer-takeoff' : '';
   return {
-    subject: tool && !tool.sizeTool ? tool.subject : m.size,
+    subject: autoSubject(tool, m.size),
     label: m.size,
-    style: tool ? { ...tool.style } : { ...defaultStyle('length'), color: sizeColor(m.size), lineWidth: 3 },
+    style,
     custom,
     layer,
     toolId: tool?.id,
     text: undefined,
     comments: `Automatic takeoff from the label “${m.text}”`,
+    auto: true,
   };
 }
 
@@ -76,16 +50,20 @@ export function AutoTakeoffPanel() {
   const sheet = useStore(currentSheet);
   const result = useStore((s) => s.autoTakeoff);
   const chest = useStore((s) => s.toolChest);
-  const [opts, setOptsState] = useState<Options>(() => ({ ...DEFAULTS, ...lsGet<Partial<Options>>('ts.autoTakeoff', {}) }));
+  const prefs = useStore((s) => s.prefs);
+  const opts = prefs.auto;
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const st = getState();
-  const setOpts = (p: Partial<Options>) => {
-    const next = { ...opts, ...p };
-    setOptsState(next);
-    lsSet('ts.autoTakeoff', next);
+  const setOpts = (p: Partial<AutoOptions>) => {
+    st.setPrefs({ auto: { ...opts, ...p } });
     if (p.skipExisting !== undefined && result) st.setAutoTakeoff({ ...result, skipExisting: p.skipExisting });
   };
+  const looks = useMemo(() => {
+    const out = new Map<string, ReturnType<typeof autoLook>>();
+    for (const m of result?.members ?? []) if (!out.has(m.size)) out.set(m.size, autoLook(chest, prefs, m.size));
+    return out;
+  }, [result, chest, prefs]);
 
   const sheetsById = useMemo(() => new Map(doc.sheets.map((s) => [s.id, s])), [doc.sheets]);
   const extendIn = opts.extend.trim() ? parseLength(opts.extend, 'ft-in') : 0;
@@ -180,7 +158,8 @@ export function AutoTakeoffPanel() {
     }
     const items = included.map((m) => {
       const sh = sheetsById.get(m.sheetId)!;
-      return { sheetId: m.sheetId, points: pointsFor(m, scaleFor(sh, m)), extra: markupFields(doc, chestToolForSize(chest, m.size), m) };
+      const look = looks.get(m.size) ?? autoLook(chest, prefs, m.size);
+      return { sheetId: m.sheetId, points: pointsFor(m, scaleFor(sh, m)), extra: markupFields(doc, look.tool, look.style, m) };
     });
     st.setTool({ kind: 'select' });
     const made = st.applyAutoTakeoff(items, scales);
@@ -192,6 +171,14 @@ export function AutoTakeoffPanel() {
   };
 
   const setResult = (patch: Partial<AutoTakeoffState>) => result && st.setAutoTakeoff({ ...result, ...patch });
+  const setMember = (id: string, fn: (m: AutoMember) => AutoMember) => setResult({ members: result!.members.map((m) => (m.id === id ? fn(m) : m)) });
+  /** Lengthen (positive) or shorten a member's ends by real inches. */
+  const adjustMember = (m: AutoMember, dStart: number, dEnd: number) => {
+    const sc = scaleFor(sheetsById.get(m.sheetId)!, m);
+    if (!sc) return;
+    const [p1, p2] = extendSegment(m.p1, m.p2, dStart / sc.realPerPt, dEnd / sc.realPerPt);
+    setMember(m.id, (x) => ({ ...x, p1, p2, orig: x.orig ?? { p1: x.p1, p2: x.p2 } }));
+  };
   const settings = doc.settings;
   const total = (list: AutoMember[]) => list.reduce((n, m) => n + (lengthOf(m)?.inches ?? 0), 0);
   const fmtTotal = (inches: number) => `${fmtNumber(lengthToReport(inches, settings), settings.decimals)} ${LENGTH_SUFFIX[settings.lengthUnit]}`;
@@ -223,7 +210,7 @@ export function AutoTakeoffPanel() {
               ))}
             </div>
             <div className="field-row">
-              <select value={opts.scope} onChange={(e) => setOpts({ scope: e.target.value as Options['scope'] })} data-testid="auto-scope">
+              <select value={opts.scope} onChange={(e) => setOpts({ scope: e.target.value as AutoOptions['scope'] })} data-testid="auto-scope">
                 <option value="sheet">This sheet ({sheet.number || sheet.title})</option>
                 <option value="all">All {doc.sheets.length} sheets</option>
               </select>
@@ -300,7 +287,14 @@ export function AutoTakeoffPanel() {
                           title={sizeOn ? 'Leave this size out' : 'Include this size'}
                           data-testid="auto-size-check"
                         />
-                        <span className="swatch" style={{ background: sizeColor(size) }} />
+                        {(() => {
+                          const look = looks.get(size);
+                          return look ? (
+                            <span title={look.rule ? `Line style rule: subject ${look.rule.match === 'is' ? 'is' : look.rule.match === 'contains' ? 'contains' : 'starts with'} “${look.rule.text}”` : look.tool ? `Tool Chest tool “${look.tool.name}”` : 'Colour for this size'}>
+                              <LineSample style={look.style} width={22} />
+                            </span>
+                          ) : null;
+                        })()}
                         <span className="grow auto-size">{size}</span>
                         <span className="auto-count" data-testid="auto-size-count">
                           {inc.length}
@@ -314,37 +308,51 @@ export function AutoTakeoffPanel() {
                             const on = autoIncluded(result, m);
                             const l = lengthOf(m);
                             const sh = sheetsById.get(m.sheetId)!;
+                            const focused = result.focusId === m.id;
                             return (
-                              <div key={m.id} className={`auto-member${on ? '' : ' off'}`} data-testid="auto-member-row">
-                                <input
-                                  type="checkbox"
-                                  checked={on}
-                                  disabled={!sizeOn}
-                                  onChange={() =>
-                                    setResult({
-                                      excluded: on ? [...result.excluded, m.id] : result.excluded.filter((x) => x !== m.id),
-                                      ...(m.existingId && !on && result.skipExisting ? { skipExisting: false } : {}),
-                                    })
-                                  }
-                                />
-                                <button
-                                  className="auto-zoom"
-                                  onClick={() => {
-                                    if (st.currentSheetId !== m.sheetId) st.setCurrentSheet(m.sheetId);
-                                    const x = Math.min(m.p1.x, m.p2.x);
-                                    const y = Math.min(m.p1.y, m.p2.y);
-                                    const w = Math.abs(m.p2.x - m.p1.x);
-                                    const h = Math.abs(m.p2.y - m.p1.y);
-                                    const pad = Math.max(w, h) * 0.4 + 30;
-                                    st.requestView({ kind: 'zoomTo', rect: { x: x - pad, y: y - pad, w: w + pad * 2, h: h + pad * 2 } } as never);
-                                  }}
-                                  title="Zoom to this member"
-                                >
-                                  {result.sheetIds.length > 1 && <small>{sh.number || sh.title}</small>}
-                                  <span>{l ? formatLength(l.inches, l.scale.unit, l.scale.precision) : 'no scale'}</span>
-                                  {m.existingId && <em>taken off</em>}
-                                  {m.dashed && <em>dashed</em>}
-                                </button>
+                              <div key={m.id} className={`auto-member-wrap${focused ? ' focused' : ''}`}>
+                                <div className={`auto-member${on ? '' : ' off'}`} data-testid="auto-member-row">
+                                  <input
+                                    type="checkbox"
+                                    checked={on}
+                                    disabled={!sizeOn}
+                                    onChange={() =>
+                                      setResult({
+                                        excluded: on ? [...result.excluded, m.id] : result.excluded.filter((x) => x !== m.id),
+                                        ...(m.existingId && !on && result.skipExisting ? { skipExisting: false } : {}),
+                                      })
+                                    }
+                                  />
+                                  <button
+                                    className="auto-zoom"
+                                    onClick={() => {
+                                      if (st.currentSheetId !== m.sheetId) st.setCurrentSheet(m.sheetId);
+                                      setResult({ focusId: focused ? undefined : m.id });
+                                      const x = Math.min(m.p1.x, m.p2.x);
+                                      const y = Math.min(m.p1.y, m.p2.y);
+                                      const w = Math.abs(m.p2.x - m.p1.x);
+                                      const h = Math.abs(m.p2.y - m.p1.y);
+                                      const pad = Math.max(w, h) * 0.4 + 30;
+                                      st.requestView({ kind: 'zoomTo', rect: { x: x - pad, y: y - pad, w: w + pad * 2, h: h + pad * 2 } } as never);
+                                    }}
+                                    title="Zoom to this member and adjust its ends"
+                                    data-testid="auto-member-zoom"
+                                  >
+                                    {result.sheetIds.length > 1 && <small>{sh.number || sh.title}</small>}
+                                    <span data-testid="auto-member-length">{l ? formatLength(l.inches, l.scale.unit, l.scale.precision) : 'no scale'}</span>
+                                    {m.orig && <em>adjusted</em>}
+                                    {m.existingId && <em>taken off</em>}
+                                    {m.dashed && <em>dashed</em>}
+                                  </button>
+                                  {m.orig && (
+                                    <button className="icon-btn" title="Back to the line as found" onClick={() => setMember(m.id, (x) => ({ ...x, ...x.orig!, orig: undefined }))} data-testid="auto-member-reset">
+                                      <RotateCcw size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                                {focused && (
+                                  <EndAdjuster names={endNames(m.p1, m.p2)} metric={!!l && isMetric(l.scale.unit)} onAdjust={(a, b) => adjustMember(m, a, b)} testId="auto-adjust" />
+                                )}
                               </div>
                             );
                           })}
@@ -361,7 +369,13 @@ export function AutoTakeoffPanel() {
                     <span data-testid="auto-total-count">{included.length}</span>
                     <span>{fmtTotal(total(included))}</span>
                   </div>
-                  <div className="hint">Click a member on the drawing to leave it out or put it back.</div>
+                  <div className="hint">
+                    Click a member on the drawing to leave it out or put it back. Drag the square at either end to adjust it – it slides along the member and
+                    snaps to the drawing (hold Alt to move it freely) – or pick a member in the list to adjust it step by step.{' '}
+                    <button className="linkish" onClick={() => st.setDialog({ kind: 'settings', tab: 'auto' })} data-testid="auto-styles-link">
+                      Line styles…
+                    </button>
+                  </div>
                   <button className="btn primary" disabled={!included.length} onClick={create} data-testid="auto-create">
                     <Wand2 size={14} /> Create {included.length} Measurement{included.length === 1 ? '' : 's'}
                   </button>

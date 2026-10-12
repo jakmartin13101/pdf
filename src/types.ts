@@ -157,6 +157,24 @@ export interface Markup {
   detailsOff?: string[];
   toolId?: string;
   locked?: boolean;
+  /** Made by the automatic takeoff (restyled by Settings → Auto Takeoff line styles). */
+  auto?: boolean;
+}
+
+/**
+ * Look of automatic takeoff measurements whose subject matches, e.g. subjects starting with "W" drawn
+ * as a solid green line. The first enabled rule that matches wins.
+ */
+export interface AutoStyleRule {
+  id: string;
+  enabled: boolean;
+  match: 'starts' | 'contains' | 'is';
+  text: string;
+  color: string;
+  lineWidth: number;
+  lineStyle: LineStyle;
+  /** 0..1 */
+  opacity: number;
 }
 
 export type ColumnKind = 'text' | 'number' | 'choice' | 'formula';
