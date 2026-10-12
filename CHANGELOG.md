@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.2.0 – 2026-10-12
+
+### Overlay / compare sheets
+- **Document → Compare / Overlay Sheets…** (or the **Compare** toolbar button and panel) draws one sheet over
+  another, Bluebeam-style: each sheet's line work in its own colour, multiplied, so unchanged work shows dark and
+  anything that differs shows in sheet A's or sheet B's colour. The revision of the same sheet number in another PDF
+  is suggested automatically.
+- **Colour and intensity per sheet** (colour picker, intensity slider, presets, swap), show/hide either sheet, and
+  switch the overlay on and off. Changes are instant – the drawings are not re-rendered.
+- **Auto Align** matches the text the two sheets share (sheet title, notes, grid bubbles, member labels) and fits the
+  shift, scale and rotation, so a revision plotted at a different size or offset lines up. Drawings without text
+  (scans) are aligned by image correlation. The panel reports how much of the line work matches.
+- **Manual alignment**: Align by Points (click 2 or 3 features on sheet A, then the same features on sheet B, with
+  snapping to each sheet's line work), Move by Hand (drag sheet B), arrow nudges and exact X/Y offset, rotation and
+  scale fields, and Reset.
+- **Find Changes** boxes every difference – line work compared as images, text compared as text so a single changed
+  digit is caught – lists them (only on A / only on B / changed) and zooms to each. **Add Clouds** turns them into
+  Revision Change cloud markups in one undo step.
+- Overlays are saved with the project; sheets with an overlay show a badge in the Sheets panel. Works in split and
+  detached panes. The example takeoff includes Addendum 2 of S1.02 with an overlay ready to switch on.
+
 ## 1.1.0 – 2026-10-09
 
 ### Standard details

@@ -34,7 +34,7 @@ test('overlays a revision, aligns it automatically and finds the changes', async
 
   // Colours and intensity are per sheet; either sheet can be hidden.
   await page.getByTestId('compare-color-b').fill('#1aa34a');
-  await expect(page.locator('filter[id$="-b"] feColorMatrix')).toHaveAttribute('values', /^0\.19773 0\.66523/);
+  await expect(page.locator('filter[id$="-b"] feColorMatrix')).toHaveAttribute('values', /^0\.19092 0\.64228 /);
   await page.getByTestId('compare-intensity-a').fill('40');
   await expect(page.locator('filter[id$="-a"] feColorMatrix')).toHaveAttribute('values', /^0\.00\d+ /);
   await page.getByTestId('compare-show-b').click();

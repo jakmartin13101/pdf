@@ -68,6 +68,21 @@ async function launch(extraArgs = []) {
   await report.waitForLoadState('domcontentloaded');
   check((await report.locator('h1').textContent()) === 'Report', 'summary report opens in its own window');
 
+  // Overlay compare: S1.01 over S1.02, auto-aligned, drawn as two tinted layers.
+  await win.getByTestId('sheet-thumb').nth(2).click();
+  await win.getByTestId('tb-compare').click();
+  await win.getByTestId('compare-start').click();
+  await win.getByTestId('compare-ok').click();
+  const aligned = await win
+    .getByTestId('compare-status')
+    .filter({ hasText: /Auto-aligned/ })
+    .waitFor({ timeout: 30000 })
+    .then(() => true)
+    .catch(() => false);
+  check(aligned && (await win.getByTestId('overlay-b').count()) === 1, 'overlay compare renders and auto-aligns');
+  if (shots) await win.screenshot({ path: join(shots, 'desktop-overlay.png') });
+  await win.getByTestId('compare-remove').click();
+
   // Split the view and detach a pane into its own desktop window.
   await win.getByTestId('split-vertical').click();
   const paneOpened = app.waitForEvent('window');

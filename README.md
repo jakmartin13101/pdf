@@ -9,7 +9,8 @@ editable, filterable markup database that stays linked to the drawing. Part of t
 
 > Independent implementation inspired by the Revu workflow. Not affiliated with or endorsed by Bluebeam, Inc.
 >
-> **Version 1.1.0** adds Standard Details and detachable split windows – see the [changelog](CHANGELOG.md).
+> **Version 1.2.0** adds overlay / compare for drawing revisions (1.1.0: Standard Details and detachable split
+> windows) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -81,6 +82,7 @@ A five-minute tour with the sample set:
 | **10. Drawing ⇄ data link** | Selecting a row navigates to its sheet, zooms and flashes the markup; selecting on the drawing highlights and scrolls to the row. Hover a markup for a quick readout. |
 | **11. Takeoff summary** | Totals per subject grouped by Category (or any column): pieces (EA), length (LF), area (SF), volume (CY), Qty and every numeric/formula column (e.g. weight in lbs and tons). Click a line to select its markups. |
 | **12. Export / report** | Markups CSV, summary CSV, printable summary report (save as PDF from the print dialog), flattened PDF with markups and measurement labels burned in, and portable project files (`.takeoff.json`, drawings embedded). |
+| **Overlay / compare** | *Document → Compare / Overlay Sheets*: two sheets in their own colours, auto-aligned (text or image) or aligned by points / by hand, with change detection and revision clouds. See [Overlay / compare](#overlay--compare-sheets). |
 | **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length. See [Standard details](#standard-details). |
 
 ### Tool Chest: size tools and hidden tools
@@ -132,6 +134,31 @@ IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
 <img src="docs/screenshot-standard-details.png" width="640" alt="Standard Details dialog">
 
 ![Material added by standard details in the Markups List](docs/screenshot-detail-rows.png)
+
+### Overlay / compare sheets
+
+Compare two versions of a drawing the way Revu's Overlay Pages does: *Document → Compare / Overlay Sheets…* (or the
+**Compare** button). Add the revised PDF to the set first (*File → Add PDF to Set…*); the revision of the same sheet
+number is suggested as the overlay.
+
+![Addendum 2 of S1.02 overlaid on the original, with the changes boxed](docs/screenshot-overlay.png)
+
+* **Colours** – sheet A and sheet B each draw in their own colour (red/blue by default, presets or any colour) and
+  multiply: line work on both sheets shows dark, what is only on A shows in A's colour, what is only on B in B's.
+  Each sheet has an **intensity** slider and an eye button to hide it; *Overlay on* switches the whole overlay off and
+  on.
+* **Auto Align** – matches the text both sheets share (titles, notes, grid bubbles, member labels) and fits shift,
+  scale and rotation, so revisions plotted at a different size or position line up exactly; scans without text are
+  aligned by image correlation. The panel shows how much of the line work matches after aligning.
+* **Manual alignment** – *Align by Points*: click 2 or 3 sharp features (grid intersections, corners) on sheet A, then
+  the same features on sheet B; each step shows only the sheet being clicked and snaps to its line work. *Move by Hand*
+  drags sheet B; arrow buttons nudge it by 0.01", 0.1" or 1"; X/Y offset, rotation and scale can be typed exactly.
+* **Find Changes** – boxes and lists every difference (*Only on A*, *Only on B*, *Changed*). Line work is compared as
+  images and text as text, so a single changed digit in a note is found. Click a change to zoom to it; **Add Clouds**
+  adds a *Revision Change* cloud markup around each one (one undo step).
+* The overlay is saved with the project and works in split and detached panes. Markups and measurements stay on
+  sheet A. The example takeoff includes Addendum 2 of S1.02 with an overlay ready to switch on (Compare panel →
+  *Overlay on*).
 
 ### Split view and workspace layout
 
@@ -200,7 +227,7 @@ npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
 npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
-npm run sample     # regenerate public/samples/Sample-Structural-Set.pdf
+npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff project (needs `npm run dev` running)
 npm run build:artifact  # self-contained bundle in dist-artifact/ for publishing as a claude.ai Artifact
 npm run desktop    # build, then run the desktop app with Electron
@@ -226,6 +253,8 @@ src/
     columns.ts       built-in + custom column model, row building for the list
     summary.ts       takeoff summary aggregation
     details.ts       standard details: matching rules and the material rows they add
+    align.ts         overlay maths: similarity fits, text/RANSAC and image alignment, change finding
+    compare.ts       overlay rendering helpers: tint matrices, auto-align and changes on rendered sheets
     pdf.ts           pdf.js loading, rendering, title-block text, snap index
     export.ts        CSV, printable report, flattened PDF
   store/           Zustand store (undo/redo history), project I/O, autosave, commands

@@ -3031,3 +3031,8 @@ body.popout-body {
 .badge.overlay.on {
   background: linear-gradient(90deg, #e8112d, #1f6feb);
 }
+.badge.overlay {
+  display: inline-grid;
+  place-items: center;
+  padding: 1px 4px;
+}

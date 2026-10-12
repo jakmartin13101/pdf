@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { FilePlus2, Files, LayoutGrid, List, Search, Tags } from 'lucide-react';
+import { FilePlus2, Files, GitCompareArrows, LayoutGrid, List, Search, Tags } from 'lucide-react';
 import { PanelHeader } from '../dock/PanelHeader';
 import type { Sheet } from '../../types';
 import { getState, useStore } from '../../store/store';
@@ -123,7 +123,7 @@ const Thumb = memo(function Thumb({
       <div className="thumb-badges">
         {sheet.compare && (
           <span className={`badge overlay${sheet.compare.enabled ? ' on' : ''}`} title={sheet.compare.enabled ? 'Overlay compare is on' : 'Has an overlay (switched off)'} data-testid="badge-overlay">
-            Overlay
+            <GitCompareArrows size={10} />
           </span>
         )}
         {markupCount > 0 && <span className="badge" title="Markups on this sheet">{markupCount}</span>}
