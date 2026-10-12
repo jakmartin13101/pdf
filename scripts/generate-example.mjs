@@ -156,6 +156,21 @@ await page.getByTestId('btn-details').click();
 await page.getByTestId('detail-examples').click();
 await page.getByTestId('details-save').click();
 
+// Addendum 2 revision of S1.02, overlaid on S1.02 (aligned, switched off until wanted).
+const [chooser] = await Promise.all([
+  page.waitForEvent('filechooser'),
+  page.locator('.menu-btn', { hasText: 'File' }).click().then(() => page.getByText('Add PDF to Set…').first().click()),
+]);
+await chooser.setFiles(resolve(dirname(out), 'Sample-S1.02-Addendum-2.pdf'));
+await page.getByTestId('sheet-thumb').nth(7).waitFor();
+await sheet(2);
+await page.getByTestId('tb-compare').click();
+await page.getByTestId('compare-start').click();
+await page.getByTestId('compare-ok').click();
+await page.getByTestId('compare-status').filter({ hasText: 'text matches' }).waitFor({ timeout: 30000 });
+await page.getByTestId('compare-enabled').uncheck();
+await page.getByTestId('tb-compare').click();
+
 await sheet(2);
 await page.getByTestId('tb-select').click();
 await page.keyboard.press('Escape');
@@ -168,6 +183,8 @@ await browser.close();
 const pf = JSON.parse(readFileSync(out, 'utf8'));
 pf.name = 'Example Takeoff – Riverside Warehouse';
 const levelBySheet = { 'S1.01': 'Foundation', 'S1.02': 'Roof', 'S2.01': 'Roof', 'A1.01': 'Level 1', 'M1.01': 'Level 1', 'E1.01': 'Level 1' };
+const revSheet = pf.doc.sheets.find((s) => s.fileId !== pf.doc.sheets[0].fileId);
+if (revSheet) revSheet.title = 'Roof Framing Plan (Addendum 2)';
 const sheetNo = Object.fromEntries(pf.doc.sheets.map((s) => [s.id, s.number]));
 const letters = 'ABCDEFG';
 for (const m of pf.doc.markups) {

@@ -13,6 +13,7 @@ import type {
   Rect,
   Scale,
   Sheet,
+  SheetCompare,
   StandardDetail,
   ToolSet,
   Viewport,
@@ -33,7 +34,24 @@ export type ToolMode =
   | { kind: 'calibrate' }
   | { kind: 'viewport' }
   | { kind: 'region'; purpose: 'number' | 'title' }
-  | { kind: 'cutout'; markupId: string };
+  | { kind: 'cutout'; markupId: string }
+  /** Overlay alignment: click `count` points on this sheet (A), then the same points on the overlaid sheet (B). */
+  | { kind: 'alignPoints'; sheetId: string; count: 2 | 3; ptsA: Pt[]; ptsB: Pt[] }
+  /** Drag the overlaid sheet into place. */
+  | { kind: 'moveOverlay'; sheetId: string };
+
+/** A difference found between a sheet and its overlay, in page points of the base sheet. */
+export interface CompareChange extends Rect {
+  id: string;
+  kind: 'added' | 'removed' | 'changed';
+}
+
+export interface CompareChanges {
+  changes: CompareChange[];
+  /** The alignment the changes were found with (they go stale when it moves). */
+  transformKey: string;
+  visible: boolean;
+}
 
 export type DialogState =
   | { kind: 'calibrate'; sheetId: string; pts: [Pt, Pt] }
@@ -42,6 +60,7 @@ export type DialogState =
   | { kind: 'pageLabels'; region?: { purpose: 'number' | 'title'; rect: Rect } }
   | { kind: 'columns' }
   | { kind: 'details'; detailId?: string; newForMarkupId?: string }
+  | { kind: 'compare'; sheetId?: string }
   | { kind: 'toolEdit'; setId: string; toolId?: string; fromMarkupId?: string }
   | { kind: 'shapeTool'; setId?: string; toolId?: string }
   | { kind: 'terms' }
@@ -73,15 +92,16 @@ export interface UIState {
   showHiddenTools: boolean;
 }
 
-export type PanelId = 'sheets' | 'toolchest' | 'properties' | 'measurements' | 'layers' | 'markups' | 'summary';
+export type PanelId = 'sheets' | 'toolchest' | 'properties' | 'measurements' | 'layers' | 'compare' | 'markups' | 'summary';
 export type DockSide = 'left' | 'right' | 'top' | 'bottom';
-export const PANEL_IDS: PanelId[] = ['sheets', 'toolchest', 'properties', 'measurements', 'layers', 'markups', 'summary'];
+export const PANEL_IDS: PanelId[] = ['sheets', 'toolchest', 'properties', 'measurements', 'layers', 'compare', 'markups', 'summary'];
 export const PANEL_TITLES: Record<PanelId, string> = {
   sheets: 'Sheets',
   toolchest: 'Tool Chest',
   properties: 'Properties',
   measurements: 'Measurements',
   layers: 'Layers',
+  compare: 'Compare',
   markups: 'Markups List',
   summary: 'Takeoff Summary',
 };
@@ -187,6 +207,8 @@ export interface AppState {
   activePaneId: string;
   /** Bumped whenever the active pane changes; a count never continues across a pane change. */
   activeEpoch: number;
+  /** Differences found between sheets and their overlays, by base sheet id (not saved). */
+  compareChanges: Record<string, CompareChanges>;
   paneSplit: { x: number; y: number };
   prefs: Prefs;
   toolChest: ToolSet[];
@@ -235,6 +257,8 @@ export interface AppState {
 
   // markups
   createMarkup: (type: MarkupType, sheetId: string, points: Pt[], extra?: Partial<Markup>) => Markup;
+  /** Several new markups in one undo step. */
+  addMarkups: (items: { type: MarkupType; sheetId: string; points: Pt[]; extra?: Partial<Markup> }[]) => Markup[];
   addPointsToMarkup: (id: string, pts: Pt[]) => void;
   updateMarkup: (id: string, patch: Partial<Markup>) => void;
   updateMarkups: (ids: string[], fn: (m: Markup) => Markup) => void;
@@ -260,6 +284,11 @@ export interface AppState {
   // settings
   updateSettings: (patch: Partial<ProjectSettings>) => void;
   setStandardDetails: (details: StandardDetail[]) => void;
+  /** Overlay another sheet on a sheet (null removes it). */
+  setCompare: (sheetId: string, compare: SheetCompare | null) => void;
+  /** Change overlay settings; `live` skips undo history (wrap slider/drag sequences in beginChange/endChange). */
+  updateCompare: (sheetId: string, patch: Partial<SheetCompare>, live?: boolean) => void;
+  setCompareChanges: (sheetId: string, value: CompareChanges | null) => void;
   setUI: (patch: Partial<UIState>) => void;
 
   // workspace layout
@@ -341,8 +370,9 @@ export function defaultLayout(): LayoutState {
       properties: place('right', 2),
       measurements: place('right', 3),
       layers: place('right', 4),
-      markups: { ...place('bottom', 5), float: { x: 160, y: 220, w: 760, h: 320 } },
-      summary: { ...place('bottom', 6), float: { x: 190, y: 250, w: 760, h: 360 } },
+      compare: place('right', 5),
+      markups: { ...place('bottom', 6), float: { x: 160, y: 220, w: 760, h: 320 } },
+      summary: { ...place('bottom', 7), float: { x: 190, y: 250, w: 760, h: 360 } },
     },
     // Small screens start with the drawing visible; side panels open as overlays on demand.
     active: { left: narrow ? null : 'sheets', right: narrow ? null : 'toolchest', top: null, bottom: 'markups' },
@@ -395,6 +425,53 @@ export const useStore = create<AppState>()((set, get) => {
     const next = fn(doc);
     if (next === doc) return;
     set({ doc: next, past: [...past.slice(-(HISTORY_LIMIT - 1)), doc], future: [] });
+  };
+
+  /** A new markup with the current tool's (or the type's default) properties; not yet added. */
+  const buildMarkup = (type: MarkupType, sheetId: string, points: Pt[], extra: Partial<Markup> = {}): Markup => {
+    const { tool, toolChest, prefs, typeDefaults, doc } = get();
+    const chestTool =
+      tool.kind === 'markup' && tool.chestToolId ? toolChest.flatMap((s) => s.tools).find((t) => t.id === tool.chestToolId) : undefined;
+    const td = typeDefaults[type];
+    const custom: Record<string, CustomValue> = {};
+    if (chestTool) {
+      const byName = new Map(doc.columns.map((c) => [normName(c.name), c.id]));
+      for (const [k, v] of Object.entries(chestTool.custom)) {
+        const id = byName.get(normName(k));
+        if (id) custom[id] = v;
+      }
+    }
+    const layerIds = new Set(doc.layers.map((l) => l.id));
+    const layer = chestTool?.layer && layerIds.has(chestTool.layer) ? chestTool.layer : '';
+    const now = Date.now();
+    // Size tools stamp their current size on the markup (label, optionally subject and Member Size).
+    const size = chestTool?.sizeTool?.value.trim() ?? '';
+    if (size && chestTool?.sizeTool?.setMemberSize) {
+      const col = doc.columns.find((c) => normName(c.name) === 'membersize');
+      if (col) custom[col.id] = size;
+    }
+    const m: Markup = {
+      id: uid('m'),
+      sheetId,
+      type,
+      points,
+      subject: (size && chestTool?.sizeTool?.setSubject ? size : chestTool?.subject) ?? td?.subject ?? TYPE_INFO[type].listName,
+      label: size || chestTool?.label || '',
+      comments: '',
+      author: prefs.author,
+      created: now,
+      modified: now,
+      status: 'None',
+      checked: false,
+      layer,
+      style: { ...(chestTool?.style ?? td?.style ?? defaultStyle(type)) },
+      custom,
+      toolId: chestTool?.id,
+      text: chestTool?.text ?? (type === 'stamp' ? 'APPROVED' : undefined),
+      depth: type === 'volume' ? chestTool?.depth ?? 4 : undefined,
+      ...extra,
+    };
+    return m;
   };
 
   const mapMarkups = (ids: Set<string>, fn: (m: Markup) => Markup) =>
@@ -454,6 +531,7 @@ export const useStore = create<AppState>()((set, get) => {
     paneLayout: 'single',
     activePaneId: 'pane-1',
     activeEpoch: 0,
+    compareChanges: {},
     paneSplit: { x: 0.5, y: 0.5 },
     prefs: { ...defaultPrefs, ...lsGet<Partial<Prefs>>('ts.prefs', {}) },
     toolChest: toolChestFromStorage ?? defaultToolChest(),
@@ -584,50 +662,14 @@ export const useStore = create<AppState>()((set, get) => {
       })),
 
     createMarkup: (type, sheetId, points, extra = {}) => {
-      const { tool, toolChest, prefs, typeDefaults, doc } = get();
-      const chestTool =
-        tool.kind === 'markup' && tool.chestToolId ? toolChest.flatMap((s) => s.tools).find((t) => t.id === tool.chestToolId) : undefined;
-      const td = typeDefaults[type];
-      const custom: Record<string, CustomValue> = {};
-      if (chestTool) {
-        const byName = new Map(doc.columns.map((c) => [normName(c.name), c.id]));
-        for (const [k, v] of Object.entries(chestTool.custom)) {
-          const id = byName.get(normName(k));
-          if (id) custom[id] = v;
-        }
-      }
-      const layerIds = new Set(doc.layers.map((l) => l.id));
-      const layer = chestTool?.layer && layerIds.has(chestTool.layer) ? chestTool.layer : '';
-      const now = Date.now();
-      // Size tools stamp their current size on the markup (label, optionally subject and Member Size).
-      const size = chestTool?.sizeTool?.value.trim() ?? '';
-      if (size && chestTool?.sizeTool?.setMemberSize) {
-        const col = doc.columns.find((c) => normName(c.name) === 'membersize');
-        if (col) custom[col.id] = size;
-      }
-      const m: Markup = {
-        id: uid('m'),
-        sheetId,
-        type,
-        points,
-        subject: (size && chestTool?.sizeTool?.setSubject ? size : chestTool?.subject) ?? td?.subject ?? TYPE_INFO[type].listName,
-        label: size || chestTool?.label || '',
-        comments: '',
-        author: prefs.author,
-        created: now,
-        modified: now,
-        status: 'None',
-        checked: false,
-        layer,
-        style: { ...(chestTool?.style ?? td?.style ?? defaultStyle(type)) },
-        custom,
-        toolId: chestTool?.id,
-        text: chestTool?.text ?? (type === 'stamp' ? 'APPROVED' : undefined),
-        depth: type === 'volume' ? chestTool?.depth ?? 4 : undefined,
-        ...extra,
-      };
+      const m = buildMarkup(type, sheetId, points, extra);
       commit((d) => ({ ...d, markups: [...d.markups, m] }));
       return m;
+    },
+    addMarkups: (items) => {
+      const list = items.map((it) => buildMarkup(it.type, it.sheetId, it.points, it.extra ?? {}));
+      if (list.length) commit((d) => ({ ...d, markups: [...d.markups, ...list] }));
+      return list;
     },
     addPointsToMarkup: (id, pts) => mapMarkups(new Set([id]), (m) => ({ ...m, points: [...m.points, ...pts] })),
     updateMarkup: (id, patch) => mapMarkups(new Set([id]), (m) => ({ ...m, ...patch })),
@@ -720,6 +762,24 @@ export const useStore = create<AppState>()((set, get) => {
 
     updateSettings: (patch) => commit((d) => ({ ...d, settings: { ...d.settings, ...patch } })),
     setStandardDetails: (standardDetails) => commit((d) => ({ ...d, standardDetails })),
+    setCompare: (sheetId, compare) => {
+      commit((d) => ({ ...d, sheets: d.sheets.map((x) => (x.id === sheetId ? { ...x, compare: compare ?? undefined } : x)) }));
+      if (!compare) get().setCompareChanges(sheetId, null);
+    },
+    updateCompare: (sheetId, patch, live) => {
+      const fn = (d: DocState): DocState => ({
+        ...d,
+        sheets: d.sheets.map((x) => (x.id === sheetId && x.compare ? { ...x, compare: { ...x.compare, ...patch } } : x)),
+      });
+      if (live) set({ doc: fn(get().doc) });
+      else commit(fn);
+    },
+    setCompareChanges: (sheetId, value) => {
+      const next = { ...get().compareChanges };
+      if (value) next[sheetId] = value;
+      else delete next[sheetId];
+      set({ compareChanges: next });
+    },
     setUI: (patch) => {
       const ui = { ...get().ui, ...patch };
       lsSet('ts.ui', ui);

@@ -1,6 +1,7 @@
 // Generates public/samples/Sample-Structural-Set.pdf: a small vector drawing set (ARCH D, 36"x24")
-// with real text title blocks, dimension strings and repeated symbols for takeoff practice.
-import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
+// with real text title blocks, dimension strings and repeated symbols for takeoff practice, and
+// public/samples/Sample-S1.02-Addendum-2.pdf: a revision of S1.02 for trying overlay / compare.
+import { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, concatTransformationMatrix } from 'pdf-lib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,12 +13,15 @@ const GREY = rgb(0.45, 0.45, 0.45);
 const LIGHT = rgb(0.7, 0.7, 0.7);
 const FT8 = 9; // points per foot at 1/8" = 1'-0"
 
-const doc = await PDFDocument.create();
-doc.setTitle('Riverside Distribution Center - Construction Documents');
-doc.setAuthor('Northpoint Structural Engineers (sample)');
-doc.setCreator('Takeoff Studio sample generator');
-const font = await doc.embedFont(StandardFonts.Helvetica);
-const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+async function makeDoc(title) {
+  const d = await PDFDocument.create();
+  d.setTitle(title);
+  d.setAuthor('Northpoint Structural Engineers (sample)');
+  d.setCreator('Takeoff Studio sample generator');
+  return { doc: d, font: await d.embedFont(StandardFonts.Helvetica), bold: await d.embedFont(StandardFonts.HelveticaBold) };
+}
+const SET = await makeDoc('Riverside Distribution Center - Construction Documents');
+const doc = SET.doc;
 
 function ftIn(feet) {
   const totalIn = Math.round(feet * 12);
@@ -27,10 +31,22 @@ function ftIn(feet) {
 }
 
 class Sheet {
-  constructor(number, title) {
-    this.page = doc.addPage([W, H]);
+  /** `opts.plot` re-plots the whole sheet with a scale and offset, as a revision issued from a different plot setup. */
+  constructor(number, title, opts = {}) {
+    const target = opts.target ?? SET;
+    this.page = target.doc.addPage([W, H]);
+    this.font = target.font;
+    this.boldFont = target.bold;
     this.number = number;
     this.title = title;
+    this.revs = opts.revs ?? [
+      ['1', 'ISSUED FOR BID', '03/14/2026'],
+      ['2', 'ADDENDUM 1', '04/02/2026'],
+    ];
+    if (opts.plot) {
+      const { scale, dx, dy } = opts.plot;
+      this.page.pushOperators(pushGraphicsState(), concatTransformationMatrix(scale, 0, 0, scale, dx, dy));
+    }
     this.border();
   }
   Y(y) {
@@ -64,7 +80,7 @@ class Sheet {
     this.page.drawSvgPath(d, { x: 0, y: H, borderColor: o.color ?? BLACK, borderWidth: o.w ?? 1, color: o.fill });
   }
   text(s, x, y, size = 10, o = {}) {
-    const f = o.bold ? bold : font;
+    const f = o.bold ? this.boldFont : this.font;
     let tx = x;
     if (o.align === 'center') tx = x - f.widthOfTextAtSize(s, size) / 2;
     if (o.align === 'right') tx = x - f.widthOfTextAtSize(s, size);
@@ -94,11 +110,7 @@ class Sheet {
     this.text('4410 Industrial Parkway', cx, 238, 8, { align: 'center', color: GREY });
     this.line(x, 260, W - 36, 260);
     this.text('REVISIONS', x + 12, 280, 7, { color: GREY });
-    const revs = [
-      ['1', 'ISSUED FOR BID', '03/14/2026'],
-      ['2', 'ADDENDUM 1', '04/02/2026'],
-    ];
-    revs.forEach((r, i) => {
+    this.revs.forEach((r, i) => {
       const y = 300 + i * 18;
       this.text(r[0], x + 14, y, 8);
       this.text(r[1], x + 34, y, 8);
@@ -109,7 +121,7 @@ class Sheet {
     this.text('PROJECT NO.', x + 12, 1200, 7, { color: GREY });
     this.text('2026-118', x + 12, 1216, 10);
     this.text('DATE', x + 120, 1200, 7, { color: GREY });
-    this.text('04/02/2026', x + 120, 1216, 10);
+    this.text(this.revs[this.revs.length - 1][2], x + 120, 1216, 10);
     this.text('DRAWN', x + 12, 1240, 7, { color: GREY });
     this.text('JRM', x + 12, 1256, 10);
     this.text('CHECKED', x + 120, 1240, 7, { color: GREY });
@@ -154,7 +166,7 @@ class Sheet {
       this.line(x - 5, y + 5, x + 5, y - 5, { w: 1.4 });
     }
     const size = o.size ?? 10;
-    const tw = font.widthOfTextAtSize(label, size);
+    const tw = this.font.widthOfTextAtSize(label, size);
     this.text(label, x - 5, (y1 + y2) / 2 + tw / 2, size, { rotate: 90 });
   }
   bubble(x, y, label) {
@@ -263,14 +275,16 @@ function grid(s, { dims = true } = {}) {
 }
 
 // ---------------------------------------------------------------- S1.02 roof framing plan
-{
-  const s = new Sheet('S1.02', 'Roof Framing Plan');
+// Addendum 2 (rev: true) changes: girder on grid 3 between C-D upsized to W27x84, RTU-1 opening
+// replaced by RTU-2 in bay B-C / 4-5, new W16x26 infill beam in bay D-E / 2-3, T/steel raised.
+function roofFramingPlan(s, rev = false) {
   grid(s);
   // girders along numbered grid lines (E-W), beams along lettered lines (N-S)
   for (let j = 0; j <= NY; j++)
     for (let i = 0; i < NX; i++) {
-      s.line(gx(i) + 9, gy(j), gx(i + 1) - 9, gy(j), { w: 3 });
-      const lbl = j === 0 || j === NY ? 'W18x35' : 'W24x55';
+      const upsized = rev && j === 2 && i === 2;
+      s.line(gx(i) + 9, gy(j), gx(i + 1) - 9, gy(j), { w: upsized ? 4.5 : 3 });
+      const lbl = upsized ? 'W27x84' : j === 0 || j === NY ? 'W18x35' : 'W24x55';
       s.text(lbl, (gx(i) + gx(i + 1)) / 2, gy(j) - 8, 10, { bold: true, align: 'center' });
     }
   for (let i = 0; i <= NX; i++)
@@ -300,15 +314,32 @@ function grid(s, { dims = true } = {}) {
     }
   s.text('HSS6x6x3/8 COLUMNS (TYP.)', gx(5) + 14, gy(4) + 24, 10, { bold: true });
   // roof opening (RTU) with angle frame
-  s.rect(gx(3) + 40, gy(2) + 40, 10 * FT8, 8 * FT8, { w: 1.5 });
-  s.line(gx(3) + 40, gy(2) + 40, gx(3) + 40 + 10 * FT8, gy(2) + 40 + 8 * FT8, { w: 0.6 });
-  s.line(gx(3) + 40 + 10 * FT8, gy(2) + 40, gx(3) + 40, gy(2) + 40 + 8 * FT8, { w: 0.6 });
-  s.text('RTU-1 OPENING, L4x4x3/8 FRAME', gx(3) + 40, gy(2) + 30, 9, { bold: true });
+  const opening = (x, y, w, h, label) => {
+    s.rect(x, y, w, h, { w: 1.5 });
+    s.line(x, y, x + w, y + h, { w: 0.6 });
+    s.line(x + w, y, x, y + h, { w: 0.6 });
+    s.text(label, x, y - 10, 9, { bold: true });
+  };
+  if (!rev) opening(gx(3) + 40, gy(2) + 40, 10 * FT8, 8 * FT8, 'RTU-1 OPENING, L4x4x3/8 FRAME');
+  else {
+    opening(gx(1) + 50, gy(3) + 40, 12 * FT8, 10 * FT8, 'RTU-2 OPENING, L5x5x3/8 FRAME');
+    // infill beam at mid-bay
+    s.line(gx(3) + 9, gy(1) + 10 * FT8, gx(4) - 9, gy(1) + 10 * FT8, { w: 2.5 });
+    s.text('W16x26', (gx(3) + gx(4)) / 2, gy(1) + 10 * FT8 - 8, 10, { bold: true, align: 'center' });
+    // revision deltas
+    const delta = (x, y) => {
+      s.path(`M ${x} ${y - 14} L ${x + 14} ${y + 10} L ${x - 14} ${y + 10} Z`, { w: 1.2 });
+      s.text('3', x, y + 7, 10, { bold: true, align: 'center' });
+    };
+    delta((gx(2) + gx(3)) / 2 + 60, gy(2) - 26);
+    delta(gx(1) + 50 + 12 * FT8 + 24, gy(3) + 40);
+    delta((gx(3) + gx(4)) / 2 + 52, gy(1) + 10 * FT8 - 12);
+  }
   s.drawingTitle(1, 'Roof Framing Plan', '1/8" = 1\'-0"', OX - 40, gy(NY) + 130, 520);
   s.notes(1750, 300, 'FRAMING NOTES', [
     '1. STRUCTURAL STEEL: W SHAPES ASTM A992; HSS ASTM A500 GR. C.',
     '2. ANGLES, CHANNELS AND PLATES: ASTM A36.',
-    '3. T/STEEL EL. 124\'-0" U.N.O.',
+    rev ? '3. T/STEEL EL. 126\'-0" U.N.O.' : '3. T/STEEL EL. 124\'-0" U.N.O.',
     '4. JOISTS: SJI K-SERIES, BRIDGING PER SJI.',
     '5. ROOF DECK: 1.5" TYPE B, 20 GA, GALVANIZED.',
     '6. BEAM CONNECTIONS: SEE 1/S2.01.',
@@ -316,6 +347,7 @@ function grid(s, { dims = true } = {}) {
   s.notes(1750, 470, 'MEMBER LEGEND', ['W24x55   INTERIOR GIRDER', 'W18x35   PERIMETER BEAM', 'W30x90   MOMENT FRAME BEAM', 'HSS6x6x3/8   COLUMN']);
   s.titleBlock();
 }
+roofFramingPlan(new Sheet('S1.02', 'Roof Framing Plan'));
 
 // ---------------------------------------------------------------- S2.01 sections & details (mixed scales)
 {
@@ -514,3 +546,22 @@ const out = resolve(dirname(fileURLToPath(import.meta.url)), '../public/samples/
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, await doc.save());
 console.log('Wrote', out);
+
+// Revision of S1.02, re-plotted 1% smaller and shifted (as if from a different plot setup), so the
+// overlay has to be aligned before it lines up.
+const REV = await makeDoc('Riverside Distribution Center - Addendum 2');
+roofFramingPlan(
+  new Sheet('S1.02', 'Roof Framing Plan', {
+    target: REV,
+    plot: { scale: 0.99, dx: 30, dy: 4 },
+    revs: [
+      ['1', 'ISSUED FOR BID', '03/14/2026'],
+      ['2', 'ADDENDUM 1', '04/02/2026'],
+      ['3', 'ADDENDUM 2', '05/06/2026'],
+    ],
+  }),
+  true,
+);
+const revOut = resolve(dirname(out), 'Sample-S1.02-Addendum-2.pdf');
+writeFileSync(revOut, await REV.doc.save());
+console.log('Wrote', revOut);

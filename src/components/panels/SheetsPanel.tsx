@@ -121,6 +121,11 @@ const Thumb = memo(function Thumb({
         </div>
       )}
       <div className="thumb-badges">
+        {sheet.compare && (
+          <span className={`badge overlay${sheet.compare.enabled ? ' on' : ''}`} title={sheet.compare.enabled ? 'Overlay compare is on' : 'Has an overlay (switched off)'} data-testid="badge-overlay">
+            Overlay
+          </span>
+        )}
         {markupCount > 0 && <span className="badge" title="Markups on this sheet">{markupCount}</span>}
         {sheet.scale || scaleCount ? (
           <span className="badge scale" title={sheet.scale ? `Scale ${sheet.scale.label}${scaleCount ? ` + ${scaleCount} viewport(s)` : ''}` : `${scaleCount} viewport(s)`}>

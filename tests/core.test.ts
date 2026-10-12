@@ -317,3 +317,121 @@ describe('standard details', () => {
     expect(subjects(d({ enabled: false, conditions: [{ column: 'subject', op: 'eq', value: 'Handrail' }] }))).toEqual([]);
   });
 });
+
+import { alignByText, applySim, dilate, findChanges, fitSimilarity, inkAgreement, invertSim, mergeBoxes, phaseCorrelate, ransacSimilarity, textChanges, type Mask, type TextBox } from '../src/core/align';
+
+describe('overlay alignment', () => {
+  const truth = { scale: 0.99, rotation: (0.4 * Math.PI) / 180, tx: 18, ty: -12 };
+  const close = (p: { x: number; y: number }, q: { x: number; y: number }, d = 1e-6) => {
+    expect(p.x).toBeCloseTo(q.x, -Math.log10(d) - 1);
+    expect(p.y).toBeCloseTo(q.y, -Math.log10(d) - 1);
+  };
+
+  it('inverts and fits similarities from point pairs', () => {
+    const p = { x: 300, y: 500 };
+    close(applySim(invertSim(truth), applySim(truth, p)), p);
+    const bs = [{ x: 100, y: 100 }, { x: 2000, y: 150 }, { x: 900, y: 1400 }];
+    const fit = fitSimilarity(bs.map((b) => ({ a: applySim(truth, b), b })))!;
+    expect(fit.scale).toBeCloseTo(0.99, 6);
+    expect(fit.rotation).toBeCloseTo(truth.rotation, 6);
+    expect(fit.tx).toBeCloseTo(18, 4);
+    // a single pair is a pure shift
+    expect(fitSimilarity([{ a: { x: 5, y: 7 }, b: { x: 1, y: 2 } }])).toEqual({ scale: 1, rotation: 0, tx: 4, ty: 5 });
+  });
+
+  it('ignores wrong matches (RANSAC)', () => {
+    const pairs = [];
+    for (let i = 0; i < 30; i++) {
+      const b = { x: 100 + ((i * 397) % 2300), y: 80 + ((i * 211) % 1500) };
+      pairs.push({ a: applySim(truth, b), b });
+    }
+    for (let i = 0; i < 10; i++) pairs.push({ a: { x: 50 + i * 200, y: 900 - i * 60 }, b: { x: 1500 - i * 90, y: 100 + i * 120 } });
+    const r = ransacSimilarity(pairs, 3)!;
+    expect(r.inliers).toHaveLength(30);
+    expect(r.t.tx).toBeCloseTo(18, 3);
+    expect(r.t.scale).toBeCloseTo(0.99, 5);
+  });
+
+  it('aligns two revisions of a sheet from their text, including repeated labels', () => {
+    const words = ['NORTHPOINT', 'ROOF FRAMING PLAN', 'S1.02', 'A', 'B', 'C', '1', '2', 'FRAMING NOTES', 'MEMBER LEGEND', 'T/STEEL EL. 124\'-0"'];
+    const a: TextBox[] = words.map((str, i) => ({ str, x: 120 + ((i * 523) % 2200), y: 90 + ((i * 331) % 1500), w: 40 + str.length * 6, h: 12 }));
+    for (let i = 0; i < 12; i++) a.push({ str: 'W24x55', x: 300 + i * 160, y: 480, w: 50, h: 10 });
+    const b: TextBox[] = a
+      .filter((t) => !t.str.startsWith('T/STEEL')) // a note changed in the revision…
+      .map((t) => {
+        const inv = invertSim(truth);
+        const c = applySim(inv, { x: t.x + t.w / 2, y: t.y + t.h / 2 });
+        return { ...t, x: c.x - t.w / 2, y: c.y - t.h / 2 };
+      });
+    b.push({ str: "T/STEEL EL. 126'-0\"", x: 1700, y: 400, w: 120, h: 12 }, { str: 'NEW NOTE', x: 900, y: 1200, w: 60, h: 12 });
+    const r = alignByText(a, b)!;
+    expect(r.matches).toBeGreaterThanOrEqual(20); // unique words + the repeated W24x55 labels
+    expect(r.t.tx).toBeCloseTo(18, 1);
+    expect(r.t.ty).toBeCloseTo(-12, 1);
+    expect(r.t.scale).toBeCloseTo(0.99, 3);
+    expect(alignByText(a.slice(0, 2), b.slice(0, 2))).toBeNull();
+  });
+
+  it('finds the shift between two scans by phase correlation', () => {
+    const n = 64;
+    const img = (dx: number, dy: number) => {
+      const out = new Float32Array(n * n);
+      const put = (x: number, y: number) => {
+        const X = x + dx;
+        const Y = y + dy;
+        if (X >= 0 && X < n && Y >= 0 && Y < n) out[Y * n + X] = 1;
+      };
+      for (let x = 10; x < 50; x++) put(x, 20);
+      for (let y = 8; y < 44; y++) put(30, y);
+      for (let x = 14; x < 22; x++) for (let y = 30; y < 38; y++) put(x, y);
+      return out;
+    };
+    const r = phaseCorrelate(img(0, 0), img(5, -3), n);
+    expect(Math.round(r.dx)).toBe(-5);
+    expect(Math.round(r.dy)).toBe(3);
+  });
+
+  it('dilates ink and reports added, removed and changed areas', () => {
+    const w = 60;
+    const h = 40;
+    const blank = (): Mask => ({ w, h, data: new Uint8Array(w * h) });
+    const line = (m: Mask, x0: number, x1: number, y: number) => {
+      for (let x = x0; x <= x1; x++) m.data[y * w + x] = 1;
+    };
+    const d = dilate({ w: 5, h: 5, data: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) }, 1);
+    expect([...d.data].filter(Boolean)).toHaveLength(9);
+    const a = blank();
+    const b = blank();
+    line(a, 2, 57, 5); // common line, drawn 1 px lower on B
+    line(b, 2, 57, 6);
+    line(a, 5, 20, 30); // removed in B
+    line(b, 35, 55, 30); // added in B
+    const boxes = findChanges(a, b, { tolerance: 1, group: 3, minSize: 5 });
+    expect(boxes.map((x) => x.kind).sort()).toEqual(['added', 'removed']);
+    expect(boxes.find((x) => x.kind === 'added')).toMatchObject({ x: 35, y: 30, w: 21, h: 1 });
+    expect(inkAgreement(a, b, 1)).toBeCloseTo(56 / (56 + 21), 2);
+  });
+
+  it('compares text through the alignment and merges nearby changes', () => {
+    const t = { scale: 1, rotation: 0, tx: 30, ty: -10 };
+    const a: TextBox[] = [
+      { str: 'W24x55', x: 100, y: 100, w: 40, h: 10 },
+      { str: 'W24x55', x: 300, y: 100, w: 40, h: 10 },
+      { str: "T/STEEL EL. 124'-0\"", x: 600, y: 400, w: 120, h: 9 },
+    ];
+    // B is shifted by (-30, +10): the same labels, one girder upsized, the note changed, a new label.
+    const b: TextBox[] = [
+      { str: 'W24x55', x: 70, y: 110, w: 40, h: 10 },
+      { str: 'W27x84', x: 270, y: 110, w: 40, h: 10 },
+      { str: "T/STEEL EL. 126'-0\"", x: 570, y: 410, w: 120, h: 9 },
+      { str: 'W16x26', x: 470, y: 210, w: 40, h: 10 },
+    ];
+    const ch = textChanges(a, b, t);
+    expect(ch.filter((c) => c.kind === 'added').map((c) => c.text).sort()).toEqual(["T/STEEL EL. 126'-0\"", 'W16x26', 'W27x84']);
+    expect(ch.filter((c) => c.kind === 'removed').map((c) => c.text).sort()).toEqual(["T/STEEL EL. 124'-0\"", 'W24x55']);
+    expect(ch.find((c) => c.text === 'W16x26')).toMatchObject({ x: 500, y: 200 });
+    const merged = mergeBoxes(ch, 4);
+    expect(merged).toHaveLength(3);
+    expect(merged.filter((m) => m.kind === 'changed')).toHaveLength(2);
+  });
+});

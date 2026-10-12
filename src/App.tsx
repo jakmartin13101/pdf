@@ -14,6 +14,7 @@ import { ToolEditDialog } from './components/dialogs/ToolEditDialog';
 import { AboutDialog, ConfirmDialog, SettingsDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
 import { TermsDialog } from './components/dialogs/TermsDialog';
 import { StandardDetailsDialog } from './components/dialogs/StandardDetailsDialog';
+import { CompareDialog } from './components/dialogs/CompareDialog';
 import { openPdfFiles, openProjectFile, restoreAutosave, startAutosave } from './store/project';
 import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, handleAppShortcut } from './store/commands';
 import { sheetDisplayName } from './core/columns';
@@ -145,6 +146,8 @@ function Dialogs() {
       return <PageLabelsDialog region={d.region} />;
     case 'columns':
       return <ColumnsDialog />;
+    case 'compare':
+      return <CompareDialog sheetId={d.sheetId} />;
     case 'details':
       return <StandardDetailsDialog detailId={d.detailId} newForMarkupId={d.newForMarkupId} />;
     case 'shapeTool':

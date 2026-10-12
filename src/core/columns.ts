@@ -117,6 +117,15 @@ export function sheetDisplayName(sheet: Sheet | undefined): string {
   return sheet.title ? `${n} – ${sheet.title}` : n;
 }
 
+/** Sheet name with its file added when another sheet has the same number (revisions of a sheet). */
+export function sheetLongName(sheet: Sheet | undefined, doc: Pick<DocState, 'sheets' | 'files'>): string {
+  if (!sheet) return '';
+  const name = sheetDisplayName(sheet);
+  const dup = doc.sheets.some((s) => s.id !== sheet.id && sheetLabel(s) === sheetLabel(sheet));
+  const file = doc.files.find((f) => f.id === sheet.fileId)?.name;
+  return dup && file ? `${name} · ${file.replace(/\.pdf$/i, '')}` : name;
+}
+
 /** Build list rows for markups, evaluating built-in and custom (incl. formula) columns. */
 export function buildRows(doc: DocState, markups: Markup[] = doc.markups): Row[] {
   const make = rowBuilder(doc);

@@ -71,6 +71,33 @@ export interface Sheet {
   rotation: number;
   scale: Scale | null;
   viewports: Viewport[];
+  /** Another sheet overlaid on this one for comparison (see SheetCompare). */
+  compare?: SheetCompare;
+}
+
+/**
+ * Overlay of sheet B on this sheet (A). Each sheet's line work is drawn in its own colour and the
+ * two multiply, so unchanged work shows dark and differences show in A's or B's colour.
+ */
+export interface SheetCompare {
+  /** The sheet drawn over this one. */
+  sheetId: string;
+  enabled: boolean;
+  colorA: string;
+  colorB: string;
+  /** 0..1: how strongly each sheet's line work is drawn. */
+  intensityA: number;
+  intensityB: number;
+  showA: boolean;
+  showB: boolean;
+  /** Places sheet B on this sheet: pA = scale · R(rotation) · pB + (tx, ty), in page points and radians. */
+  transform: { scale: number; rotation: number; tx: number; ty: number };
+  /** How the current alignment was set, for the status line. */
+  alignedBy?: 'text' | 'image' | 'points' | 'manual' | null;
+  /** Share of B's line work that lands on A's after aligning (0..1). */
+  agreement?: number;
+  /** Number of text or point matches the alignment used. */
+  matches?: number;
 }
 
 export type LineStyle = 'solid' | 'dashed' | 'dotted';

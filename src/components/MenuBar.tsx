@@ -142,6 +142,7 @@ export function MenuBar() {
     ],
     Document: [
       { label: 'Page Labels…', onClick: () => st().setDialog({ kind: 'pageLabels' }), disabled: !loaded },
+      { label: 'Compare / Overlay Sheets…', onClick: () => st().setDialog({ kind: 'compare' }), disabled: !loaded || st().doc.sheets.length < 2 },
       { label: 'Next Sheet', shortcut: 'PgDn', onClick: () => st().gotoSheetOffset(1), disabled: !loaded },
       { label: 'Previous Sheet', shortcut: 'PgUp', onClick: () => st().gotoSheetOffset(-1), disabled: !loaded },
       { sep: true },

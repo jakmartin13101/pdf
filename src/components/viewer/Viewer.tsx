@@ -11,6 +11,8 @@ import { querySnap, snapIndex, type SnapIndex } from '../../core/pdf';
 import { formatLength } from '../../core/units';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { useOwnerWindow } from '../ownerWindow';
+import { AlignMarkers, ChangeBoxes, LayerA, LayerB, TintDefs } from './OverlayLayers';
+import { applySim, fitSimilarity, invertSim, type Similarity } from '../../core/align';
 import { useShallow } from 'zustand/react/shallow';
 
 interface View {
@@ -26,7 +28,8 @@ type Drag =
   | { kind: 'marquee'; start: Pt; additive: boolean }
   | { kind: 'rect'; start: Pt; purpose: 'create' | 'zoom' | 'viewport' | 'region' }
   | { kind: 'freehand' }
-  | { kind: 'twopoint'; downScreen: Pt };
+  | { kind: 'twopoint'; downScreen: Pt }
+  | { kind: 'overlay'; start: Pt; orig: Similarity };
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 24;
@@ -134,6 +137,10 @@ export function Viewer({ paneId }: { paneId: string }) {
   const editingTextId = useStore((s) => s.editingTextId);
   const loaded = useStore((s) => s.loaded);
   const win = useOwnerWindow();
+  // Overlay compare: the sheet drawn over this one, and the differences found between them.
+  const compareSheetId = sheet?.compare?.sheetId ?? null;
+  const other = useStore((s) => (compareSheetId ? s.doc.sheets.find((x) => x.id === compareSheetId) : undefined));
+  const changes = useStore((s) => (sheet ? s.compareChanges[sheet.id] : undefined));
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -167,6 +174,7 @@ export function Viewer({ paneId }: { paneId: string }) {
   const countRef = useRef<{ id: string; epoch: number } | null>(null);
   const spaceDown = useRef(false);
   const snapIdx = useRef<SnapIndex | null>(null);
+  const otherSnapIdx = useRef<SnapIndex | null>(null);
 
   const hiddenLayers = useMemo(() => new Set(layers.filter((l) => !l.visible).map((l) => l.id)), [layers]);
   const pageMarkups = useMemo(
@@ -298,6 +306,22 @@ export function Viewer({ paneId }: { paneId: string }) {
     setFreehand(null);
   }, [isActive]);
 
+  // ---- the overlaid sheet's line work, for snapping while picking its alignment points
+  const pickingOverlay = tool.kind === 'alignPoints' && tool.sheetId === sheet?.id;
+  useEffect(() => {
+    otherSnapIdx.current = null;
+    if (!pickingOverlay || !other) return;
+    let alive = true;
+    snapIndex(other.fileId, other.pageIndex)
+      .then((idx) => {
+        if (alive) otherSnapIdx.current = idx;
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [pickingOverlay, other?.fileId, other?.pageIndex, other]);
+
   // ---- content snap index
   useEffect(() => {
     snapIdx.current = null;
@@ -344,6 +368,40 @@ export function Viewer({ paneId }: { paneId: string }) {
     }
     if (best) return { pt: best.pt, snap: best.snap };
     return { pt: raw, snap: null };
+  };
+
+  /** While aligning by points on the overlaid sheet: snap to its line work (placed by the overlay). */
+  const snapOverlayPoint = (raw: Pt): { pt: Pt; snap: string | null } => {
+    const t = sheet?.compare?.transform;
+    const idx = otherSnapIdx.current;
+    if (!t || !idx || !getState().prefs.snapContent) return { pt: raw, snap: null };
+    const s = querySnap(idx, applySim(invertSim(t), raw), 8 / viewRef.current.zoom / t.scale);
+    return s ? { pt: applySim(t, s.pt), snap: s.kind } : { pt: raw, snap: null };
+  };
+
+  /** Align by points: N clicks on this sheet, then the same N features on the overlaid sheet. */
+  const alignClick = (raw: Pt) => {
+    if (!sheet?.compare || tool.kind !== 'alignPoints') return;
+    const st = getState();
+    const t = sheet.compare.transform;
+    if (tool.ptsA.length < tool.count) {
+      st.setTool({ ...tool, ptsA: [...tool.ptsA, snapPoint(raw, false).pt] });
+      return;
+    }
+    // Points on the overlaid sheet are kept in its own coordinates.
+    const ptsB = [...tool.ptsB, applySim(invertSim(t), snapOverlayPoint(raw).pt)];
+    if (ptsB.length < tool.count) {
+      st.setTool({ ...tool, ptsB });
+      return;
+    }
+    const fit = fitSimilarity(tool.ptsA.map((a, i) => ({ a, b: ptsB[i] })));
+    st.setTool({ kind: 'select' });
+    if (!fit || fit.scale < 0.2 || fit.scale > 5) {
+      st.toast('Those points do not line up. Pick the same features on both sheets and try again.', 'error');
+      return;
+    }
+    st.updateCompare(sheet.id, { transform: fit, alignedBy: 'points', matches: tool.count, agreement: undefined, enabled: true, showA: true, showB: true });
+    st.toast(`Aligned by ${tool.count} points`, 'success');
   };
 
   // ---- creation
@@ -448,6 +506,19 @@ export function Viewer({ paneId }: { paneId: string }) {
       return;
     }
 
+    if (tool.kind === 'alignPoints') {
+      alignClick(raw);
+      return;
+    }
+    if (tool.kind === 'moveOverlay') {
+      if (sheet.compare) {
+        el.setPointerCapture(e.pointerId);
+        st.beginChange();
+        dragRef.current = { kind: 'overlay', start: raw, orig: sheet.compare.transform };
+      }
+      return;
+    }
+
     const anchor = draft?.[draft.length - 1];
     const { pt } = snapPoint(raw, e.shiftKey, anchor);
 
@@ -535,6 +606,16 @@ export function Viewer({ paneId }: { paneId: string }) {
       setView({ ...d.view, x: d.view.x + e.clientX - d.sx, y: d.view.y + e.clientY - d.sy });
       return;
     }
+    if (d?.kind === 'overlay') {
+      let dx = raw.x - d.start.x;
+      let dy = raw.y - d.start.y;
+      if (e.shiftKey) {
+        if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
+      st.updateCompare(sheet.id, { transform: { ...d.orig, tx: d.orig.tx + dx, ty: d.orig.ty + dy }, alignedBy: 'manual', agreement: undefined }, true);
+      return;
+    }
     if (d?.kind === 'move') {
       let dx = raw.x - d.start.x;
       let dy = raw.y - d.start.y;
@@ -596,7 +677,11 @@ export function Viewer({ paneId }: { paneId: string }) {
       if (hover) setHover(null);
       return;
     }
-    if (tool.kind === 'pan') return;
+    if (tool.kind === 'pan' || tool.kind === 'moveOverlay') return;
+    if (tool.kind === 'alignPoints') {
+      setHover(tool.ptsA.length < tool.count ? snapPoint(raw, false) : snapOverlayPoint(raw));
+      return;
+    }
     const anchor = draft?.[draft.length - 1];
     setHover(snapPoint(raw, e.shiftKey, anchor));
   };
@@ -608,6 +693,10 @@ export function Viewer({ paneId }: { paneId: string }) {
     if (!d || !sheet) return;
     const st = getState();
     const raw = toPage(e.clientX, e.clientY);
+    if (d.kind === 'overlay') {
+      st.endChange();
+      return;
+    }
     if (d.kind === 'marquee') {
       setMarquee(null);
       const r = rectFromPoints(d.start, raw);
@@ -1013,7 +1102,7 @@ export function Viewer({ paneId }: { paneId: string }) {
   const editing = editingTextId ? pageMarkups.find((m) => m.id === editingTextId) : undefined;
 
   const cursorClass =
-    panning ? 'cur-grabbing' : tool.kind === 'pan' ? 'cur-grab' : tool.kind === 'select' ? 'cur-default' : tool.kind === 'zoomrect' ? 'cur-zoom' : 'cur-cross';
+    panning ? 'cur-grabbing' : tool.kind === 'pan' || tool.kind === 'moveOverlay' ? 'cur-grab' : tool.kind === 'select' ? 'cur-default' : tool.kind === 'zoomrect' ? 'cur-zoom' : 'cur-cross';
 
   const svgStyle = { '--px': `${1 / z}px`, '--hit': `${12 / z}px` } as CSSProperties;
 
@@ -1022,6 +1111,14 @@ export function Viewer({ paneId }: { paneId: string }) {
   }
 
   const scaleAtCursor = hover ? scaleAt(sheet, hover.pt) : null;
+
+  // Overlay compare: while aligning by points only the sheet being clicked is shown.
+  const pick = tool.kind === 'alignPoints' && tool.sheetId === sheet.id ? (tool.ptsA.length < tool.count ? 'A' : 'B') : null;
+  const overlay =
+    sheet.compare && other && (sheet.compare.enabled || pick)
+      ? { cmp: sheet.compare, other, pick, showA: pick ? pick === 'A' : sheet.compare.showA, showB: pick ? pick === 'B' : sheet.compare.showB }
+      : null;
+  const overlayId = `cmp-${paneId}`;
 
   return (
     <div
@@ -1040,7 +1137,17 @@ export function Viewer({ paneId }: { paneId: string }) {
       data-testid="viewer"
     >
       <div className="page" style={{ transform: `translate(${view.x}px, ${view.y}px)`, width: sheet.width * z, height: sheet.height * z }}>
-        <PageCanvas sheet={sheet} zoom={z} visible={visible} />
+        {overlay ? (
+          <div className="cmp-stack" data-testid="overlay-stack">
+            <TintDefs id={overlayId} cmp={overlay.cmp} />
+            <LayerA id={overlayId} show={overlay.showA}>
+              <PageCanvas sheet={sheet} zoom={z} visible={visible} />
+            </LayerA>
+            {overlay.showB && <LayerB id={overlayId} other={overlay.other} cmp={overlay.cmp} zoom={z} visible={visible} />}
+          </div>
+        ) : (
+          <PageCanvas sheet={sheet} zoom={z} visible={visible} />
+        )}
         <svg
           className={`overlay ${tool.kind === 'select' ? '' : 'drawing'}`}
           viewBox={`0 0 ${sheet.width} ${sheet.height}`}
@@ -1069,6 +1176,13 @@ export function Viewer({ paneId }: { paneId: string }) {
           ) : (
             <rect x={rectPreview.x} y={rectPreview.y} width={rectPreview.w} height={rectPreview.h} className={`rubber ${tool.kind}`} />
           ))}
+          {overlay && changes?.visible && <ChangeBoxes changes={changes.changes} zoom={z} colors={{ a: overlay.cmp.colorA, b: overlay.cmp.colorB }} />}
+          {overlay && tool.kind === 'alignPoints' && (
+            <>
+              <AlignMarkers points={tool.ptsA} zoom={z} color={overlay.pick === 'B' ? '#8a8f98' : overlay.cmp.colorA} />
+              <AlignMarkers points={tool.ptsB.map((p) => applySim(overlay.cmp.transform, p))} zoom={z} color={overlay.cmp.colorB} />
+            </>
+          )}
           {marquee && <rect x={marquee.r.x} y={marquee.r.y} width={marquee.r.w} height={marquee.r.h} className={`marquee ${marquee.crossing ? 'crossing' : ''}`} />}
           {tool.kind === 'select' &&
             selectedOnPage.map((m) => {

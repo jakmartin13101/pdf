@@ -23,6 +23,12 @@ function prompt(tool: ReturnType<typeof getState>['tool']): string {
       return `Page labels: drag a rectangle around the sheet ${tool.purpose === 'number' ? 'number' : 'title'} in the title block.`;
     case 'cutout':
       return 'Cutout: click points of the hole, double-click or Enter to finish. Esc cancels.';
+    case 'alignPoints':
+      return tool.ptsA.length < tool.count
+        ? `Align overlay: click point ${tool.ptsA.length + 1} of ${tool.count} on sheet A (grid intersections and corners work best). Esc cancels.`
+        : `Align overlay: click the same point ${tool.ptsB.length + 1} of ${tool.count} on sheet B. Esc cancels.`;
+    case 'moveOverlay':
+      return 'Move overlay: drag to slide sheet B into place (Shift keeps it straight). Fine-tune in the Compare panel. Esc when done.';
     case 'markup': {
       const info = TYPE_INFO[tool.type];
       const base = info.label;
