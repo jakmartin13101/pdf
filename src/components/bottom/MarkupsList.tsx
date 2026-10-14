@@ -1,9 +1,11 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { PanelContext, PanelHeader } from '../dock/PanelHeader';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Columns3, Download, Filter, PackagePlus, Search, Table2, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Columns3, Download, Filter, LayoutTemplate, PackagePlus, Search, Table2, Trash2, X } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import type { Markup, MarkupStatus } from '../../types';
 import { STATUSES } from '../../types';
-import { getState, useStore } from '../../store/store';
+import { getState, listStyleOf, useStore, type ListState } from '../../store/store';
+import { listStyleMenuItems } from '../../store/commands';
 import { allColumns, formatTotal, isSummable, type ColumnSpec, type Row } from '../../core/columns';
 import { buildTakeoffRows } from '../../core/details';
 import { TYPE_ICON } from '../icons';
@@ -282,8 +284,15 @@ export function MarkupsList() {
   const list = useStore((s) => s.list);
   const selection = useStore((s) => s.selection);
   const { rows, filtered } = useFilteredRows();
-  const cols = useMemo(() => allColumns(doc.columns), [doc.columns]);
-  const visibleCols = useMemo(() => list.columns.map((id) => cols.find((c) => c.id === id)).filter(Boolean) as ColumnSpec[], [list.columns, cols]);
+  // How this document's list shows its columns (order, widths, renamed headers).
+  const style = useStore(useShallow((s) => listStyleOf(s)));
+  const cols = useMemo(() => allColumns(doc.columns, style.labels), [doc.columns, style.labels]);
+  const visibleCols = useMemo(() => style.columns.map((id) => cols.find((c) => c.id === id)).filter(Boolean) as ColumnSpec[], [style.columns, cols]);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [dropCol, setDropCol] = useState<{ id: string; after: boolean } | null>(null);
+  const resizing = useRef(false);
+  // The sort before a header click, so a double-click (rename) leaves the sort as it was.
+  const sortBefore = useRef<ListState['sort']>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<{ id: string; col: string } | null>(null);
   const [filterFor, setFilterFor] = useState<{ col: ColumnSpec; x: number; y: number } | null>(null);
@@ -450,10 +459,12 @@ export function MarkupsList() {
   const startResize = (e: React.PointerEvent, c: ColumnSpec) => {
     e.preventDefault();
     e.stopPropagation();
+    resizing.current = true;
     const startX = e.clientX;
-    const w0 = list.widths[c.id] ?? c.width;
-    const move = (ev: PointerEvent) => st().setList({ widths: { ...st().list.widths, [c.id]: Math.max(36, w0 + ev.clientX - startX) } });
+    const w0 = style.widths[c.id] ?? c.width;
+    const move = (ev: PointerEvent) => st().setListStyle({ widths: { ...listStyleOf(st()).widths, [c.id]: Math.max(36, w0 + ev.clientX - startX) } });
     const up = () => {
+      resizing.current = false;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
@@ -466,7 +477,43 @@ export function MarkupsList() {
     [cols],
   );
   const activeFilters = Object.keys(list.filters);
-  const width = (c: ColumnSpec) => list.widths[c.id] ?? c.width;
+  const width = (c: ColumnSpec) => style.widths[c.id] ?? c.width;
+
+  // Column layout: rename headers, hide, reorder (also by dragging headers).
+  const setColumns = (ids: string[]) => st().setListStyle({ columns: ids });
+  const rename = (c: ColumnSpec, name: string) => {
+    const labels = { ...style.labels };
+    const own = c.original ?? c.name;
+    if (!name.trim() || name.trim() === own) delete labels[c.id];
+    else labels[c.id] = name.trim();
+    st().setListStyle({ labels });
+    setRenaming(null);
+  };
+  const moveCol = (id: string, to: string, after: boolean) => {
+    if (id === to) return;
+    const rest = style.columns.filter((x) => x !== id);
+    const i = rest.indexOf(to);
+    if (i < 0) return;
+    setColumns([...rest.slice(0, after ? i + 1 : i), id, ...rest.slice(after ? i + 1 : i)]);
+  };
+  const onHeaderContext = (e: React.MouseEvent, c: ColumnSpec) => {
+    e.preventDefault();
+    const i = style.columns.indexOf(c.id);
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        { label: 'Rename Column…', onClick: () => setRenaming(c.id) },
+        ...(c.original ? [{ label: `Back to "${c.original}"`, onClick: () => rename(c, '') }] : []),
+        { label: 'Hide Column', disabled: style.columns.length < 2, onClick: () => setColumns(style.columns.filter((x) => x !== c.id)) },
+        { label: 'Move Left', disabled: i <= 0, onClick: () => moveCol(c.id, style.columns[i - 1], false) },
+        { label: 'Move Right', disabled: i < 0 || i >= style.columns.length - 1, onClick: () => moveCol(c.id, style.columns[i + 1], true) },
+        { sep: true },
+        { label: 'Columns…', onClick: () => st().setDialog({ kind: 'columns' }) },
+        { label: 'List Style', children: listStyleMenuItems() },
+      ],
+    });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
@@ -540,6 +587,17 @@ export function MarkupsList() {
         <button className="icon-btn" title="Columns…" onClick={() => st().setDialog({ kind: 'columns' })} data-testid="btn-columns">
           <Columns3 size={14} />
         </button>
+        <button
+          className="icon-btn"
+          title="List style: save the columns as the default, export or import them"
+          onClick={(e) => {
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setMenu({ x: r.left, y: r.bottom + 2, items: listStyleMenuItems() });
+          }}
+          data-testid="btn-list-style"
+        >
+          <LayoutTemplate size={14} />
+        </button>
         <button className="icon-btn" title="Export markups list to CSV" onClick={exportMarkupsCsv}>
           <Download size={14} />
         </button>
@@ -554,9 +612,69 @@ export function MarkupsList() {
           <thead>
             <tr>
               {visibleCols.map((c) => (
-                <th key={c.id} title={c.custom?.kind === 'formula' ? `${c.name} = ${c.custom.formula}` : c.name}>
-                  <div className="th-inner" onClick={() => toggleSort(c)}>
-                    <span className="th-name">{c.name}</span>
+                <th
+                  key={c.id}
+                  title={`${c.custom?.kind === 'formula' ? `${c.name} = ${c.custom.formula}` : c.name}${c.original ? ` (${c.original})` : ''}\nDrag to move · double-click to rename · right-click for more`}
+                  className={dropCol?.id === c.id ? (dropCol.after ? 'drop-after' : 'drop-before') : undefined}
+                  draggable={renaming !== c.id}
+                  onDragStart={(e) => {
+                    if (resizing.current) return e.preventDefault();
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/list-column', c.id);
+                  }}
+                  onDragOver={(e) => {
+                    if (!e.dataTransfer.types.includes('text/list-column')) return;
+                    e.preventDefault();
+                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    const after = e.clientX > r.left + r.width / 2;
+                    if (dropCol?.id !== c.id || dropCol.after !== after) setDropCol({ id: c.id, after });
+                  }}
+                  onDragLeave={() => setDropCol(null)}
+                  onDrop={(e) => {
+                    const id = e.dataTransfer.getData('text/list-column');
+                    setDropCol(null);
+                    if (!id) return;
+                    e.preventDefault();
+                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    moveCol(id, c.id, e.clientX > r.left + r.width / 2);
+                  }}
+                  onContextMenu={(e) => onHeaderContext(e, c)}
+                  data-testid="list-header"
+                  data-col={c.id}
+                >
+                  <div
+                    className="th-inner"
+                    onClick={(e) => {
+                      if (renaming === c.id || e.detail > 1) return;
+                      sortBefore.current = list.sort;
+                      toggleSort(c);
+                    }}
+                  >
+                    {renaming === c.id ? (
+                      <input
+                        className="th-rename"
+                        autoFocus
+                        defaultValue={c.name}
+                        onClick={(e) => e.stopPropagation()}
+                        onBlur={(e) => rename(c, e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') rename(c, e.currentTarget.value);
+                          if (e.key === 'Escape') setRenaming(null);
+                        }}
+                        data-testid="list-header-rename"
+                      />
+                    ) : (
+                      <span
+                        className="th-name"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          st().setList({ sort: sortBefore.current });
+                          setRenaming(c.id);
+                        }}
+                      >
+                        {c.name}
+                      </span>
+                    )}
                     {list.sort?.col === c.id && (list.sort.dir === 1 ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                     <button
                       className={`icon-btn th-filter${list.filters[c.id] ? ' on' : ''}`}

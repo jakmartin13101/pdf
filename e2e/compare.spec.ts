@@ -1,15 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 import { clickAt, gotoSheet, gx, gy, openSample } from './helpers';
 
-/** Sample set plus the Addendum 2 revision of S1.02 (re-plotted at 99 % and shifted). */
+/** Sample set plus the Addendum 2 revision of S1.02 (re-plotted at 99 % and shifted), opened as a second document. */
 async function openWithRevision(page: Page) {
   await openSample(page);
+  // The revision is its own document; its sheet can still be overlaid on the set's.
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.locator('.menu-btn', { hasText: 'File' }).click().then(() => page.getByText('Open PDF in a New Tab…').first().click()),
+    page.locator('.menu-btn', { hasText: 'File' }).click().then(() => page.locator('.dropdown .menu-item', { hasText: 'Open PDF…' }).click()),
   ]);
   await chooser.setFiles('public/samples/Sample-S1.02-Addendum-2.pdf');
-  await expect(page.getByTestId('sheet-thumb')).toHaveCount(8);
+  await expect(page.getByTestId('doc-tab')).toHaveCount(2);
+  await expect(page.getByTestId('sheet-thumb')).toHaveCount(1);
+  await page.getByTestId('doc-tab').first().click();
+  await expect(page.getByTestId('sheet-thumb')).toHaveCount(7);
   await gotoSheet(page, 2);
 }
 

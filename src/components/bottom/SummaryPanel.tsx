@@ -26,7 +26,7 @@ export function SummaryPanel() {
   const { groups, total } = useMemo(() => buildSummary(source, doc, validGroup), [source, doc, validGroup]);
   const extras = summableCustomColumns(doc);
   const s = doc.settings;
-  const groupOptions = allColumns(doc.columns).filter((c) => !c.numeric && ['subject', 'page', 'type', 'layer', 'status', 'author'].includes(c.id) || (c.custom && c.custom.kind !== 'number' && c.custom.kind !== 'formula'));
+  const groupOptions = allColumns(doc.columns, doc.listStyle?.labels).filter((c) => !c.numeric && ['subject', 'page', 'type', 'layer', 'status', 'author'].includes(c.id) || (c.custom && c.custom.kind !== 'number' && c.custom.kind !== 'formula'));
   const n = (v: number, d = s.decimals) => (v ? fmtNumber(v, d) : '');
   const weightCol = extras.find((c) => /weight/i.test(c.name));
   const weight = weightCol ? total.extras[customColId(weightCol)] ?? 0 : 0;

@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2, X } from 'lucide-react';
 import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolveBindings } from '../../core/keymap';
 import type { AutoStyleRule, LineStyle, ProjectSettings } from '../../types';
-import { getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
+import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
+import { cmdExportListStyle, cmdImportListStyle, cmdSaveDefaultListStyle } from '../../store/commands';
+import { allColumns } from '../../core/columns';
 import { desktop, type GpuMode } from '../../brand';
 import { AUTO_MATCH, autoStyleFor, defaultAutoStyles, isAutoMarkup, newAutoStyle, withRule } from '../../core/autoStyles';
 import { MEMBER_FAMILIES } from '../../core/autoTakeoff';
@@ -18,6 +20,7 @@ const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'units', label: 'Units & Totals', hint: 'This project' },
   { id: 'editing', label: 'Drawing & Editing', hint: 'Snapping and adjusting' },
   { id: 'keys', label: 'Keyboard', hint: 'Shortcuts for commands' },
+  { id: 'list', label: 'Markups List', hint: 'Default columns for new files' },
   { id: 'auto', label: 'Auto Takeoff', hint: 'Line styles by subject' },
   { id: 'speed', label: 'Speed & Graphics', hint: 'Graphics card, rendering' },
   { id: 'workspace', label: 'Workspace', hint: 'Panels and toolbar' },
@@ -582,6 +585,48 @@ function Speed() {
   );
 }
 
+/** The Markups List style files opened from now on start with. */
+function ListDefaults() {
+  const prefs = useStore((s) => s.prefs);
+  const loaded = useStore((s) => s.loaded);
+  const style = defaultListStyle(prefs);
+  const cols = allColumns(style.columns, style.labels);
+  const names = style.visible.map((id) => cols.find((c) => c.id === id)?.name).filter(Boolean) as string[];
+  return (
+    <>
+      <div className="hint">
+        Each file keeps its own Markups List layout: which columns show, their order, widths and header names, and its custom columns. Files you open from now on start with
+        this default. Change a file's layout in the list itself (drag headers, right-click a header, or Columns…), then save it as the default here or from the list's style
+        button.
+      </div>
+      <h4 className="set-h">Default layout {prefs.listStyle ? '' : '(built-in)'}</h4>
+      <div className="set-chips" data-testid="list-default-columns">
+        {names.map((n, i) => (
+          <span key={i} className="set-chip">
+            {n}
+          </span>
+        ))}
+      </div>
+      <div className="hint">{style.columns.length} custom columns.</div>
+      <div className="field-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+        <button className="btn sm narrow primary" disabled={!loaded} onClick={cmdSaveDefaultListStyle} data-testid="list-default-save">
+          Use This File's Layout
+        </button>
+        <button className="btn sm narrow" onClick={() => void cmdExportListStyle('default')} data-testid="list-default-export">
+          Export…
+        </button>
+        <button className="btn sm narrow" onClick={() => void cmdImportListStyle(true, false)} data-testid="list-default-import">
+          Import…
+        </button>
+        <button className="btn sm narrow" disabled={!prefs.listStyle} onClick={() => getState().setPrefs({ listStyle: null })} data-testid="list-default-reset">
+          <RotateCcw size={12} /> Back to Built-in
+        </button>
+      </div>
+      <div className="hint">Export keeps a copy of the layout (a backup, or to use on another computer); Import makes a saved layout the default again.</div>
+    </>
+  );
+}
+
 function Workspace() {
   const layout = useStore((s) => s.layout);
   const st = getState();
@@ -642,6 +687,7 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
           {tab === 'units' && <Units />}
           {tab === 'editing' && <Editing />}
           {tab === 'keys' && <Keyboard />}
+          {tab === 'list' && <ListDefaults />}
           {tab === 'auto' && <AutoTakeoff />}
           {tab === 'speed' && <Speed />}
           {tab === 'workspace' && <Workspace />}

@@ -7,12 +7,11 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.5.0**: **document tabs** – every PDF opens in its own tab in the active pane, and tabs drag to any
-> other pane or window; **Add Detail…** on the right-click menu of selected markups; **custom keyboard shortcuts**;
-> **Flatten Markups** into the drawing; **page labels from a box** drawn once and read on all or the ticked pages;
-> faster opening and paging with the **graphics card** helping (1.4: Settings menu, auto takeoff line styles by
-> subject, fine adjustment; 1.3.0: automatic takeoff of beams and tubing; 1.2.0: overlay / compare) – see the
-> [changelog](CHANGELOG.md).
+> **Version 1.6.0**: **every PDF is its own document** – its markups, scales, columns and standard details belong to
+> that file and are **saved inside the PDF** (open it again and the takeoff is back); each document has its own undo,
+> its own tab and its own **Markups List layout**, which can be **saved as the default** for new files and
+> **exported / imported** (1.5.0: document tabs, Add Detail, custom shortcuts, flatten, page labels from a box, faster
+> rendering; 1.4: Settings menu, auto takeoff line styles; 1.3.0: automatic takeoff) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -39,9 +38,10 @@ The installer is not code-signed yet, so Windows SmartScreen shows *Windows prot
 (*More info → Run anyway*). Sign it with your organisation's certificate before distributing (see
 [Building the installer](#building-the-windows-installer)).
 
-The desktop app works offline. PDFs and `.takeoff.json` projects can also be opened by dragging them onto the window or
-the desktop shortcut, or from Explorer with *Open with → Choose another app* (pick BuildSuite Takeoff Studio once; the
-installer does not take over the default PDF viewer). Saves and exports use the normal Windows *Save As* dialog.
+The desktop app works offline. PDFs can also be opened by dragging them onto the window or the desktop shortcut, or from
+Explorer with *Open with → Choose another app* (pick BuildSuite Takeoff Studio once; the installer does not take over
+the default PDF viewer). *Save* writes the takeoff back into the PDF it was opened from; *Save As* and exports use the
+normal Windows *Save As* dialog.
 
 ## Quick start (web version for testing)
 
@@ -72,7 +72,7 @@ A five-minute tour with the sample set:
 
 | Workflow step | Where it lives |
 | --- | --- |
-| **1. Sheet labeling & organization** | Sheets panel: thumbnails/list, search, drag to reorder, double-click to rename. *Document → Page Labels*: auto-detect from title blocks, **box the number and/or title once on any page** and read the same spot on all or the ticked pages, sequential numbering, or edit in a table. Multiple PDFs combine into one sheet set, each in its own **document tab**. |
+| **1. Sheet labeling & organization** | Sheets panel: thumbnails/list, search, drag to reorder, double-click to rename. *Document → Page Labels*: auto-detect from title blocks, **box the number and/or title once on any page** and read the same spot on all or the ticked pages, sequential numbering, or edit in a table. Each PDF is its own document, in its own **document tab**. |
 | **2. Scale calibration** | *Calibrate* (two points + known distance such as `20'-0"`, `20-6`, `6.1 m`), *Set Scale* (architectural, engineering and metric presets or custom), apply to one / all / unscaled sheets. **Viewports** give a rectangular area of a sheet its own scale (details drawn at 1½" = 1'-0" next to a 1/4" section). Units: ft-in, decimal ft, in, m, cm, mm with selectable precision. |
 | **3. Linear measurements** | Length and Polylength tools; results are persistent markup objects you can select, move, reshape by dragging vertices, restyle and inspect. Snaps to PDF line work (endpoints, midpoints, intersections, lines), to markup vertices, and Shift/ORTHO constrain angles. |
 | **4. Area & perimeter** | Area (with perimeter shown), Perimeter, Volume (area × depth, CY/CF/m³), Angle; area **cutouts** for openings. |
@@ -83,12 +83,13 @@ A five-minute tour with the sample set:
 | **9. Sort, filter, group** | Click headers to sort, funnel icons for per-column value filters, search box, *Current Sheet* scope, *Group by* any text/choice column with per-group subtotals and a totals row. |
 | **10. Drawing ⇄ data link** | Selecting a row navigates to its sheet, zooms and flashes the markup; selecting on the drawing highlights and scrolls to the row. Hover a markup for a quick readout. |
 | **11. Takeoff summary** | Totals per subject grouped by Category (or any column): pieces (EA), length (LF), area (SF), volume (CY), Qty and every numeric/formula column (e.g. weight in lbs and tons). Click a line to select its markups. |
-| **12. Export / report** | Markups CSV, summary CSV, printable summary report (save as PDF from the print dialog), flattened PDF with markups and measurement labels burned in, and portable project files (`.takeoff.json`, drawings embedded). |
+| **12. Export / report** | Markups CSV, summary CSV, printable summary report (save as PDF from the print dialog), flattened PDF with markups and measurement labels burned in. The takeoff itself is saved **inside each PDF**. |
 | **Overlay / compare** | *Document → Compare / Overlay Sheets*: two sheets in their own colours, auto-aligned (text or image) or aligned by points / by hand, with change detection and revision clouds. See [Overlay / compare](#overlay--compare-sheets). |
 | **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length – or add a detail by hand to any selected markups. See [Standard details](#standard-details). |
 | **Automatic takeoff** | *Auto* button (*Tools → Automatic Takeoff*): finds the member-size labels on a plan (W24x55, HSS8x4x1/4, Pipe 4 Std…), measures the line each one labels at the sheet's scale and creates labelled length measurements, drawn by line style rules (*Settings → Auto Takeoff Line Styles*). See [Automatic takeoff](#automatic-takeoff-beams-and-tubing). |
 | **Settings & preferences** | *Settings* menu (`Ctrl+,`): general preferences, the project's units and totals, snapping and fine adjustment, **keyboard shortcuts**, auto takeoff line styles, **speed & graphics**, workspace. See [Settings](#settings--preferences). |
-| **Document tabs** | Each open PDF has a tab in the active pane; drag tabs between panes and detached windows. See [Document tabs](#document-tabs). |
+| **Documents** | Every PDF is its own document: its takeoff is saved inside it, with its own undo and Markups List layout; each has a tab, and tabs drag between panes and windows. See [Documents and tabs](#documents-and-tabs). |
+| **Markups List layout** | Rename, move, show and hide columns per file; save the layout as the default for new files; export / import it. See [Markups List layout](#markups-list-layout). |
 | **Flatten markups** | *Edit → Flatten Markups…* (or right-click): draws markups into the drawing itself. See [Flatten markups](#flatten-markups). |
 
 ### Tool Chest: size tools and hidden tools
@@ -142,7 +143,8 @@ IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
   only where you add it; one with a rule still lets you add it to other markups or take it off single ones by hand.
   *Back to Rules Only* drops the by-hand changes.
 * The editor shows the rule as a formula and a live preview of pieces, length and weight. Details are saved with the
-  project; export/import them as JSON to reuse on other jobs. The example takeoff includes four.
+  document (its PDF) and work only there – each file has its own details; export/import them as JSON to use them in
+  another file. The example takeoff includes four.
 
 <img src="docs/screenshot-standard-details.png" width="640" alt="Standard Details dialog">
 
@@ -203,8 +205,8 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
 
 * **General** – author name for new markups, theme, mouse wheel (zoom or scroll), measurement labels on the drawing,
   keep tools active, show hidden Tool Chest tools.
-* **Units & Totals** – the project's units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area
-  labels; saved with the project.
+* **Units & Totals** – the document's units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area
+  labels; saved with the document.
 * **Drawing & Editing** – snapping to the drawing and to markups, ortho; what the arrow keys move a selection by (screen
   pixels, or a drawing length such as 1" at each markup's own scale – Shift ×10); the step for adjusting ends.
 * **Keyboard** – every command with its keys: click **+** and press the keys to add a shortcut, × to remove one,
@@ -217,13 +219,16 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
 
 <img src="docs/screenshot-keyboard.png" width="560" alt="Settings: keyboard shortcuts">
 
-Preferences are kept on the computer and apply to every project; the units belong to the project.
+* **Markups List** – the default Markups List layout for files you open from now on (see
+  [Markups List layout](#markups-list-layout)).
+
+Preferences are kept on the computer and apply to every document; the units belong to the document.
 
 ### Overlay / compare sheets
 
 Compare two versions of a drawing: *Document → Compare / Overlay Sheets…* (or the
-**Compare** button). Open the revised PDF first (*File → Open PDF in a New Tab…*, which adds it to the set); the
-revision of the same sheet number is suggested as the overlay.
+**Compare** button). Open the revised PDF first (*File → Open PDF…*): sheet B can be a sheet of the same document or
+of any other open document, and the revision of the same sheet number is suggested.
 
 ![Addendum 2 of S1.02 overlaid on the original, with the changes boxed](docs/screenshot-overlay.png)
 
@@ -240,27 +245,54 @@ revision of the same sheet number is suggested as the overlay.
 * **Find Changes** – boxes and lists every difference (*Only on A*, *Only on B*, *Changed*). Line work is compared as
   images and text as text, so a single changed digit in a note is found. Click a change to zoom to it; **Add Clouds**
   adds a *Revision Change* cloud markup around each one (one undo step).
-* The overlay is saved with the project and works in split and detached panes. Markups and measurements stay on
+* The overlay is saved with sheet A's document; when sheet B is in another file, that file needs to be open to show it
+  (the Compare panel says which). It works in split and detached panes. Markups and measurements stay on
   sheet A. The example takeoff includes Addendum 2 of S1.02 with an overlay ready to switch on (Compare panel →
   *Overlay on*).
 
-### Document tabs
+### Documents and tabs
 
-Every PDF in the project has a **tab** across the top of the pane – *File → Open PDF…* (`Ctrl+O`), the Open button or
-dropping PDFs on a pane opens each one in a new tab of that pane (and adds it to the project's sheet set; *File → New
-Project from PDF…* starts over instead).
+Every PDF is **its own document**. *File → Open PDF…* (`Ctrl+O`), the Open button or dropping PDFs on a pane opens each
+one in a new tab of that pane. A document's markups, sheet labels, scales and viewports, custom columns, layers,
+standard details, overlays and Markups List layout belong to that file only, and it has its own undo history.
 
 ![Two documents in two panes, each with its own tabs](docs/screenshot-doc-tabs.png)
 
-* Click a tab to show that document; each tab remembers the sheet it was on. The Sheets panel lists the sheets of
-  every document – picking one opens its tab. `Ctrl+Tab` / `Ctrl+Shift+Tab` (also `Ctrl+Shift+]` / `[`) go to the next
-  and previous tab; `Ctrl+F4` or the × closes one, and so does a middle click. Closing a tab does not remove the
-  document from the project: **+** at the end of the tabs (or the Sheets panel) opens it again.
-* **Move a tab to another pane**: drag it onto another pane's tabs or drawing (hold `Ctrl` to keep it in both), or
+* **Saved inside the PDF**: *File → Save* (`Ctrl+S`) puts the takeoff into the PDF itself (as an embedded file the PDF
+  carries along, so the drawing looks the same in any PDF viewer). Open that PDF again – here, on another computer, or
+  after e-mailing it – and the takeoff is back. In the desktop app *Save* writes back to the file it was opened from;
+  *Save As…* (`Ctrl+Shift+S`) asks where. In a browser the PDF is downloaded. *Save All* saves every changed document.
+  A PDF that is protected against changes is saved as a `.takeoff.json` file instead (open that to carry on).
+* A dot on a tab marks unsaved changes. Closing a document with unsaved changes asks whether to save it first. Open
+  documents (saved or not) also come back when the program starts again.
+* Click a tab to show that document; each tab remembers the sheet it was on. The Sheets panel, Markups List, Takeoff
+  Summary, Layers and Measurements panels show the active document. `Ctrl+Tab` / `Ctrl+Shift+Tab` (also
+  `Ctrl+Shift+]` / `[`) go to the next and previous tab; `Ctrl+F4`, the × or a middle click closes it.
+* **Move a tab to another pane**: drag it onto another pane's tabs or drawing (hold `Ctrl` to show it in both), or
   right-click it → *Move to Pane* / *Also Show in Pane* / *Move to New Pane* / *Move to New Window*. Drag along the
-  tabs to reorder them. Tabs drag into detached windows too. A pane whose last tab moves away closes.
-* *Window → Document Tab* has the same commands for the active pane's tab.
-* Flattening markups keeps the tab (the flattened file is a new version of the same document).
+  tabs to reorder them. Tabs drag into detached windows too. A pane whose last tab moves away closes. **+** at the end
+  of the tabs opens a PDF, or shows a document open in another pane here.
+* Opening a file that is already open shows its tab. Takeoff project files from earlier versions (`.takeoff.json`,
+  several PDFs in one) open as one document per PDF.
+
+### Markups List layout
+
+Each file keeps its own Markups List layout: which columns show, their order, widths and header names, and its custom
+columns.
+
+* **Rename** a column header: double-click it, or right-click → *Rename Column…* (the column keeps its own name in
+  formulas). **Move** a column by dragging its header, or right-click → *Move Left / Move Right*. **Hide** one from the
+  same menu; *Columns…* shows, hides, orders and renames them all and edits custom columns.
+* The **list style button** in the Markups List toolbar (and the header menu): *Save as Default Style* – files you
+  open from now on start with this layout; *Apply Default Style* / *Reset to Built-in Style* for this file;
+  *Export This Style…* / *Export Default Style…* to keep a copy (a backup, or to use on another computer);
+  *Import Style…* (this file) and *Import as Default Style…*. Importing adds the style's custom columns, or updates the
+  file's columns of the same name.
+* *Settings → Markups List* shows the default layout, with the same save, export, import and reset.
+
+<img src="docs/screenshot-list-style.png" width="760" alt="The Markups List with a renamed column and the list style menu">
+
+<img src="docs/screenshot-list-default.png" width="560" alt="Settings: the default Markups List layout">
 
 ### Split view and workspace layout
 
@@ -299,7 +331,7 @@ itself – the selected markups, those on this sheet, or all – with or without
 including hidden layers. The drawing then carries them like any other line work (other programs see them, and page
 labels and snapping read them). Flattened markups leave the Markups List, or choose **Keep them as takeoff data**: they
 stay in the list and totals on a hidden, locked *Flattened* layer so nothing is drawn twice. Undo puts everything back.
-*File → Export → Flattened PDF* still makes a marked-up copy without changing the project.
+*File → Export → Flattened PDF* still makes a marked-up copy without changing the document.
 
 ### Speed and graphics
 
@@ -338,7 +370,7 @@ Report units (LF/in/m, SF/SY/m², CY/CF/m³) and decimals are set in the **Measu
 | Wheel, `Ctrl+0`, `Ctrl+9`, `Ctrl+=`/`-`, `Z` | Zoom at cursor, fit page, fit width, zoom in/out, zoom rectangle |
 | `PgUp` / `PgDn` | Previous / next sheet |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab`, `Ctrl+F4` | Next / previous document tab, close tab |
-| `Ctrl+O`, `Ctrl+S` | Open PDF in a new tab, save project |
+| `Ctrl+O`, `Ctrl+S`, `Ctrl+Shift+S` | Open PDF, save (into the PDF), save as |
 | `Shift+Alt+K L M A P V C G` | Calibrate, Length, Polylength, Area, Perimeter, Volume, Count, Angle |
 | `T Q C R E L A N G P H` | Text, Callout, Cloud, Rectangle, Ellipse, Line, Arrow, Polyline, Polygon, Pen, Highlight |
 | `Enter` / double-click / right-click | Finish a multi-point markup; `Backspace` removes the last point; `Esc` cancels |
@@ -354,22 +386,22 @@ tool active), **LABELS** (measurement labels on the drawing).
 ## Data & persistence
 
 * Everything runs locally on your computer (or in the browser for the web version); nothing is uploaded.
-* The open project autosaves to IndexedDB and is restored on reload.
-* *File → Save Project As…* writes a single `.takeoff.json` containing the PDFs and all takeoff data; open it with
-  *File → Open Project…* or drag it onto the window.
+* Each document's takeoff is saved inside its PDF (*File → Save*). Open documents also autosave to IndexedDB (with
+  any unsaved changes) and come back on reload.
+* Takeoff project files from earlier versions (`.takeoff.json`) still open – *Open Takeoff Project…* on the start
+  screen, *File → Open PDF…* or drag them onto the window – as one document per PDF.
 * The Tool Chest (including size-tool sizes and hidden tools), list layout, workspace layout, keyboard shortcuts and
-  preferences are stored per user and shared across projects. Opening a project opens each of its documents as a tab
-  in the first pane.
+  preferences (including the default Markups List layout) are stored per user and shared by all documents.
 
 ## Development
 
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
-npm run example    # regenerate the example takeoff project (needs `npm run dev` running)
+npm run example    # regenerate the example takeoff (sample set + addendum; needs `npm run dev` running)
 npm run build:artifact  # self-contained bundle in dist-artifact/ for publishing as a claude.ai Artifact
 npm run desktop    # build, then run the desktop app with Electron
 npm run dist:win   # Windows installer in release/ (see below)
@@ -378,7 +410,7 @@ npm run legal      # regenerate build/license.txt and THIRD-PARTY-NOTICES.txt fr
 ```
 
 The artifact build opens straight into the example takeoff, follows the viewer's light/dark theme, and saves
-files (project, CSV, PDF) through the viewer's download prompt, since a published page cannot start downloads itself.
+files (PDF, CSV, styles) through the viewer's download prompt, since a published page cannot start downloads itself.
 
 Stack: React 18, TypeScript, Vite, Zustand, pdf.js (rendering, text and vector extraction), pdf-lib (export), lucide icons.
 
@@ -402,8 +434,11 @@ src/
     renderCache.ts   kept page renders, rendering ahead, background renders that give way to the screen
     keymap.ts        commands and their default keys, key chords, custom bindings and clashes
     text.ts          title-block text: sheet numbers, captions, labels from a box
-    export.ts        CSV, printable report, flattened PDF (also used to flatten markups into the project)
-  store/           Zustand store (undo/redo history, panes and document tabs), project I/O, autosave, commands
+    export.ts        CSV, printable report, flattened PDF (also used to flatten markups into a document)
+    embed.ts         the takeoff saved inside its PDF (an embedded file), and read back
+    listStyle.ts     Markups List styles: the file format, built-in style
+  store/           Zustand store (open documents, each with its undo history; panes and tabs), project.ts
+                   (opening, saving into the PDF, closing, autosave), commands
                    (menu and keyboard commands), flatten (markups into new versions of the PDFs)
   components/      viewer (canvas + SVG markup layer), panels, markups list, summary, dialogs,
                    dock/ (dockable/floating panels; Panes.tsx: split panes and detached pane windows)
@@ -444,8 +479,9 @@ GitHub release when a `v*` tag is pushed.
 
 * Scanned (raster) PDFs have no text layer: title-block reading and content snapping need vector PDFs; enter labels by
   hand and rely on markup snapping for scans.
-* Markups are stored in the project, not written back into the PDF as native annotations; flatten them into the
-  drawing, or use the flattened PDF export to share marked-up drawings.
+* The takeoff is saved inside the PDF as data this program reads, not as native PDF annotations: other PDF viewers
+  show the drawing without the markups. Flatten them into the drawing, or use the flattened PDF export, to share
+  marked-up drawings.
 * In a browser, `Ctrl+Tab`, `Ctrl+F4` and some other keys belong to the browser; use `Ctrl+Shift+]` / `[` or set your
   own keys. The desktop app gets them all.
 * Automatic takeoff needs vector PDFs whose member labels are text placed beside the member, parallel to it. Labels

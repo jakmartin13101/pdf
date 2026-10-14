@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.6.0 – 2026-10-14
+
+### Every PDF is its own document
+- Opening a PDF opens it as its own document (in a new tab), no longer as part of a combined project. Its markups,
+  sheet labels, scales and viewports, custom columns, layers, standard details and overlays belong to that file only,
+  and each document has its own undo history and selection. The Sheets panel, Markups List, Summary and the other
+  panels show the active document.
+- **The takeoff is saved inside the PDF** (as an embedded file the PDF carries along; the drawing looks unchanged in
+  other PDF viewers). Opening that PDF again brings the takeoff back. *File → Save* (`Ctrl+S`) writes back to the
+  file it was opened from in the desktop app; *Save As…* (`Ctrl+Shift+S`) asks where; *Save All*. In a browser the
+  PDF is downloaded. PDFs protected against changes are saved as a `.takeoff.json` file instead.
+- Tabs show a dot for unsaved changes; closing a changed document asks to save it first (*Save*, *Don't Save*,
+  *Cancel*); *File → Close* and *Close All*. Open documents, with unsaved changes, come back when the program starts.
+- Standard details belong to the file they are made in and work only there (export/import them to reuse elsewhere).
+- Overlay compare can overlay a sheet from another open document (a revision opened as its own PDF); the Compare
+  panel says when that document needs opening.
+- Opening a file that is already open shows its tab. Takeoff project files from earlier versions open as one
+  document per PDF. *File → Add PDF to Set* and *New Project from PDF* are gone.
+
+### Markups List layout per file, with a default
+- Rename column headers (double-click, or right-click → *Rename Column…*), move columns by dragging their headers
+  (or *Move Left / Right*), hide them from the header menu; *Columns…* renames too. Each file keeps its own layout.
+- *Save as Default Style*: files opened from now on start with this layout (columns shown, order, widths, header
+  names and the custom columns). *Apply Default Style*, *Reset to Built-in Style*.
+- *Export This Style… / Export Default Style…* save the layout to a file as a backup; *Import Style…* and *Import as
+  Default Style…* bring it back. Also in the new *Settings → Markups List*.
+
+### Fixes
+- The sheet title bar no longer picks up the document tab style.
+
 ## 1.5.0 – 2026-10-14
 
 ### Document tabs

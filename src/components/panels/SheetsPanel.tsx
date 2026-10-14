@@ -1,11 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { FilePlus2, Files, GitCompareArrows, LayoutGrid, List, Search, Tags } from 'lucide-react';
+import { Files, GitCompareArrows, LayoutGrid, List, Search, Tags } from 'lucide-react';
 import { PanelHeader } from '../dock/PanelHeader';
 import type { Sheet } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { cachedRender, renderInBackground } from '../../core/renderCache';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
-import { cmdAddPdf } from '../../store/commands';
 import { sheetLabel } from '../../core/columns';
 
 const thumbCache = new Map<string, string>();
@@ -224,9 +223,6 @@ export function SheetsPanel() {
         </button>
         <button className="icon-btn" title="Page Labels (sheet numbers & titles)" onClick={() => getState().setDialog({ kind: 'pageLabels' })}>
           <Tags size={14} />
-        </button>
-        <button className="icon-btn" title="Add PDF to set" onClick={cmdAddPdf}>
-          <FilePlus2 size={14} />
         </button>
       </PanelHeader>
       <div className="sheet-search">

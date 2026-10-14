@@ -1,6 +1,10 @@
 // Builds public/samples/Example-Takeoff.takeoff.json by performing a takeoff on the sample set in a
 // real browser. Run `npm run dev` first, then: node scripts/generate-example.mjs [baseUrl]
+//
+// The sample set and its Addendum 2 are two documents, each saving its takeoff inside its PDF; the
+// example file holds both (a takeoff project, which opens as one document per PDF).
 import { chromium } from '@playwright/test';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -156,10 +160,11 @@ await page.getByTestId('details-save').click();
 // Addendum 2 revision of S1.02, overlaid on S1.02 (aligned, switched off until wanted).
 const [chooser] = await Promise.all([
   page.waitForEvent('filechooser'),
-  page.locator('.menu-btn', { hasText: 'File' }).click().then(() => page.getByText('Add PDF to Set…').first().click()),
+  page.locator('.menu-btn', { hasText: 'File' }).click().then(() => page.locator('.dropdown .menu-item', { hasText: 'Open PDF…' }).click()),
 ]);
 await chooser.setFiles(resolve(dirname(out), 'Sample-S1.02-Addendum-2.pdf'));
-await page.getByTestId('sheet-thumb').nth(7).waitFor();
+await page.getByTestId('doc-tab').nth(1).waitFor();
+await page.getByTestId('doc-tab').first().click();
 await sheet(2);
 await page.getByTestId('tb-compare').click();
 await page.getByTestId('compare-start').click();
@@ -172,12 +177,28 @@ await sheet(2);
 await page.getByTestId('tb-select').click();
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
-const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('tb-save').click()]);
-await download.saveAs(out);
+// Save both documents (the takeoff goes inside each PDF) and read the takeoffs back.
+const takeoffs = [];
+for (const i of [0, 1]) {
+  await page.getByTestId('doc-tab').nth(i).click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('tb-save').click()]);
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(await download.path())), verbosity: 0 }).promise;
+  const att = await pdf.getAttachments();
+  takeoffs.push(JSON.parse(new TextDecoder().decode(att['BuildSuite-Takeoff.json'].content)));
+}
 await browser.close();
+const [set, rev] = takeoffs;
+const pdfData = (name) => readFileSync(resolve(dirname(out), name)).toString('base64');
+const pf = {
+  app: 'takeoff-studio',
+  version: 1,
+  name: '',
+  doc: { ...set.doc, files: [...set.doc.files, ...rev.doc.files], sheets: [...set.doc.sheets, ...rev.doc.sheets], markups: [...set.doc.markups, ...rev.doc.markups] },
+  currentSheetId: set.currentSheetId,
+  files: [set, rev].map((t) => ({ id: t.doc.files[0].id, name: t.doc.files[0].name, data: pdfData(t.doc.files[0].name) })),
+};
 
 // Fill in the takeoff data an estimator would enter: levels and grid references.
-const pf = JSON.parse(readFileSync(out, 'utf8'));
 pf.name = 'Example Takeoff – Riverside Warehouse';
 const levelBySheet = { 'S1.01': 'Foundation', 'S1.02': 'Roof', 'S2.01': 'Roof', 'A1.01': 'Level 1', 'M1.01': 'Level 1', 'E1.01': 'Level 1' };
 const revSheet = pf.doc.sheets.find((s) => s.fileId !== pf.doc.sheets[0].fileId);

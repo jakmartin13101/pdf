@@ -116,5 +116,5 @@ export function primaryQuantity(l: SummaryLine, doc: DocState): string {
 }
 
 export function columnName(doc: DocState, id: string) {
-  return allColumns(doc.columns).find((c) => c.id === id)?.name ?? id;
+  return allColumns(doc.columns, doc.listStyle?.labels).find((c) => c.id === id)?.name ?? id;
 }

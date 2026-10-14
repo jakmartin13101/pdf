@@ -11,14 +11,14 @@ import { CalibrateDialog, ScaleDialog, ViewportDialog } from './components/dialo
 import { PageLabelsDialog } from './components/dialogs/PageLabelsDialog';
 import { ColumnsDialog } from './components/dialogs/ColumnsDialog';
 import { ToolEditDialog } from './components/dialogs/ToolEditDialog';
-import { AboutDialog, ConfirmDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
+import { AboutDialog, ConfirmDialog, ShortcutsDialog, UnsavedDialog } from './components/dialogs/MiscDialogs';
 import { SettingsDialog } from './components/dialogs/SettingsDialog';
 import { AddDetailDialog } from './components/dialogs/AddDetailDialog';
 import { FlattenDialog } from './components/dialogs/FlattenDialog';
 import { TermsDialog } from './components/dialogs/TermsDialog';
 import { StandardDetailsDialog } from './components/dialogs/StandardDetailsDialog';
 import { CompareDialog } from './components/dialogs/CompareDialog';
-import { openPdfFiles, openProjectFile, restoreAutosave, startAutosave } from './store/project';
+import { openFiles, restoreAutosave, startAutosave, type OpenFile } from './store/project';
 import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, handleAppShortcut } from './store/commands';
 import { sheetDisplayName } from './core/columns';
 import { downloadsCapability } from './core/persistence';
@@ -67,7 +67,7 @@ function StartScreen() {
               </span>
               <span>
                 <b>Open PDF Drawings…</b>
-                <small>Choose one or more PDFs (or drop them anywhere) to build a sheet set</small>
+                <small>Each PDF opens as its own document; its takeoff is saved inside it</small>
               </span>
             </button>
             <button className="start-action" onClick={cmdOpenProject}>
@@ -75,8 +75,8 @@ function StartScreen() {
                 <FileJson size={20} />
               </span>
               <span>
-                <b>Open Project…</b>
-                <small>A saved .takeoff.json project with drawings and takeoff data</small>
+                <b>Open Takeoff Project…</b>
+                <small>A .takeoff.json file from an earlier version: each PDF in it opens as a document</small>
               </span>
             </button>
           </div>
@@ -86,7 +86,7 @@ function StartScreen() {
           <ol>
             <li>
               <span>
-                Import drawings<small>Multiple PDFs become one navigable sheet set</small>
+                Open drawings<small>Each PDF in its own tab, its takeoff saved in the PDF</small>
               </span>
             </li>
             <li>
@@ -126,11 +126,9 @@ function StartScreen() {
   );
 }
 
-/** Opens dropped or launched files: a project file replaces the project, PDFs are added to it. */
-async function openGivenFiles(files: File[]) {
-  const project = files.find((f) => f.name.toLowerCase().endsWith('.json'));
-  if (project) await openProjectFile(project);
-  else if (files.length) await openPdfFiles(files, getState().loaded ? 'append' : 'new');
+/** Opens dropped or launched files: each PDF as its own document (takeoff files too). */
+async function openGivenFiles(files: (File | OpenFile)[]) {
+  if (files.length) await openFiles(files);
 }
 
 function Dialogs() {
@@ -173,6 +171,8 @@ function Dialogs() {
       return <AboutDialog />;
     case 'confirm':
       return <ConfirmDialog title={d.title} message={d.message} onConfirm={d.onConfirm} />;
+    case 'unsaved':
+      return <UnsavedDialog docIds={d.docIds} then={d.then} />;
   }
 }
 
@@ -184,7 +184,7 @@ function DocBar() {
   const scaleOk = !!sheet.scale;
   return (
     <div className="docbar">
-      <div className="doc-tab" title={projectName}>
+      <div className="docbar-sheet" title={projectName}>
         <Files size={13} />
         <span>{sheet.number}</span>
         <span className="sheet-sub">{sheet.title}</span>
@@ -239,14 +239,14 @@ export function App() {
     (async () => {
       const restored = await restoreAutosave();
       const launchFiles = desktop ? await desktop.takeOpenFiles().catch(() => []) : [];
-      if (launchFiles.length) await openGivenFiles(launchFiles.map((f) => new File([f.data], f.name)));
+      if (launchFiles.length) await openGivenFiles(launchFiles.map((f) => ({ name: f.name, bytes: f.data, path: f.path })));
       // The published build opens straight into a working example; locally the start screen shows.
       else if (!restored && (import.meta.env.VITE_OPEN_EXAMPLE === '1' || location.hash === '#example')) await cmdOpenExample();
       else if (!restored && params.has('sample')) await cmdOpenSample();
       setBooting(false);
     })();
     // Desktop: files opened from Explorer while the app is already running.
-    return desktop?.onOpenFiles((files) => void openGivenFiles(files.map((f) => new File([f.data], f.name))));
+    return desktop?.onOpenFiles((files) => void openGivenFiles(files.map((f) => ({ name: f.name, bytes: f.data, path: f.path }))));
   }, []);
 
   // Speed & graphics settings.

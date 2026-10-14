@@ -80,8 +80,10 @@ export interface Sheet {
  * two multiply, so unchanged work shows dark and differences show in A's or B's colour.
  */
 export interface SheetCompare {
-  /** The sheet drawn over this one. */
+  /** The sheet drawn over this one (of this document or another open one). */
   sheetId: string;
+  /** Another document's sheet: that document's name, to ask for it when it is not open. */
+  docName?: string;
   enabled: boolean;
   colorA: string;
   colorB: string;
@@ -208,6 +210,27 @@ export interface ProjectSettings {
   showPerimeterOnArea: boolean;
 }
 
+/** How a document's Markups List shows its columns. */
+export interface ListStyle {
+  /** Visible columns in order ('subject', 'c:<custom column id>', …). */
+  columns: string[];
+  widths: Record<string, number>;
+  /** Column headers renamed by the user (column id → name). */
+  labels: Record<string, string>;
+}
+
+/**
+ * A Markups List style that can be saved as the default for new files, or exported and imported:
+ * the custom columns themselves plus how the list shows them.
+ */
+export interface MarkupListStyle {
+  columns: CustomColumn[];
+  visible: string[];
+  widths: Record<string, number>;
+  labels: Record<string, string>;
+}
+
+/** One document: a PDF (files[0]; a flattened version replaces it) and the takeoff on it. */
 export interface DocState {
   files: SourceFile[];
   sheets: Sheet[];
@@ -217,6 +240,8 @@ export interface DocState {
   settings: ProjectSettings;
   /** Standard details: rules that add material to markups matching a condition. */
   standardDetails?: StandardDetail[];
+  /** The Markups List columns of this document (older files: the list's own columns). */
+  listStyle?: ListStyle;
 }
 
 // ---------------------------------------------------------------------------

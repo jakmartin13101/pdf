@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Columns3, Plus, Trash2 } from 'lucide-react';
 import type { ColumnKind, CustomColumn } from '../../types';
-import { getState, useStore } from '../../store/store';
+import { getState, listStyleOf, useStore } from '../../store/store';
+import { useShallow } from 'zustand/react/shallow';
+import { listStyleMenuItems } from '../../store/commands';
+import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { Modal } from './Modal';
 import { allColumns, buildRows, customColId } from '../../core/columns';
 import { FUNCTIONS, validateFormula } from '../../core/formula';
@@ -18,17 +21,26 @@ const BLANK: Omit<CustomColumn, 'id'> = { name: '', kind: 'text', options: [], f
 
 export function ColumnsDialog() {
   const doc = useStore((s) => s.doc);
-  const list = useStore((s) => s.list);
+  const style = useStore(useShallow((s) => listStyleOf(s)));
   const selection = useStore((s) => s.selection);
-  const cols = useMemo(() => allColumns(doc.columns), [doc.columns]);
+  const cols = useMemo(() => allColumns(doc.columns, style.labels), [doc.columns, style.labels]);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null); // custom column id or 'new'
   const editing = editId && editId !== 'new' ? doc.columns.find((c) => c.id === editId) : undefined;
   const [form, setForm] = useState<Omit<CustomColumn, 'id'>>(BLANK);
   const st = getState();
 
-  const visible = list.columns.filter((id) => cols.some((c) => c.id === id));
+  const visible = style.columns.filter((id) => cols.some((c) => c.id === id));
   const hidden = cols.filter((c) => !visible.includes(c.id));
-  const setVisible = (ids: string[]) => st.setList({ columns: ids });
+  const setVisible = (ids: string[]) => st.setListStyle({ columns: ids });
+  const rename = (id: string, own: string, name: string) => {
+    const labels = { ...style.labels };
+    if (!name.trim() || name.trim() === own) delete labels[id];
+    else labels[id] = name.trim();
+    st.setListStyle({ labels });
+    setRenaming(null);
+  };
   const move = (id: string, d: number) => {
     const i = visible.indexOf(id);
     const j = i + d;
@@ -77,8 +89,11 @@ export function ColumnsDialog() {
   const addTemplate = () => {
     const have = new Set(doc.columns.map((c) => c.name.toLowerCase()));
     const missing = defaultColumns().filter((c) => !have.has(c.name.toLowerCase()));
-    st.commit((d) => ({ ...d, columns: [...d.columns, ...missing] }));
-    st.setList({ columns: [...list.columns, ...missing.map((c) => customColId(c)).filter((id) => !list.columns.includes(id))] });
+    st.commit((d) => ({
+      ...d,
+      columns: [...d.columns, ...missing],
+      listStyle: { ...style, columns: [...style.columns, ...missing.map((c) => customColId(c)).filter((id) => !style.columns.includes(id))] },
+    }));
     st.toast(missing.length ? `Added ${missing.length} columns` : 'Template columns already present', 'success');
   };
 
@@ -94,6 +109,17 @@ export function ColumnsDialog() {
             <button className="btn sm" onClick={addTemplate}>
               Add Structural Steel Template
             </button>
+            <button
+              className="btn sm"
+              onClick={(e) => {
+                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setMenu({ x: r.left, y: r.top - 8 - 8 * 26, items: listStyleMenuItems() });
+              }}
+              data-testid="columns-style"
+            >
+              List Style ▾
+            </button>
+            {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
           </div>
           <button className="btn primary" onClick={() => st.setDialog(null)}>
             Done
@@ -103,7 +129,10 @@ export function ColumnsDialog() {
     >
       <div className="two-col">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-          <div className="hint">Checked columns appear in the Markups List in this order. Custom columns store takeoff data on every markup.</div>
+          <div className="hint">
+            Checked columns appear in the Markups List in this order (this file only: <i>List Style → Save as Default Style</i> makes it the layout for files you open from now
+            on). Custom columns store takeoff data on every markup. Click a name to rename its header.
+          </div>
           <div className="col-list">
             {[...visible.map((id) => cols.find((c) => c.id === id)!), ...hidden].map((c) => {
               const isVis = visible.includes(c.id);
@@ -114,13 +143,28 @@ export function ColumnsDialog() {
                     checked={isVis}
                     onChange={(e) => setVisible(e.target.checked ? [...visible, c.id] : visible.filter((x) => x !== c.id))}
                   />
-                  <span className="grow">
-                    {c.name}{' '}
-                    <small>
-                      {c.builtin ? 'built-in' : c.custom?.kind}
-                      {c.custom?.kind === 'formula' ? ` = ${c.custom.formula}` : ''}
-                    </small>
-                  </span>
+                  {renaming === c.id ? (
+                    <input
+                      className="grow"
+                      autoFocus
+                      defaultValue={c.name}
+                      onBlur={(e) => rename(c.id, c.original ?? c.name, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') rename(c.id, c.original ?? c.name, e.currentTarget.value);
+                        if (e.key === 'Escape') setRenaming(null);
+                      }}
+                      data-testid="col-rename"
+                    />
+                  ) : (
+                    <span className="grow col-name" onClick={() => setRenaming(c.id)} title="Click to rename the header" data-testid="col-item-name">
+                      {c.name}{' '}
+                      <small>
+                        {c.original ? `(${c.original}) ` : ''}
+                        {c.builtin ? 'built-in' : c.custom?.kind}
+                        {c.custom?.kind === 'formula' ? ` = ${c.custom.formula}` : ''}
+                      </small>
+                    </span>
+                  )}
                   {isVis && (
                     <>
                       <button className="icon-btn" onClick={() => move(c.id, -1)} title="Move up">

@@ -9,12 +9,13 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, FileText, PanelTopClose, Plus, X } from 'lucide-react';
-import { getState, useStore, type Pane } from '../../store/store';
+import { docTitle, findSheet, getState, isDirty, paneDoc, useStore, type Pane } from '../../store/store';
 import { Viewer } from '../viewer/Viewer';
 import { sheetDisplayName } from '../../core/columns';
 import { FULL_NAME } from '../../brand';
 import { OwnerWindowContext } from '../ownerWindow';
-import { cmdOpenPdf, handleAppShortcut } from '../../store/commands';
+import { cmdCloseTab, cmdCloseTabs, cmdOpenPdf, handleAppShortcut } from '../../store/commands';
+import { saveDocument } from '../../store/project';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { useShortcuts } from '../useShortcuts';
 
@@ -23,18 +24,16 @@ const st = getState;
 // ---------------------------------------------------------------------------
 // Document tabs
 //
-// Each pane has a tab per open document (PDF file). Tabs drag to another place in the strip, onto
+// Each pane has a tab per document (PDF) open in it. Tabs drag to another place in the strip, onto
 // another pane's strip or drawing (Ctrl to copy rather than move), and into detached windows too:
 // those are portals of this same app, so the tab being dragged is simply remembered here.
 
-let dragging: { fileId: string; from: string } | null = null;
+let dragging: { docId: string; from: string } | null = null;
 const TAB_TYPE = 'application/x-takeoff-tab';
 const isTabDrag = (e: React.DragEvent) => !!dragging && e.dataTransfer.types.includes(TAB_TYPE);
 
-const docName = (name: string) => name.replace(/\.pdf$/i, '');
-
 /** Menu items for a document tab (its right-click menu, and Window → Document Tab). */
-export function tabMenuItems(paneId: string, fileId: string, sc: (id: string) => string | undefined): MenuItem[] {
+export function tabMenuItems(paneId: string, docId: string, sc: (id: string) => string | undefined): MenuItem[] {
   const s = st();
   const pane = s.panes.find((p) => p.id === paneId);
   if (!pane) return [];
@@ -42,29 +41,32 @@ export function tabMenuItems(paneId: string, fileId: string, sc: (id: string) =>
   const attached = s.panes.filter((p) => !p.detached).length;
   const paneName = (p: Pane) => `Pane ${s.panes.indexOf(p) + 1}${p.detached ? ' (window)' : ''}`;
   return [
-    { label: 'Close Tab', shortcut: sc('tab.close'), onClick: () => st().closeTab(paneId, fileId) },
+    { label: 'Save', shortcut: sc('file.save'), onClick: () => void saveDocument(docId) },
+    { label: 'Save As…', shortcut: sc('file.saveAs'), onClick: () => void saveDocument(docId, { as: true }) },
+    { sep: true },
+    { label: 'Close', shortcut: sc('tab.close'), onClick: () => cmdCloseTab(paneId, docId) },
     {
-      label: 'Close Other Tabs',
+      label: 'Close Others',
       disabled: pane.tabs.length < 2,
-      onClick: () => pane.tabs.filter((t) => t.fileId !== fileId).forEach((t) => st().closeTab(paneId, t.fileId)),
+      onClick: () => cmdCloseTabs(paneId, pane.tabs.filter((t) => t.docId !== docId).map((t) => t.docId)),
     },
     { sep: true },
     {
       label: 'Move to Pane',
       disabled: !others.length,
-      children: others.map((p) => ({ label: paneName(p), onClick: () => st().moveTab(fileId, paneId, p.id) })),
+      children: others.map((p) => ({ label: paneName(p), onClick: () => st().moveTab(docId, paneId, p.id) })),
     },
     {
       label: 'Also Show in Pane',
       disabled: !others.length,
-      children: others.map((p) => ({ label: paneName(p), onClick: () => st().moveTab(fileId, paneId, p.id, { copy: true }) })),
+      children: others.map((p) => ({ label: paneName(p), onClick: () => st().moveTab(docId, paneId, p.id, { copy: true }) })),
     },
-    { label: 'Move to New Pane', shortcut: sc('tab.newPane'), disabled: attached >= 4, onClick: () => st().tabToNewPane(paneId, fileId) },
+    { label: 'Move to New Pane', shortcut: sc('tab.newPane'), disabled: attached >= 4, onClick: () => st().tabToNewPane(paneId, docId) },
     {
       label: 'Move to New Window',
       disabled: attached >= 4,
       onClick: () => {
-        st().tabToNewPane(paneId, fileId);
+        st().tabToNewPane(paneId, docId);
         st().detachPane(st().activePaneId, 'window');
       },
     },
@@ -72,14 +74,13 @@ export function tabMenuItems(paneId: string, fileId: string, sc: (id: string) =>
 }
 
 function DocTabs({ pane }: { pane: Pane }) {
-  const files = useStore((s) => s.doc.files);
-  const sheets = useStore((s) => s.doc.sheets);
-  const lonely = useStore((s) => !pane.detached && s.panes.filter((p) => !p.detached).length === 1 && pane.tabs.length === 1);
+  const docs = useStore((s) => s.docs);
+  // Documents with unsaved changes (a string, so the selector stays stable).
+  const dirty = useStore((s) => s.docs.filter((d) => isDirty(s, d.id)).map((d) => d.id).join(' '));
   const sc = useShortcuts();
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const activeFile = sheets.find((x) => x.id === pane.sheetId)?.fileId;
   // Keep the active tab in sight when the strip is too narrow for all of them.
   useEffect(() => {
     const el = ref.current?.querySelector<HTMLElement>('.doc-tab.active');
@@ -87,7 +88,7 @@ function DocTabs({ pane }: { pane: Pane }) {
     if (!el || !strip) return;
     if (el.offsetLeft < strip.scrollLeft) strip.scrollLeft = el.offsetLeft;
     else if (el.offsetLeft + el.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = el.offsetLeft + el.offsetWidth - strip.clientWidth;
-  }, [activeFile, pane.tabs.length]);
+  }, [pane.docId, pane.tabs.length]);
 
   const indexAt = (x: number) => {
     const tabs = [...(ref.current?.querySelectorAll<HTMLElement>('.doc-tab') ?? [])];
@@ -98,14 +99,12 @@ function DocTabs({ pane }: { pane: Pane }) {
     return i < 0 ? tabs.length : i;
   };
   const addMenu = (e: React.MouseEvent) => {
-    const closed = files.filter((f) => !pane.tabs.some((t) => t.fileId === f.id) && sheets.some((x) => x.fileId === f.id));
+    const elsewhere = docs.filter((d) => !pane.tabs.some((t) => t.docId === d.id));
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setMenu({
       x: r.left,
       y: r.bottom + 2,
       items: [
-        ...closed.map<MenuItem>((f) => ({ label: docName(f.name), onClick: () => st().openTab(pane.id, f.id) })),
-        ...(closed.length ? [{ sep: true }] : []),
         {
           label: 'Open PDF…',
           shortcut: sc('file.openPdf'),
@@ -114,6 +113,7 @@ function DocTabs({ pane }: { pane: Pane }) {
             void cmdOpenPdf();
           },
         },
+        ...(elsewhere.length ? [{ sep: true }, ...elsewhere.map<MenuItem>((d) => ({ label: `Show ${docTitle(d.name)} Here`, onClick: () => st().openTab(pane.id, d.id) }))] : []),
       ],
     });
   };
@@ -140,64 +140,63 @@ function DocTabs({ pane }: { pane: Pane }) {
         const d = dragging;
         dragging = null;
         setDropAt(null);
-        st().moveTab(d.fileId, d.from, pane.id, { index: indexAt(e.clientX), copy: e.ctrlKey });
+        st().moveTab(d.docId, d.from, pane.id, { index: indexAt(e.clientX), copy: e.ctrlKey });
       }}
       data-testid="doc-tabs"
     >
       {pane.tabs.map((t, i) => {
-        const f = files.find((x) => x.id === t.fileId);
-        if (!f) return null;
-        const active = t.fileId === activeFile;
-        const count = sheets.filter((x) => x.fileId === t.fileId).length;
+        const d = docs.find((x) => x.id === t.docId);
+        if (!d) return null;
+        const active = t.docId === pane.docId;
+        const unsaved = dirty.split(' ').includes(t.docId);
         return (
           <div
-            key={t.fileId}
+            key={t.docId}
             role="tab"
             aria-selected={active}
-            className={`doc-tab${active ? ' active' : ''}${dropAt === i ? ' drop-before' : ''}`}
-            title={`${f.name} · ${count} sheet${count === 1 ? '' : 's'}\nDrag to another pane to move it there (hold Ctrl to show it in both)`}
+            className={`doc-tab${active ? ' active' : ''}${dropAt === i ? ' drop-before' : ''}${unsaved ? ' unsaved' : ''}`}
+            title={`${d.path ?? d.name}${unsaved ? ' – unsaved changes' : ''}\nDrag to another pane to move it there (hold Ctrl to show it in both)`}
             draggable
             onDragStart={(e) => {
-              dragging = { fileId: t.fileId, from: pane.id };
+              dragging = { docId: t.docId, from: pane.id };
               e.dataTransfer.effectAllowed = 'copyMove';
-              e.dataTransfer.setData(TAB_TYPE, t.fileId);
-              e.dataTransfer.setData('text/plain', f.name);
+              e.dataTransfer.setData(TAB_TYPE, t.docId);
+              e.dataTransfer.setData('text/plain', d.name);
             }}
             onDragEnd={() => {
               dragging = null;
               setDropAt(null);
             }}
-            onClick={() => st().openTab(pane.id, t.fileId)}
-            onAuxClick={(e) => e.button === 1 && !lonely && st().closeTab(pane.id, t.fileId)}
+            onClick={() => st().openTab(pane.id, t.docId)}
+            onAuxClick={(e) => e.button === 1 && cmdCloseTab(pane.id, t.docId)}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
               st().setActivePane(pane.id);
-              setMenu({ x: e.clientX, y: e.clientY, items: tabMenuItems(pane.id, t.fileId, sc) });
+              setMenu({ x: e.clientX, y: e.clientY, items: tabMenuItems(pane.id, t.docId, sc) });
             }}
             data-testid="doc-tab"
-            data-file={t.fileId}
+            data-doc={t.docId}
           >
             <FileText size={12} className="doc-tab-icon" />
-            <span className="doc-tab-name">{docName(f.name)}</span>
-            {!lonely && (
-              <button
-                className="doc-tab-x"
-                title="Close tab (the document stays in the project)"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  st().closeTab(pane.id, t.fileId);
-                }}
-                data-testid="doc-tab-close"
-              >
-                <X size={11} />
-              </button>
-            )}
+            <span className="doc-tab-name">{docTitle(d.name)}</span>
+            {unsaved && <span className="doc-tab-dot" title="Unsaved changes" data-testid="doc-tab-unsaved" />}
+            <button
+              className="doc-tab-x"
+              title="Close"
+              onClick={(e) => {
+                e.stopPropagation();
+                cmdCloseTab(pane.id, t.docId);
+              }}
+              data-testid="doc-tab-close"
+            >
+              <X size={11} />
+            </button>
           </div>
         );
       })}
       <div className={`doc-tab-end${dropAt === pane.tabs.length ? ' drop-before' : ''}`} />
-      <button className="icon-btn doc-tab-add" title="Open a document in this pane" onClick={addMenu} data-testid="doc-tab-add">
+      <button className="icon-btn doc-tab-add" title="Open a PDF, or show another open document here" onClick={addMenu} data-testid="doc-tab-add">
         <Plus size={13} />
       </button>
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
@@ -206,14 +205,10 @@ function DocTabs({ pane }: { pane: Pane }) {
 }
 
 function PaneHeader({ pane, index, onDragStart }: { pane: Pane; index: number; onDragStart?: (e: React.PointerEvent) => void }) {
-  const sheets = useStore((s) => s.doc.sheets);
-  const files = useStore((s) => s.doc.files);
+  const sheets = useStore((s) => paneDoc(s, pane.id).sheets);
   const multi = useStore((s) => s.panes.length > 1);
   const active = useStore((s) => s.activePaneId === pane.id);
   const canDetach = useStore((s) => s.panes.filter((p) => !p.detached).length > 1);
-  const activeFile = sheets.find((x) => x.id === pane.sheetId)?.fileId;
-  // The sheet picker lists the sheets of the document on show; other documents are a tab away.
-  const own = sheets.filter((x) => x.fileId === activeFile);
   return (
     <div
       className={`pane-head${multi && active ? ' active' : ''}${onDragStart ? ' draggable' : ''}`}
@@ -227,23 +222,11 @@ function PaneHeader({ pane, index, onDragStart }: { pane: Pane; index: number; o
       <DocTabs pane={pane} />
       {multi && (
         <select value={pane.sheetId ?? ''} onChange={(e) => st().setPaneSheet(pane.id, e.target.value)} title="Sheet shown in this pane" data-testid="pane-sheet">
-          {(own.length ? own : sheets).map((s) => (
+          {sheets.map((s) => (
             <option key={s.id} value={s.id}>
               {sheetDisplayName(s)}
             </option>
           ))}
-          {files.length > 1 &&
-            sheets.some((x) => x.fileId !== activeFile) && (
-              <optgroup label="Other documents">
-                {sheets
-                  .filter((x) => x.fileId !== activeFile)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {sheetDisplayName(s)}
-                    </option>
-                  ))}
-              </optgroup>
-            )}
         </select>
       )}
       {!multi ? null : pane.detached ? (
@@ -300,7 +283,7 @@ function PaneView({ pane, index, style, onDragStart }: { pane: Pane; index: numb
         if (kind === 'tab' && dragging) {
           const d = dragging;
           dragging = null;
-          st().moveTab(d.fileId, d.from, pane.id, { copy: e.ctrlKey });
+          st().moveTab(d.docId, d.from, pane.id, { copy: e.ctrlKey });
         } else {
           const sheetId = e.dataTransfer.getData('text/sheet');
           st().setActivePane(pane.id);
@@ -472,7 +455,7 @@ function prepareWindow(win: Window, title: string) {
 /** A detached pane in its own browser/desktop window. Falls back to floating when pop-ups are blocked. */
 function PopoutPane({ pane, index }: { pane: Pane; index: number }) {
   const [host, setHost] = useState<{ win: Window; root: HTMLElement } | null>(null);
-  const sheetName = useStore((s) => sheetDisplayName(s.doc.sheets.find((x) => x.id === pane.sheetId)));
+  const sheetName = useStore((s) => sheetDisplayName(findSheet(s, pane.sheetId)?.sheet));
   const theme = useStore((s) => s.ui.theme);
 
   useEffect(() => {

@@ -85,11 +85,17 @@ function filesFromArgv(argv) {
   return argv.slice(app.isPackaged ? 1 : 2).filter((a) => !a.startsWith('-') && OPENABLE.test(a) && fs.existsSync(a));
 }
 
+// Files the user chose (opened, given on the command line, or saved through a dialog): the renderer
+// may write back to these and no others (Save writes a document's takeoff into its PDF).
+const granted = new Set();
+const grantKey = (p) => path.resolve(p).toLowerCase();
+
 async function readFiles(paths) {
   const out = [];
   for (const p of paths) {
     try {
-      out.push({ name: path.basename(p), data: new Uint8Array(await fsp.readFile(p)) });
+      out.push({ name: path.basename(p), data: new Uint8Array(await fsp.readFile(p)), path: p });
+      granted.add(grantKey(p));
     } catch {
       /* unreadable – skip */
     }
@@ -213,7 +219,40 @@ ipcMain.handle('buildsuite:save-file', async (event, name, data) => {
   if (res.canceled || !res.filePath) return false;
   await fsp.writeFile(res.filePath, Buffer.from(data));
   lastDir = path.dirname(res.filePath);
-  return true;
+  granted.add(grantKey(res.filePath));
+  return res.filePath;
+});
+
+// Open PDFs (or takeoff files) through the native dialog, so Save can write back to them.
+ipcMain.handle('buildsuite:open-dialog', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Open',
+    defaultPath: lastDir ?? app.getPath('documents'),
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'PDF and Takeoff Files', extensions: ['pdf', 'json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (res.canceled || !res.filePaths.length) return [];
+  lastDir = path.dirname(res.filePaths[0]);
+  return readFiles(res.filePaths);
+});
+
+// Save to a file the user opened or saved before (written to a temporary file first, then moved).
+ipcMain.handle('buildsuite:write-file', async (_event, file, data) => {
+  const target = String(file);
+  if (!granted.has(grantKey(target))) return false;
+  const tmp = `${target}.${process.pid}.saving`;
+  try {
+    await fsp.writeFile(tmp, Buffer.from(data));
+    await fsp.rename(tmp, target);
+    return true;
+  } catch {
+    await fsp.rm(tmp, { force: true }).catch(() => {});
+    return false;
+  }
 });
 
 // Reports open in their own window; written to a temp file so the print button works.

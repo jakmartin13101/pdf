@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Markup, MarkupType, Pt, Rect, Sheet } from '../../types';
-import { getState, useStore, type ToolMode, type ViewRequest } from '../../store/store';
+import { findSheet, getState, paneDoc, useStore, type ToolMode, type ViewRequest } from '../../store/store';
 import { MarkupShape } from './MarkupShape';
 import { PageCanvas } from './PageCanvas';
 import { defaultStyle as defaultStyleFor, TYPE_INFO } from '../../core/markupTypes';
@@ -127,12 +127,13 @@ function ViewportsLayer({ sheet, zoom }: { sheet: Sheet; zoom: number }) {
 
 export function Viewer({ paneId }: { paneId: string }) {
   const paneSheetId = useStore((s) => s.panes.find((p) => p.id === paneId)?.sheetId ?? null);
-  const sheet = useStore((s) => s.doc.sheets.find((x) => x.id === paneSheetId));
+  // Each pane shows its own document (the active pane's is the active document).
+  const sheet = useStore((s) => paneDoc(s, paneId).sheets.find((x) => x.id === paneSheetId));
   const isActive = useStore((s) => s.activePaneId === paneId);
   const multiPane = useStore((s) => s.panes.length > 1);
-  const allMarkups = useStore((s) => s.doc.markups);
-  const layers = useStore((s) => s.doc.layers);
-  const settings = useStore((s) => s.doc.settings);
+  const allMarkups = useStore((s) => paneDoc(s, paneId).markups);
+  const layers = useStore((s) => paneDoc(s, paneId).layers);
+  const settings = useStore((s) => paneDoc(s, paneId).settings);
   const selection = useStore((s) => s.selection);
   const tool = useStore((s) => s.tool);
   const prefs = useStore(useShallow((s) => s.prefs));
@@ -144,7 +145,8 @@ export function Viewer({ paneId }: { paneId: string }) {
   const win = useOwnerWindow();
   // Overlay compare: the sheet drawn over this one, and the differences found between them.
   const compareSheetId = sheet?.compare?.sheetId ?? null;
-  const other = useStore((s) => (compareSheetId ? s.doc.sheets.find((x) => x.id === compareSheetId) : undefined));
+  // (The overlaid sheet can be in another open document.)
+  const other = useStore((s) => findSheet(s, compareSheetId)?.sheet);
   const changes = useStore((s) => (sheet ? s.compareChanges[sheet.id] : undefined));
   const autoTakeoff = useStore((s) => s.autoTakeoff);
   const autoHere = useMemo(() => (sheet && autoTakeoff ? autoTakeoff.members.filter((m) => m.sheetId === sheet.id) : []), [autoTakeoff, sheet]);

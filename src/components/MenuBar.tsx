@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { MenuList, type MenuItem } from './ContextMenu';
-import { getState, useStore, PANEL_IDS, PANEL_TITLES, type LayoutState, type PanelId } from '../store/store';
+import { getState, isDirty, listStyleOf, useStore, PANEL_IDS, PANEL_TITLES, type LayoutState, type PanelId } from '../store/store';
 import { dockMenuItems } from './dock/PanelHeader';
 import { useShortcuts } from './useShortcuts';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from '../brand';
-import { cmdAddPdf, cmdCloseProject, cmdLabelsFromBox, cmdNewProject, cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject, exportPdf, view } from '../store/commands';
+import { cmdCloseAll, cmdCloseDocument, cmdLabelsFromBox, cmdOpenExample, cmdOpenPdf, cmdOpenSample, cmdSave, cmdSaveAll, cmdSaveAs, exportPdf, view } from '../store/commands';
 import { tabMenuItems } from './dock/Panes';
 import { csvBlob, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
 import { buildTakeoffRows } from '../core/details';
@@ -22,7 +22,7 @@ export { exportPdf };
 export function exportMarkupsCsv() {
   const st = getState();
   const rows = buildTakeoffRows(st.doc, st.list.showDetails);
-  void offerFile(csvBlob(markupsCsv(rows, st.list.columns, st.doc)), `${safeName(st.projectName)}_markups.csv`, 'Markups list');
+  void offerFile(csvBlob(markupsCsv(rows, listStyleOf(st).columns, st.doc)), `${safeName(st.projectName)}_markups.csv`, 'Markups list');
 }
 
 export function exportSummaryCsv(groupBy: string | null = 'c:category') {
@@ -54,6 +54,7 @@ export function MenuBar() {
   const activePaneId = useStore((s) => s.activePaneId);
   const prefs = useStore((s) => s.prefs);
   const sc = useShortcuts();
+  const anyDirty = useStore((s) => s.docs.some((d) => isDirty(s, d.id)));
 
   useEffect(() => {
     if (!open) return;
@@ -79,13 +80,13 @@ export function MenuBar() {
   };
   const menus: Record<string, MenuItem[]> = {
     File: [
-      { label: loaded ? 'Open PDF in a New Tab…' : 'Open PDF…', shortcut: sc('file.openPdf'), onClick: cmdOpenPdf },
-      { label: 'New Project from PDF…', shortcut: sc('file.newProject'), onClick: cmdNewProject },
+      { label: 'Open PDF…', shortcut: sc('file.openPdf'), onClick: cmdOpenPdf },
       { label: 'Open Sample Drawing Set', onClick: cmdOpenSample },
       { label: 'Open Example Takeoff', onClick: cmdOpenExample },
       { sep: true },
-      { label: 'Open Project…', onClick: cmdOpenProject },
-      { label: 'Save Project As…', shortcut: sc('file.save'), onClick: cmdSaveProject, disabled: !loaded },
+      { label: 'Save', shortcut: sc('file.save'), onClick: () => void cmdSave(), disabled: !loaded },
+      { label: 'Save As…', shortcut: sc('file.saveAs'), onClick: () => void cmdSaveAs(), disabled: !loaded },
+      { label: 'Save All', shortcut: sc('file.saveAll'), onClick: () => void cmdSaveAll(), disabled: !loaded || !anyDirty },
       { sep: true },
       {
         label: 'Export',
@@ -98,7 +99,8 @@ export function MenuBar() {
         ],
       },
       { sep: true },
-      { label: 'Close Project', onClick: cmdCloseProject, disabled: !loaded },
+      { label: 'Close', shortcut: sc('file.close') ?? sc('tab.close'), onClick: () => cmdCloseDocument(), disabled: !loaded },
+      { label: 'Close All', onClick: cmdCloseAll, disabled: !loaded },
     ],
     Edit: [
       { label: 'Undo', shortcut: sc('edit.undo'), onClick: () => st().undo(), disabled: !canUndo },
@@ -149,8 +151,6 @@ export function MenuBar() {
       { label: 'Compare / Overlay Sheets…', onClick: () => st().setDialog({ kind: 'compare' }), disabled: !loaded || st().doc.sheets.length < 2 },
       { label: 'Next Sheet', shortcut: sc('sheet.next'), onClick: () => st().gotoSheetOffset(1), disabled: !loaded },
       { label: 'Previous Sheet', shortcut: sc('sheet.prev'), onClick: () => st().gotoSheetOffset(-1), disabled: !loaded },
-      { sep: true },
-      { label: 'Add PDF to Set…', onClick: cmdAddPdf, disabled: !loaded },
     ],
     Measure: [
       { label: 'Calibrate…', shortcut: sc('tool.calibrate'), onClick: () => st().setTool({ kind: 'calibrate' }), disabled: !loaded },

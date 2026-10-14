@@ -4,7 +4,8 @@
 //   node scripts/desktop-smoke.mjs [screenshot-dir]
 // On Linux without a display, wrap it in xvfb-run.
 import { _electron as electron } from '@playwright/test';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import os from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,20 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const shots = process.argv[2];
 const samplePdf = join(root, 'public', 'samples', 'Sample-Structural-Set.pdf');
 const addendumPdf = join(root, 'public', 'samples', 'Sample-S1.02-Addendum-2.pdf');
+
+// Where the first run saves the sample set (with its takeoff inside); later runs open it again.
+const savedPdf = join(mkdtempSync(join(os.tmpdir(), 'takeoff-saved-')), 'Saved Set.pdf');
+
+/** A rectangle markup on the sheet showing. */
+async function drawBox(win, dx = 0) {
+  await win.keyboard.press('r');
+  const b = await win.locator('.page').first().boundingBox();
+  await win.mouse.move(b.x + b.width * 0.3 + dx, b.y + b.height * 0.3);
+  await win.mouse.down();
+  await win.mouse.move(b.x + b.width * 0.4 + dx, b.y + b.height * 0.45, { steps: 6 });
+  await win.mouse.up();
+  await win.keyboard.press('Escape');
+}
 
 let failed = 0;
 const check = (ok, what) => {
@@ -55,13 +70,22 @@ async function launch(extraArgs = []) {
   if (shots) await win.screenshot({ path: join(shots, 'desktop-terms.png') });
   await win.keyboard.press('Escape');
 
-  const target = join(userData, 'Saved Project.takeoff.json');
+  // Save: the takeoff goes into the PDF. The sample came from the app, not a file, so Save asks where.
+  await drawBox(win);
   await app.evaluate(({ dialog }, filePath) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath });
-  }, target);
+  }, savedPdf);
   await win.keyboard.press('Control+s');
-  await win.waitForTimeout(1500);
-  check(existsSync(target) && JSON.parse(readFileSync(target, 'utf8')).app === 'takeoff-studio', 'Save Project writes through the native Save dialog');
+  await win.waitForTimeout(2000);
+  const takeoff = existsSync(savedPdf)
+    ? await pdfjs
+        .getDocument({ data: new Uint8Array(readFileSync(savedPdf)), verbosity: 0 })
+        .promise.then((d) => d.getAttachments())
+        .then((a) => JSON.parse(new TextDecoder().decode(a['BuildSuite-Takeoff.json'].content)))
+        .catch(() => null)
+    : null;
+  check(takeoff?.doc?.markups?.length === 1 && takeoff.doc.sheets.length === 7, 'Save writes the takeoff into the PDF through the native Save dialog');
+  check((await win.getByTestId('doc-tab').first().textContent()) === 'Saved Set', `the tab takes the saved file's name (${await win.getByTestId('doc-tab').first().textContent()})`);
 
   const reportOpened = app.waitForEvent('window');
   await win.evaluate(() => window.buildsuite.openReport('<!doctype html><title>Takeoff Summary Report</title><h1>Report</h1>'));
@@ -127,7 +151,7 @@ async function launch(extraArgs = []) {
   await win.waitForSelector('.pane canvas', { timeout: 30000 });
   await win.waitForTimeout(500);
   const name = await win.locator('.project-name').textContent();
-  check(name?.includes('Sample-Structural-Set') ?? false, `PDF given on the command line opens on launch (${name})`);
+  check(name === 'Sample-S1.02-Addendum-2', `PDFs given on the command line open on launch, the last one showing (${name})`);
   const tabs = await win.getByTestId('doc-tab').allTextContents();
   check(tabs.length === 2, `each PDF opens in its own document tab (${tabs.join(' | ')})`);
   const activeTab = () => win.locator('[data-testid=doc-tab][aria-selected=true]').textContent();
@@ -136,6 +160,32 @@ async function launch(extraArgs = []) {
   await win.waitForTimeout(300);
   const after = await activeTab();
   check(!!before && !!after && before !== after, `Ctrl+Tab switches document tabs (${before} → ${after})`);
+  await app.close();
+}
+
+// 3. A PDF saved with its takeoff: the takeoff comes back, and Save writes to the same file.
+{
+  const { app, win } = await launch([savedPdf]);
+  await win.waitForSelector('.pane canvas', { timeout: 30000 });
+  await win.getByTestId('markup-row').first().waitFor({ timeout: 15000 }).catch(() => {});
+  check((await win.getByTestId('markup-row').count()) === 1, 'opening the saved PDF brings its takeoff back');
+  await drawBox(win, 120);
+  await app.evaluate(({ dialog }) => {
+    globalThis.__askedWhere = false;
+    dialog.showSaveDialog = async () => ((globalThis.__askedWhere = true), { canceled: true });
+  });
+  const before = statSync(savedPdf).mtimeMs;
+  await win.keyboard.press('Control+s');
+  await win.waitForTimeout(2000);
+  const asked = await app.evaluate(() => globalThis.__askedWhere);
+  check(!asked && statSync(savedPdf).mtimeMs > before, 'Save writes back to the file it was opened from');
+  await app.close();
+}
+{
+  const { app, win } = await launch([savedPdf]);
+  await win.waitForSelector('.pane canvas', { timeout: 30000 });
+  await win.getByTestId('markup-row').nth(1).waitFor({ timeout: 15000 }).catch(() => {});
+  check((await win.getByTestId('markup-row').count()) === 2, 'the file saved in place has both markups');
   await app.close();
 }
 

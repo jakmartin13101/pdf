@@ -26,6 +26,8 @@ export interface ColumnSpec {
   align: 'left' | 'right' | 'center';
   width: number;
   custom?: CustomColumn;
+  /** The column's own name, when its header was renamed. */
+  original?: string;
 }
 
 export const BUILTIN_COLUMNS: ColumnSpec[] = [
@@ -53,10 +55,12 @@ export const BUILTIN_COLUMNS: ColumnSpec[] = [
 
 export const customColId = (c: CustomColumn) => `c:${c.id}`;
 
-export function allColumns(custom: CustomColumn[]): ColumnSpec[] {
+/** Every column: built-in ones, then the custom columns. `labels` renames headers (column id → name). */
+export function allColumns(custom: CustomColumn[], labels?: Record<string, string>): ColumnSpec[] {
+  const named = (c: ColumnSpec) => (labels?.[c.id] ? { ...c, name: labels[c.id], original: c.name } : c);
   return [
-    ...BUILTIN_COLUMNS,
-    ...custom.map<ColumnSpec>((c) => ({
+    ...BUILTIN_COLUMNS.map(named),
+    ...custom.map<ColumnSpec>((c) => named({
       id: customColId(c),
       name: c.name,
       builtin: false,

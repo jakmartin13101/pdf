@@ -1,13 +1,15 @@
 // UI commands shared by the menu bar, toolbar and context menus.
 import type { MarkupType } from '../types';
-import { getState, type ViewRequest } from './store';
-import { fileBytes, openExampleTakeoff, openPdfFiles, openProjectFile, openSample, safeName, saveProjectFile, closeProject } from './project';
+import { defaultListStyle, getState, isDirty, listStyleOf, liveSlots, type ViewRequest } from './store';
+import { builtInListStyle, listStyleFile, parseListStyle, styleOfDoc } from '../core/listStyle';
+import { closeDocument, fileBytes, openExampleTakeoff, openFiles, openProjectFile, openSample, safeName, saveDocument } from './project';
 import { offerFile } from './files';
 import { exportFlattenedPdf } from '../core/export';
 import { COMMAND_BY_ID, chordFromEvent, commandForChord, resolveBindings } from '../core/keymap';
 import { TYPE_INFO } from '../core/markupTypes';
+import { desktop } from '../brand';
 
-function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
+export function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -18,29 +20,22 @@ function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
   });
 }
 
-/** Open PDFs: each one opens in a new tab of the active pane (and joins the project's set). */
+/** Open PDFs (or takeoff files): each PDF is its own document, in a new tab of the active pane. */
 export async function cmdOpenPdf() {
-  const files = await pickFiles('application/pdf,.pdf', true);
-  if (files.length) await openPdfFiles(files, getState().loaded ? 'append' : 'new');
-}
-
-/** Start a new project from PDFs (the open project is closed; it stays in its saved file). */
-export async function cmdNewProject() {
-  const files = await pickFiles('application/pdf,.pdf', true);
-  if (files.length) await openPdfFiles(files, 'new');
+  if (desktop?.openFilesDialog) {
+    const files = await desktop.openFilesDialog();
+    if (files.length) await openFiles(files.map((f) => ({ name: f.name, bytes: f.data, path: f.path })));
+    return;
+  }
+  const files = await pickFiles('application/pdf,.pdf,.json,application/json', true);
+  if (files.length) await openFiles(files);
 }
 
 /** The document tab showing in the active pane. */
 function activeTab() {
   const st = getState();
   const pane = st.panes.find((p) => p.id === st.activePaneId);
-  const fileId = st.doc.sheets.find((s) => s.id === pane?.sheetId)?.fileId;
-  return pane && fileId ? { paneId: pane.id, fileId } : null;
-}
-
-export async function cmdAddPdf() {
-  const files = await pickFiles('application/pdf,.pdf', true);
-  if (files.length) await openPdfFiles(files, getState().loaded ? 'append' : 'new');
+  return pane?.docId ? { paneId: pane.id, docId: pane.docId } : null;
 }
 
 export async function cmdOpenProject() {
@@ -48,7 +43,61 @@ export async function cmdOpenProject() {
   if (file) await openProjectFile(file);
 }
 
-export const cmdSaveProject = () => saveProjectFile();
+/** Save the active document (its takeoff goes into its PDF). */
+export const cmdSave = () => {
+  const id = getState().activeDocId;
+  return id ? saveDocument(id) : Promise.resolve(false);
+};
+export const cmdSaveAs = () => {
+  const id = getState().activeDocId;
+  return id ? saveDocument(id, { as: true }) : Promise.resolve(false);
+};
+/** Save every document with unsaved changes. */
+export async function cmdSaveAll() {
+  const st = getState();
+  for (const d of st.docs) if (isDirty(getState(), d.id) && !(await saveDocument(d.id))) return false;
+  return true;
+}
+
+/**
+ * Before closing documents: when any has unsaved changes, ask whether to save them first. `then`
+ * runs unless the user cancels (or a save fails).
+ */
+export function confirmUnsaved(docIds: string[], then: () => void) {
+  const st = getState();
+  const dirty = docIds.filter((id) => isDirty(st, id));
+  if (!dirty.length) return then();
+  st.setDialog({ kind: 'unsaved', docIds: dirty, then });
+}
+
+/** Close a document (asking about unsaved changes). */
+export function cmdCloseDocument(docId = getState().activeDocId) {
+  if (docId) confirmUnsaved([docId], () => closeDocument(docId));
+}
+
+/** Close every document. */
+export function cmdCloseAll() {
+  const ids = liveSlots(getState()).map((d) => d.id);
+  confirmUnsaved(ids, () => ids.forEach((id) => closeDocument(id)));
+}
+
+/** Close a document's tab in a pane: its last tab closes the document (asking about unsaved changes). */
+export function cmdCloseTab(paneId: string, docId: string) {
+  cmdCloseTabs(paneId, [docId]);
+}
+
+/** Close several tabs of a pane; documents shown nowhere else close (asking about unsaved changes once). */
+export function cmdCloseTabs(paneId: string, docIds: string[]) {
+  const st = getState();
+  const elsewhere = (id: string) => st.panes.some((p) => p.id !== paneId && p.tabs.some((t) => t.docId === id));
+  const closing = docIds.filter((id) => !elsewhere(id));
+  confirmUnsaved(closing, () => {
+    for (const id of docIds) {
+      if (closing.includes(id)) closeDocument(id);
+      else getState().closeTab(paneId, id);
+    }
+  });
+}
 
 let bindingsCache: { from: Record<string, string[]>; map: Map<string, string[]> } | null = null;
 /** Keyboard shortcuts in effect: defaults with the user's changes. */
@@ -91,13 +140,17 @@ export function runCommand(id: string) {
   switch (id) {
     case 'file.openPdf':
       return void cmdOpenPdf();
-    case 'file.newProject':
-      return void cmdNewProject();
-    case 'file.addPdf':
-      return void cmdAddPdf();
     case 'file.save':
-      if (st.loaded) void cmdSaveProject();
+      if (st.loaded) void cmdSave();
       return;
+    case 'file.saveAs':
+      if (st.loaded) void cmdSaveAs();
+      return;
+    case 'file.saveAll':
+      if (st.loaded) void cmdSaveAll();
+      return;
+    case 'file.close':
+      return cmdCloseDocument();
     case 'file.exportPdf':
       return void exportPdf();
     case 'app.settings':
@@ -141,12 +194,12 @@ export function runCommand(id: string) {
       return st.cycleTab(-1);
     case 'tab.close': {
       const t = activeTab();
-      if (t) st.closeTab(t.paneId, t.fileId);
+      if (t) cmdCloseTab(t.paneId, t.docId);
       return;
     }
     case 'tab.newPane': {
       const t = activeTab();
-      if (t) st.tabToNewPane(t.paneId, t.fileId);
+      if (t) st.tabToNewPane(t.paneId, t.docId);
       return;
     }
     case 'tool.select':
@@ -212,15 +265,6 @@ export async function exportPdf() {
 export const cmdOpenSample = () => openSample();
 export const cmdOpenExample = () => openExampleTakeoff();
 
-export function cmdCloseProject() {
-  getState().setDialog({
-    kind: 'confirm',
-    title: 'Close Project',
-    message: 'Close the current project? Unsaved work is kept only until another project is opened. Save a project file first if you need a copy.',
-    onConfirm: () => void closeProject(),
-  });
-}
-
 export const view = (kind: ViewRequest['kind'], factor?: number) => getState().requestView({ kind, factor } as ViewRequest);
 
 export async function cmdImportToolChest() {
@@ -236,4 +280,68 @@ export async function cmdImportToolChest() {
   } catch (e) {
     getState().toast(`Import failed: ${(e as Error).message}`, 'error');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Markups List styles (columns shown, their order, widths and header names, and the custom columns)
+
+/** The active document's list as a style. */
+function currentStyle() {
+  const st = getState();
+  return styleOfDoc(st.doc, listStyleOf(st));
+}
+
+/** Files opened from now on start with this document's list style. */
+export function cmdSaveDefaultListStyle() {
+  getState().setPrefs({ listStyle: currentStyle() });
+  getState().toast('Saved as the default Markups List style for files you open from now on', 'success');
+}
+
+export function cmdApplyDefaultListStyle() {
+  const st = getState();
+  st.applyListStyle(defaultListStyle(st.prefs));
+  st.toast('Applied the default Markups List style', 'success');
+}
+
+export function cmdResetListStyle() {
+  getState().applyListStyle(builtInListStyle());
+  getState().toast('Markups List columns reset to the built-in style', 'success');
+}
+
+/** Save the list style to a file: a backup, or to use on another computer. */
+export async function cmdExportListStyle(which: 'current' | 'default' = 'current') {
+  const st = getState();
+  const style = which === 'default' ? defaultListStyle(st.prefs) : currentStyle();
+  const name = which === 'default' ? 'Default Markups List Style.json' : `${safeName(st.projectName)} Markups List Style.json`;
+  await offerFile(new Blob([JSON.stringify(listStyleFile(style), null, 2)], { type: 'application/json' }), name, 'Markups List style');
+}
+
+/** Read a list style file: use it on this document (applyHere), and (asDefault) make it the default. */
+export async function cmdImportListStyle(asDefault = false, applyHere = true) {
+  const [file] = await pickFiles('.json,application/json', false);
+  if (!file) return;
+  try {
+    const style = parseListStyle(await file.text());
+    const st = getState();
+    if (applyHere && st.activeDocId) st.applyListStyle(style);
+    if (asDefault) st.setPrefs({ listStyle: style });
+    st.toast(asDefault ? `Imported the Markups List style as the default${applyHere && st.activeDocId ? ' (and used it here)' : ''}` : 'Imported the Markups List style', 'success');
+  } catch (e) {
+    getState().toast(`Import failed: ${(e as Error).message}`, 'error');
+  }
+}
+
+/** Menu items for list styles (list toolbar, column header menu). */
+export function listStyleMenuItems(): { label?: string; onClick?: () => void; sep?: boolean; disabled?: boolean }[] {
+  const custom = !!getState().prefs.listStyle;
+  return [
+    { label: 'Save as Default Style', onClick: cmdSaveDefaultListStyle },
+    { label: 'Apply Default Style', onClick: cmdApplyDefaultListStyle },
+    { label: 'Reset to Built-in Style', onClick: cmdResetListStyle },
+    { sep: true },
+    { label: 'Export This Style…', onClick: () => void cmdExportListStyle('current') },
+    { label: 'Export Default Style…', onClick: () => void cmdExportListStyle('default'), disabled: !custom },
+    { label: 'Import Style…', onClick: () => void cmdImportListStyle(false) },
+    { label: 'Import as Default Style…', onClick: () => void cmdImportListStyle(true) },
+  ];
 }

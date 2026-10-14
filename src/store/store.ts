@@ -6,7 +6,9 @@ import type {
   CustomValue,
   DocState,
   Layer,
+  ListStyle,
   Markup,
+  MarkupListStyle,
   MarkupStyle,
   MarkupType,
   ProjectSettings,
@@ -73,7 +75,9 @@ export type DialogState =
   | { kind: 'settings'; tab?: SettingsTab }
   | { kind: 'shortcuts' }
   | { kind: 'about' }
-  | { kind: 'confirm'; title: string; message: string; onConfirm: () => void };
+  | { kind: 'confirm'; title: string; message: string; onConfirm: () => void }
+  /** Documents about to close with unsaved changes: save them, close without saving, or cancel. */
+  | { kind: 'unsaved'; docIds: string[]; then: () => void };
 
 export type ViewRequest = (
   | { kind: 'fit' | 'fitWidth' | 'actual'; nonce: number }
@@ -159,18 +163,36 @@ export interface PaneWindow {
   h: number;
 }
 
-/** A document tab in a pane: an open file, and the sheet of it last shown in that pane. */
+/** A document tab in a pane: an open document, and the sheet of it last shown in that pane. */
 export interface PaneTab {
-  fileId: string;
+  docId: string;
   sheetId: string;
 }
 
 export interface Pane {
   id: string;
+  /** The document on show (its tab is the active one) and the sheet of it. */
+  docId: string | null;
   sheetId: string | null;
-  /** Open documents, in tab order. The active tab is the file of `sheetId`. */
+  /** Open documents, in tab order. */
   tabs: PaneTab[];
   detached?: PaneWindow;
+}
+
+/** An open document: one PDF and the takeoff on it, with its own undo history and selection. */
+export interface DocSlot {
+  id: string;
+  /** File name (shown on its tab, used when saving), e.g. "S-Set.pdf". */
+  name: string;
+  /** Desktop app: the file it was opened from or saved to, where Save writes. */
+  path?: string;
+  doc: DocState;
+  past: DocState[];
+  future: DocState[];
+  /** The document as last opened or saved: when `doc` is anything else, it has unsaved changes. */
+  saved: DocState | null;
+  selection: string[];
+  autoTakeoff: AutoTakeoffState | null;
 }
 
 export type PaneLayout = 'single' | 'vertical' | 'horizontal' | 'grid';
@@ -197,6 +219,8 @@ export interface Prefs {
   keys: Record<string, string[]>;
   /** Speed & graphics (Settings → Speed & Graphics). */
   perf: PerfPrefs;
+  /** Markups List style that files opened from now on start with (null: the built-in one). */
+  listStyle: MarkupListStyle | null;
 }
 
 export interface PerfPrefs {
@@ -220,7 +244,7 @@ export interface AutoOptions {
   useprinted: boolean;
 }
 
-export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'auto' | 'speed' | 'workspace';
+export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'list' | 'auto' | 'speed' | 'workspace';
 
 interface TypeDefault {
   style: MarkupStyle;
@@ -234,9 +258,17 @@ export interface Toast {
 }
 
 export interface AppState {
+  /**
+   * Open documents. The active one (the document of the active pane) is worked on through `doc`,
+   * `past`, `future`, `selection` and `autoTakeoff`; its entry here is brought up to date when another
+   * document becomes active (use `liveSlots` to read every document as it is now).
+   */
+  docs: DocSlot[];
+  activeDocId: string | null;
   doc: DocState;
   past: DocState[];
   future: DocState[];
+  /** Name of the active document (its file name without the extension). */
   projectName: string;
   loaded: boolean;
   busy: string | null;
@@ -278,10 +310,14 @@ export interface AppState {
   undo: () => void;
   redo: () => void;
 
-  // project
-  loadDoc: (doc: DocState, name: string, opts?: { keepHistory?: boolean }) => void;
+  // documents
+  /** Open a document in a tab of a pane (the active one by default) and make it active. */
+  addDocument: (slot: { id: string; name: string; path?: string; doc: DocState; saved?: DocState | null }, opts?: { paneId?: string; sheetId?: string | null }) => void;
+  /** Close a document everywhere (unsaved changes are lost: ask first). */
+  closeDocument: (id: string) => void;
+  /** Note that a document was saved as it is now (to `path` / under `name` when given). */
+  markSaved: (id: string, patch?: { path?: string; name?: string }) => void;
   setBusy: (s: string | null) => void;
-  setProjectName: (n: string) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: string) => void;
 
@@ -292,7 +328,7 @@ export interface AppState {
    * Sheet labels read in the background after opening: applied to this and the undo history, but only
    * to sheets whose labels are still as they were (`before`), so nothing typed meanwhile is lost.
    */
-  applyReadLabels: (labels: Record<string, { number: string; title: string }>, before: Record<string, { number: string; title: string }>) => void;
+  applyReadLabels: (docId: string, labels: Record<string, { number: string; title: string }>, before: Record<string, { number: string; title: string }>) => void;
   /** Switch to the next (1) or previous (-1) document tab of the active pane. */
   cycleTab: (dir: 1 | -1) => void;
   requestView: (r: Omit<ViewRequest, 'nonce'> & { kind: ViewRequest['kind'] }) => void;
@@ -336,6 +372,10 @@ export interface AppState {
   updateColumn: (id: string, patch: Partial<CustomColumn>) => void;
   deleteColumn: (id: string) => void;
   setList: (patch: Partial<ListState>) => void;
+  /** Change how the active document's Markups List shows its columns (not an undo step). */
+  setListStyle: (patch: Partial<ListStyle>) => void;
+  /** Use a Markups List style on the active document: its custom columns are added or updated by name. */
+  applyListStyle: (style: MarkupListStyle) => void;
 
   // layers
   addLayer: (name: string) => string;
@@ -381,17 +421,20 @@ export interface AppState {
   detachPane: (id: string, mode?: PaneWindow['mode']) => void;
   attachPane: (id: string) => void;
   setPaneWindow: (id: string, patch: Partial<PaneWindow>) => void;
-  /** Show a document (file) in a pane: its tab, opened there if it is not yet. */
-  openTab: (paneId: string, fileId: string) => void;
-  /** Close a document tab in a pane (the file stays in the project). A pane left without tabs closes. */
-  closeTab: (paneId: string, fileId: string) => void;
+  /** Show a document in a pane: its tab, opened there if it is not yet. */
+  openTab: (paneId: string, docId: string) => void;
+  /**
+   * Close a document's tab in a pane. When no other pane shows it, the document closes (ask about
+   * unsaved changes first). A pane left without tabs closes.
+   */
+  closeTab: (paneId: string, docId: string) => void;
   /**
    * Move a document tab to another pane (or to another place in the same pane). With `copy`, the
    * tab stays where it was too. The main window keeps at least one document.
    */
-  moveTab: (fileId: string, fromPaneId: string, toPaneId: string, opts?: { index?: number; copy?: boolean }) => void;
+  moveTab: (docId: string, fromPaneId: string, toPaneId: string, opts?: { index?: number; copy?: boolean }) => void;
   /** Split the view and move a document tab into the new pane. */
-  tabToNewPane: (paneId: string, fileId: string) => void;
+  tabToNewPane: (paneId: string, docId: string) => void;
 
   // counts
   splitCount: (id: string, pointIndex: number | 'all') => void;
@@ -507,19 +550,86 @@ function loadLayout(): LayoutState {
   };
 }
 
-const fileOfSheet = (doc: DocState, sheetId: string | null) => (sheetId ? doc.sheets.find((s) => s.id === sheetId)?.fileId : undefined);
-
-/** A pane showing a sheet, with that sheet's document as its active tab (opened at the end if needed). */
-function showIn(p: Pane, sheetId: string | null, doc: DocState): Pane {
-  const fileId = fileOfSheet(doc, sheetId);
-  if (!sheetId || !fileId) return p.sheetId === sheetId ? p : { ...p, sheetId };
-  const at = p.tabs.findIndex((t) => t.fileId === fileId);
-  if (p.sheetId === sheetId && at >= 0 && p.tabs[at].sheetId === sheetId) return p;
-  const tabs = at >= 0 ? p.tabs.map((t, i) => (i === at ? { fileId, sheetId } : t)) : [...p.tabs, { fileId, sheetId }];
-  return { ...p, sheetId, tabs };
+/** A pane showing a sheet of a document, that document's tab active (opened at the end if needed). */
+function showIn(p: Pane, docId: string | null, sheetId: string | null): Pane {
+  if (!docId || !sheetId) return p.docId === docId && p.sheetId === sheetId ? p : { ...p, docId, sheetId };
+  const at = p.tabs.findIndex((t) => t.docId === docId);
+  if (p.docId === docId && p.sheetId === sheetId && at >= 0 && p.tabs[at].sheetId === sheetId) return p;
+  const tabs = at >= 0 ? p.tabs.map((t, i) => (i === at ? { docId, sheetId } : t)) : [...p.tabs, { docId, sheetId }];
+  return { ...p, docId, sheetId, tabs };
 }
 
-export const newPane = (id: string): Pane => ({ id, sheetId: null, tabs: [] });
+export const newPane = (id: string): Pane => ({ id, docId: null, sheetId: null, tabs: [] });
+
+const EMPTY_DOC = emptyDocConst();
+function emptyDocConst(): DocState {
+  return { files: [], sheets: [], markups: [], columns: [], layers: [], settings: { ...DEFAULT_SETTINGS }, standardDetails: [] };
+}
+
+/** Every open document as it is now (the active one's live state included). */
+export function liveSlots(s: Pick<AppState, 'docs' | 'activeDocId' | 'doc' | 'past' | 'future' | 'selection' | 'autoTakeoff'>): DocSlot[] {
+  return s.docs.map((d) => (d.id === s.activeDocId ? { ...d, doc: s.doc, past: s.past, future: s.future, selection: s.selection, autoTakeoff: s.autoTakeoff } : d));
+}
+
+/** A document by id, as it is now. */
+export const docById = (s: AppState, id: string | null | undefined): DocState | undefined =>
+  !id ? undefined : id === s.activeDocId ? s.doc : s.docs.find((d) => d.id === id)?.doc;
+
+/** The document a pane shows (an empty one when none). */
+export const paneDoc = (s: AppState, paneId: string): DocState => docById(s, s.panes.find((p) => p.id === paneId)?.docId) ?? EMPTY_DOC;
+
+/** A sheet of any open document, and the document it belongs to. */
+export function findSheet(s: AppState, sheetId: string | null | undefined): { docId: string; sheet: Sheet } | undefined {
+  if (!sheetId) return undefined;
+  const own = s.doc.sheets.find((x) => x.id === sheetId);
+  if (own && s.activeDocId) return { docId: s.activeDocId, sheet: own };
+  for (const d of s.docs) {
+    if (d.id === s.activeDocId) continue;
+    const sheet = d.doc.sheets.find((x) => x.id === sheetId);
+    if (sheet) return { docId: d.id, sheet };
+  }
+  return undefined;
+}
+
+/** Sheets that can be overlaid on the active document's: its own, then those of the other open documents. */
+export function overlayCandidates(s: Pick<AppState, 'doc' | 'docs' | 'activeDocId'>): { sheet: Sheet; docId: string; docName: string | null }[] {
+  const own = s.doc.sheets.map((sheet) => ({ sheet, docId: s.activeDocId ?? '', docName: null as string | null }));
+  const others = s.docs.filter((d) => d.id !== s.activeDocId).flatMap((d) => d.doc.sheets.map((sheet) => ({ sheet, docId: d.id, docName: d.name })));
+  return [...own, ...others];
+}
+
+/** Whether a document has changes that are not saved to its file. */
+export function isDirty(s: AppState, id: string): boolean {
+  const slot = s.docs.find((d) => d.id === id);
+  if (!slot) return false;
+  return (id === s.activeDocId ? s.doc : slot.doc) !== slot.saved;
+}
+
+/** The document name without the file extension. */
+export const docTitle = (name: string) => name.replace(/\.(pdf|json)$/i, '').replace(/\.takeoff$/i, '');
+
+/** The list style of the active document (older documents: the list's own columns). */
+const NO_LABELS: Record<string, string> = {};
+export function listStyleOf(s: Pick<AppState, 'doc' | 'list'>): ListStyle {
+  return s.doc.listStyle ?? { columns: s.list.columns, widths: s.list.widths, labels: NO_LABELS };
+}
+
+/** The style files opened from now on start with: the saved default, else the list as it was set up. */
+export function defaultListStyle(prefs: Prefs): MarkupListStyle {
+  if (prefs.listStyle) return prefs.listStyle;
+  const legacy = lsGet<Partial<ListState>>('ts.list', {});
+  return { columns: defaultColumns(), visible: legacy.columns ?? [...DEFAULT_VISIBLE_COLUMNS], widths: legacy.widths ?? {}, labels: {} };
+}
+
+/** A new document's takeoff data: no markups yet, the default list style and its columns. */
+export function newDocState(prefs: Prefs): DocState {
+  const style = defaultListStyle(prefs);
+  return {
+    ...emptyDoc(),
+    columns: structuredClone(style.columns),
+    listStyle: { columns: [...style.visible], widths: { ...style.widths }, labels: { ...style.labels } },
+  };
+}
 
 const PANE_COUNT: Record<PaneLayout, number> = { single: 1, vertical: 2, horizontal: 2, grid: 4 };
 const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
@@ -541,6 +651,7 @@ const defaultPrefs = (): Prefs => ({
   adjustStep: 1,
   keys: {},
   perf: { hwa: true, cache: 'normal', prefetch: true, backgroundLabels: true },
+  listStyle: null,
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -562,6 +673,10 @@ function loadPrefs(): Prefs {
 
 
 let clipboard: Markup[] = [];
+let clipColumns: CustomColumn[] = [];
+
+/** A document with the list layout of another (undo and redo leave the layout as it is). */
+const keepStyle = (d: DocState, cur: DocState): DocState => (d.listStyle === cur.listStyle ? d : { ...d, listStyle: cur.listStyle });
 
 export const useStore = create<AppState>()((set, get, api) => {
   const toolChestFromStorage = lsGet<ToolSet[] | null>('ts.toolchest', null);
@@ -640,55 +755,87 @@ export const useStore = create<AppState>()((set, get, api) => {
       ? { activePaneId: id }
       : { activePaneId: id, activeEpoch: get().activeEpoch + 1, currentSheetId: panes.find((p) => p.id === id)?.sheetId ?? get().currentSheetId };
 
-  // Files that have had a tab: a file new to the project opens as a tab in the active pane once, so a
-  // tab the user closes stays closed.
-  let tabbed = new Set<string>();
+  /** The document a sheet belongs to (the active one is looked in first). */
+  const docOfSheet = (sheetId: string | null | undefined) => findSheet(get(), sheetId)?.docId ?? null;
 
   /**
-   * Keep panes and their document tabs in step with the project: tabs follow their files (a flattened
-   * file is a new version of the same document), close with removed files, every pane shows a sheet
-   * of one of its tabs, and files new to the project open as tabs in the active pane.
+   * Make another document the active one: the active document's state goes back to its slot and the
+   * other's comes out. Tools tied to a sheet or markup of the old document end.
+   */
+  const activateDoc = (id: string | null) => {
+    const s = get();
+    if (id === s.activeDocId) return;
+    const docs = liveSlots(s);
+    const slot = docs.find((d) => d.id === id);
+    const pane = s.panes.find((p) => p.id === s.activePaneId);
+    const t = s.tool;
+    const tied = t.kind === 'cutout' || t.kind === 'alignPoints' || t.kind === 'moveOverlay' || t.kind === 'region';
+    set({
+      docs,
+      activeDocId: slot?.id ?? null,
+      doc: slot?.doc ?? emptyDoc(),
+      past: slot?.past ?? [],
+      future: slot?.future ?? [],
+      selection: slot?.selection ?? [],
+      autoTakeoff: slot?.autoTakeoff ?? null,
+      projectName: slot ? docTitle(slot.name) : '',
+      currentSheetId: pane?.docId === slot?.id && pane?.sheetId ? pane!.sheetId : slot?.doc.sheets[0]?.id ?? null,
+      editingTextId: null,
+      ...(tied ? { tool: { kind: 'select' } as ToolMode } : {}),
+    });
+  };
+
+  /**
+   * Keep panes and their document tabs in step with the open documents: tabs of closed documents go,
+   * every tab and pane shows a sheet its document has, a pane left without tabs closes (the main
+   * window shows another open document instead), and the current sheet is the active pane's.
    */
   const syncPanes = () => {
-    const { panes, doc, currentSheetId, activePaneId } = get();
-    const sheetIds = new Set(doc.sheets.map((s) => s.id));
-    const fileIds = new Set(doc.files.map((f) => f.id));
-    const firstSheet = (fileId: string) => doc.sheets.find((s) => s.fileId === fileId)?.id;
-    const fixTab = (t: PaneTab): PaneTab | null => {
-      const fileId = fileIds.has(t.fileId) ? t.fileId : sheetIds.has(t.sheetId) ? fileOfSheet(doc, t.sheetId) : undefined;
-      if (!fileId) return null;
-      const sheetId = sheetIds.has(t.sheetId) && fileOfSheet(doc, t.sheetId) === fileId ? t.sheetId : firstSheet(fileId);
-      return sheetId ? { fileId, sheetId } : null;
-    };
-    const inTabs = new Set<string>();
-    let next = panes.map((p) => {
+    const s = get();
+    if (!s.docs.length) return;
+    const docs = new Map(liveSlots(s).map((d) => [d.id, d.doc]));
+    const has = (docId: string, sheetId: string | null) => !!sheetId && !!docs.get(docId)?.sheets.some((x) => x.id === sheetId);
+    const first = (docId: string) => docs.get(docId)?.sheets[0]?.id ?? null;
+    let panes = s.panes.map((p) => {
       const tabs: PaneTab[] = [];
-      let activeTab: PaneTab | null = null;
       for (const t of p.tabs) {
-        const f = fixTab(t);
-        if (f && t.sheetId === p.sheetId) activeTab = f;
-        if (f && !tabs.some((x) => x.fileId === f.fileId)) tabs.push(f);
+        if (!docs.has(t.docId) || tabs.some((x) => x.docId === t.docId)) continue;
+        const sheetId = has(t.docId, t.sheetId) ? t.sheetId : first(t.docId);
+        if (sheetId) tabs.push({ docId: t.docId, sheetId });
       }
-      tabs.forEach((t) => inTabs.add(t.fileId));
-      return { pane: { ...p, tabs }, activeTab };
+      const docId = p.docId && tabs.some((t) => t.docId === p.docId) ? p.docId : tabs[0]?.docId ?? null;
+      if (!docId) return { ...p, tabs, docId: null, sheetId: null };
+      const want = p.id === s.activePaneId && docId === s.activeDocId ? s.currentSheetId : p.docId === docId ? p.sheetId : null;
+      return showIn({ ...p, tabs }, docId, has(docId, want) ? want : tabs.find((t) => t.docId === docId)!.sheetId);
     });
-    tabbed = new Set([...tabbed].filter((id) => fileIds.has(id)));
-    const fresh = doc.files.filter((f) => !tabbed.has(f.id) && !inTabs.has(f.id) && firstSheet(f.id));
-    for (const f of doc.files) if (inTabs.has(f.id) || fresh.includes(f)) tabbed.add(f.id);
-    next = next.map((n) => (n.pane.id === activePaneId ? { ...n, pane: { ...n.pane, tabs: [...n.pane.tabs, ...fresh.map((f) => ({ fileId: f.id, sheetId: firstSheet(f.id)! }))] } } : n));
-    const result = next.map(({ pane, activeTab }) => {
-      const want = pane.id === activePaneId ? currentSheetId : pane.sheetId;
-      const sheet = want && sheetIds.has(want) ? want : activeTab?.sheetId ?? pane.tabs[0]?.sheetId ?? doc.sheets[0]?.id ?? null;
-      return showIn(pane, sheet, doc);
-    });
-    const cur = result.find((p) => p.id === activePaneId)?.sheetId ?? null;
-    const same = result.length === panes.length && result.every((p, i) => JSON.stringify(p) === JSON.stringify(panes[i]));
-    if (!same) set({ panes: result });
-    if (cur !== currentSheetId) set({ currentSheetId: cur });
+    // Panes without documents: detached and split panes close; the main window keeps one pane.
+    let layout = s.paneLayout;
+    const empty = panes.filter((p) => !p.docId);
+    if (empty.length) {
+      let attachedLeft = attachedPanes(panes).filter((p) => p.docId).length;
+      for (const p of empty) {
+        if (p.detached || attachedLeft > 0) panes = panes.filter((x) => x !== p);
+        else attachedLeft++; // the last pane of the main window stays
+      }
+      layout = layoutFor(attachedPanes(panes).length, layout);
+      const fallback = s.docs[0].id;
+      panes = panes.map((p) => (p.docId ? p : showIn(p, fallback, (p.tabs.find((t) => t.docId === fallback)?.sheetId ?? first(fallback)))));
+    }
+    const activePaneId = panes.some((p) => p.id === s.activePaneId) ? s.activePaneId : attachedPanes(panes)[0]?.id ?? panes[0].id;
+    const same = panes.length === s.panes.length && panes.every((p, i) => p === s.panes[i] || JSON.stringify(p) === JSON.stringify(s.panes[i]));
+    if (!same || layout !== s.paneLayout || activePaneId !== s.activePaneId) set({ panes, paneLayout: layout, ...activeChange(activePaneId, panes) });
+    const act = get().panes.find((p) => p.id === get().activePaneId);
+    if (act?.docId === get().activeDocId && act?.sheetId !== get().currentSheetId) set({ currentSheetId: act?.sheetId ?? null });
   };
-  // Sheets and files change in many ways (undo and redo, flattening, deleting): panes follow.
+
   api.subscribe((s, prev) => {
-    if (s.doc.sheets !== prev.doc.sheets || s.doc.files !== prev.doc.files) syncPanes();
+    // The active pane's document is the active document.
+    if (s.panes !== prev.panes || s.activePaneId !== prev.activePaneId) {
+      const want = s.panes.find((p) => p.id === s.activePaneId)?.docId ?? null;
+      if (want && want !== s.activeDocId && s.docs.some((d) => d.id === want)) activateDoc(want);
+    }
+    // Sheets change in many ways (undo and redo, deleting): panes follow.
+    if (s.doc.sheets !== prev.doc.sheets || s.docs.length !== prev.docs.length) syncPanes();
   });
 
   const pruneSelection = (doc: DocState, sel: string[]) => {
@@ -697,10 +844,12 @@ export const useStore = create<AppState>()((set, get, api) => {
   };
 
   return {
+    docs: [],
+    activeDocId: null,
     doc: emptyDoc(),
     past: [],
     future: [],
-    projectName: 'Untitled Project',
+    projectName: '',
     loaded: false,
     busy: null,
     currentSheetId: null,
@@ -739,38 +888,69 @@ export const useStore = create<AppState>()((set, get, api) => {
       const { doc, past } = get();
       if (past.length && past[past.length - 1] === doc) set({ past: past.slice(0, -1) });
     },
+    // The list's column layout is not part of undo: it stays as it is.
     undo: () => {
       const { past, doc, future, selection } = get();
       if (!past.length) return;
-      const prev = past[past.length - 1];
+      const prev = keepStyle(past[past.length - 1], doc);
       set({ doc: prev, past: past.slice(0, -1), future: [doc, ...future], selection: pruneSelection(prev, selection) });
     },
     redo: () => {
       const { past, doc, future, selection } = get();
       if (!future.length) return;
-      const next = future[0];
+      const next = keepStyle(future[0], doc);
       set({ doc: next, past: [...past, doc], future: future.slice(1), selection: pruneSelection(next, selection) });
     },
 
-    loadDoc: (doc, name, opts) => {
-      // A new project starts its tabs over: every document opens as a tab in the active pane.
-      if (!opts?.keepHistory) tabbed = new Set();
-      set((s) => ({
-        ...(opts?.keepHistory ? {} : { panes: s.panes.map((p) => ({ ...p, tabs: [] })) }),
-        doc,
-        projectName: name,
-        loaded: true,
-        past: opts?.keepHistory ? [...s.past, s.doc] : [],
-        future: [],
-        selection: [],
-        currentSheetId: doc.sheets.find((x) => x.id === s.currentSheetId)?.id ?? doc.sheets[0]?.id ?? null,
-        tool: { kind: 'select' },
-        autoTakeoff: opts?.keepHistory ? s.autoTakeoff : null,
-      }));
+    addDocument: (slot, opts) => {
+      const s = get();
+      const docs = [...liveSlots(s), { selection: [], autoTakeoff: null, past: [], future: [], saved: slot.doc, ...slot }];
+      const paneId = opts?.paneId && s.panes.some((p) => p.id === opts.paneId) ? opts.paneId : s.activePaneId;
+      const sheetId = opts?.sheetId && slot.doc.sheets.some((x) => x.id === opts.sheetId) ? opts.sheetId : slot.doc.sheets[0]?.id ?? null;
+      const panes = s.panes.map((p) => (p.id === paneId ? showIn(p, slot.id, sheetId) : p));
+      set({ docs, panes, loaded: true, ...activeChange(paneId, panes) });
+    },
+    closeDocument: (id) => {
+      const s = get();
+      if (!s.docs.some((d) => d.id === id)) return;
+      const docs = liveSlots(s).filter((d) => d.id !== id);
+      if (!docs.length) {
+        set({
+          docs: [],
+          activeDocId: null,
+          doc: emptyDoc(),
+          past: [],
+          future: [],
+          selection: [],
+          autoTakeoff: null,
+          loaded: false,
+          currentSheetId: null,
+          projectName: '',
+          panes: [newPane('pane-1')],
+          paneLayout: 'single',
+          activePaneId: 'pane-1',
+          tool: { kind: 'select' },
+          editingTextId: null,
+        });
+        return;
+      }
+      const panes = s.panes.map((p) => ({ ...p, tabs: p.tabs.filter((t) => t.docId !== id), ...(p.docId === id ? { docId: null, sheetId: null } : {}) }));
+      const wasActive = s.activeDocId === id;
+      set({
+        docs,
+        panes,
+        ...(wasActive ? { activeDocId: null, doc: emptyDoc(), past: [], future: [], selection: [], autoTakeoff: null, currentSheetId: null } : {}),
+      });
       syncPanes();
     },
+    markSaved: (id, patch) => {
+      const s = get();
+      set({
+        docs: s.docs.map((d) => (d.id === id ? { ...d, ...patch, saved: id === s.activeDocId ? s.doc : d.doc } : d)),
+        ...(id === s.activeDocId && patch?.name ? { projectName: docTitle(patch.name) } : {}),
+      });
+    },
     setBusy: (busy) => set({ busy }),
-    setProjectName: (projectName) => set({ projectName }),
     toast: (text, kind = 'info') => {
       const id = uid('t');
       set((s) => ({ toasts: [...s.toasts, { id, text, kind }] }));
@@ -781,8 +961,10 @@ export const useStore = create<AppState>()((set, get, api) => {
     setCurrentSheet: (id) => {
       const { currentSheetId, panes, activePaneId } = get();
       if (id === currentSheetId && panes.find((p) => p.id === activePaneId)?.sheetId === id) return;
-      const doc = get().doc;
-      set({ currentSheetId: id, editingTextId: null, panes: panes.map((p) => (p.id === activePaneId ? showIn(p, id, doc) : p)) });
+      const docId = docOfSheet(id);
+      if (!docId) return;
+      // A sheet of another document opens that document's tab (and makes it the active document).
+      set({ currentSheetId: id, editingTextId: null, panes: panes.map((p) => (p.id === activePaneId ? showIn(p, docId, id) : p)) });
     },
     gotoSheetOffset: (delta) => {
       const { doc, currentSheetId } = get();
@@ -790,7 +972,7 @@ export const useStore = create<AppState>()((set, get, api) => {
       const n = doc.sheets[Math.max(0, Math.min(doc.sheets.length - 1, i + delta))];
       if (n) get().setCurrentSheet(n.id);
     },
-    applyReadLabels: (labels, before) => {
+    applyReadLabels: (docId, labels, before) => {
       const fix = (d: DocState): DocState => ({
         ...d,
         sheets: d.sheets.map((s) => {
@@ -799,16 +981,27 @@ export const useStore = create<AppState>()((set, get, api) => {
           return l && b && s.number === b.number && s.title === b.title ? { ...s, number: l.number, title: l.title } : s;
         }),
       });
-      const { doc, past, future } = get();
-      set({ doc: fix(doc), past: past.map(fix), future: future.map(fix) });
+      // Labels read after opening do not count as unsaved changes.
+      const s = get();
+      if (docId === s.activeDocId) {
+        const doc = fix(s.doc);
+        set({ doc, past: s.past.map(fix), future: s.future.map(fix), docs: s.docs.map((d) => (d.id === docId && d.saved === s.doc ? { ...d, saved: doc } : d)) });
+      } else {
+        set({
+          docs: s.docs.map((d) => {
+            if (d.id !== docId) return d;
+            const doc = fix(d.doc);
+            return { ...d, doc, past: d.past.map(fix), future: d.future.map(fix), saved: d.saved === d.doc ? doc : d.saved };
+          }),
+        });
+      }
     },
     cycleTab: (dir) => {
-      const { doc, panes, activePaneId } = get();
+      const { panes, activePaneId } = get();
       const pane = panes.find((p) => p.id === activePaneId);
       if (!pane || pane.tabs.length < 2) return;
-      const cur = fileOfSheet(doc, pane.sheetId);
-      const i = pane.tabs.findIndex((t) => t.fileId === cur);
-      get().openTab(pane.id, pane.tabs[(i + dir + pane.tabs.length) % pane.tabs.length].fileId);
+      const i = pane.tabs.findIndex((t) => t.docId === pane.docId);
+      get().openTab(pane.id, pane.tabs[(i + dir + pane.tabs.length) % pane.tabs.length].docId);
     },
     requestView: (r) => set({ viewRequest: { ...(r as ViewRequest), paneId: get().activePaneId, nonce: Date.now() + Math.random() } }),
     setZoom: (zoom) => set({ zoom }),
@@ -847,14 +1040,16 @@ export const useStore = create<AppState>()((set, get, api) => {
     deleteSheet: (id) => {
       const { doc, currentSheetId } = get();
       const idx = doc.sheets.findIndex((s) => s.id === id);
+      if (idx < 0) return;
+      if (doc.sheets.length === 1) {
+        get().toast('A document keeps at least one page. Close the document instead.', 'error');
+        return;
+      }
       commit((d) => ({ ...d, sheets: d.sheets.filter((s) => s.id !== id), markups: d.markups.filter((m) => m.sheetId !== id) }));
       if (currentSheetId === id) {
-        // The next sheet of the same document, else the next one in the set.
         const sheets = get().doc.sheets;
-        const fileId = doc.sheets[idx]?.fileId;
-        const same = sheets.filter((s) => s.fileId === fileId);
-        const before = doc.sheets.slice(0, idx).filter((s) => s.fileId === fileId).length;
-        set({ currentSheetId: same[Math.min(before, same.length - 1)]?.id ?? sheets[Math.min(idx, sheets.length - 1)]?.id ?? null, selection: [] });
+        get().setCurrentSheet(sheets[Math.min(idx, sheets.length - 1)].id);
+        set({ selection: [] });
       }
       syncPanes();
     },
@@ -903,21 +1098,42 @@ export const useStore = create<AppState>()((set, get, api) => {
       const { doc, selection } = get();
       const s = new Set(selection);
       clipboard = doc.markups.filter((m) => s.has(m.id)).map((m) => structuredClone(m));
+      clipColumns = doc.columns;
       if (clipboard.length) get().toast(`Copied ${clipboard.length} markup${clipboard.length > 1 ? 's' : ''}`);
     },
     paste: (at) => {
-      const { currentSheetId } = get();
+      const { currentSheetId, doc } = get();
       if (!clipboard.length || !currentSheetId) return;
       const b = bbox(clipboard.flatMap((m) => m.points));
       const dx = at ? at.x - b.x : 18;
       const dy = at ? at.y - b.y : 18;
       const now = Date.now();
+      // Pasted into another document: column values go to its columns of the same name, layers by id.
+      const byName = new Map(doc.columns.map((c) => [normName(c.name), c.id]));
+      const colFor = (k: string) => {
+        if (doc.columns.some((c) => c.id === k)) return k;
+        const src = clipColumns.find((c) => c.id === k);
+        return src ? byName.get(normName(src.name)) : undefined;
+      };
+      const mapCustom = (custom: Record<string, CustomValue>) => {
+        const out: Record<string, CustomValue> = {};
+        for (const [k, v] of Object.entries(custom)) {
+          const id = colFor(k);
+          if (id) out[id] = v;
+        }
+        return out;
+      };
+      const layers = new Set(doc.layers.map((l) => l.id));
       const copies = clipboard.map((m) => ({
         ...structuredClone(m),
         id: uid('m'),
         sheetId: currentSheetId,
         points: translate(m.points, dx, dy),
         cutouts: m.cutouts?.map((c) => translate(c, dx, dy)),
+        custom: mapCustom(m.custom),
+        layer: m.layer && !layers.has(m.layer) ? '' : m.layer,
+        details: m.details?.filter((id) => doc.standardDetails?.some((d) => d.id === id)),
+        detailsOff: m.detailsOff?.filter((id) => doc.standardDetails?.some((d) => d.id === id)),
         created: now,
         modified: now,
       }));
@@ -938,12 +1154,8 @@ export const useStore = create<AppState>()((set, get, api) => {
 
     addColumn: (c) => {
       const id = uid('col');
-      commit((d) => ({ ...d, columns: [...d.columns, { ...c, id }] }));
-      set((s) => {
-        const list = { ...s.list, columns: [...s.list.columns, `c:${id}`] };
-        lsSet('ts.list', list);
-        return { list };
-      });
+      const style = listStyleOf(get());
+      commit((d) => ({ ...d, columns: [...d.columns, { ...c, id }], listStyle: { ...style, columns: [...style.columns, `c:${id}`] } }));
       return id;
     },
     updateColumn: (id, patch) => commit((d) => ({ ...d, columns: d.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
@@ -958,12 +1170,41 @@ export const useStore = create<AppState>()((set, get, api) => {
           return { ...m, custom };
         }),
       }));
-      get().setList({ columns: get().list.columns.filter((c) => c !== `c:${id}`) });
+      const style = listStyleOf(get());
+      get().setListStyle({ columns: style.columns.filter((c) => c !== `c:${id}`) });
     },
     setList: (patch) => {
       const list = { ...get().list, ...patch };
       lsSet('ts.list', { ...list, search: '' });
       set({ list });
+    },
+    setListStyle: (patch) => {
+      const s = get();
+      if (!s.activeDocId) return;
+      set({ doc: { ...s.doc, listStyle: { ...listStyleOf(s), ...patch } } });
+    },
+    applyListStyle: (style) => {
+      const s = get();
+      if (!s.activeDocId) return;
+      // Custom columns of the style: the document's column of the same name is updated, others added.
+      const byName = new Map(s.doc.columns.map((c) => [normName(c.name), c]));
+      const idMap = new Map<string, string>();
+      const columns = [...s.doc.columns];
+      for (const c of style.columns) {
+        const have = byName.get(normName(c.name));
+        if (have) {
+          idMap.set(c.id, have.id);
+          columns[columns.indexOf(have)] = { ...c, id: have.id };
+        } else {
+          const id = columns.some((x) => x.id === c.id) ? uid('col') : c.id;
+          idMap.set(c.id, id);
+          columns.push({ ...c, id });
+        }
+      }
+      const key = (k: string) => (k.startsWith('c:') ? `c:${idMap.get(k.slice(2)) ?? k.slice(2)}` : k);
+      const remap = (r: Record<string, string | number>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [key(k), v]));
+      const listStyle: ListStyle = { columns: style.visible.map(key), widths: remap(style.widths) as Record<string, number>, labels: remap(style.labels) as Record<string, string> };
+      commit((d) => ({ ...d, columns, listStyle }));
     },
 
     addLayer: (name) => {
@@ -1083,14 +1324,14 @@ export const useStore = create<AppState>()((set, get, api) => {
     },
 
     setPaneLayout: (paneLayout) => {
-      const { panes, activePaneId, currentSheetId } = get();
+      const { panes, activePaneId, currentSheetId, activeDocId } = get();
       // The layout arranges the panes in the main window; detached windows stay as they are.
       const attached = attachedPanes(panes);
       const n = PANE_COUNT[paneLayout];
       let keep = attached.slice(0, n);
       const act = attached.find((p) => p.id === activePaneId);
       if (act && !keep.includes(act)) keep = [...keep.slice(0, n - 1), act];
-      while (keep.length < n) keep.push(showIn(newPane(uid('pane')), currentSheetId, get().doc));
+      while (keep.length < n) keep.push(showIn(newPane(uid('pane')), activeDocId, currentSheetId));
       const next = [...keep, ...panes.filter((p) => p.detached)];
       const active = next.some((p) => p.id === activePaneId) ? activePaneId : keep[0].id;
       set({ paneLayout, panes: next, editingTextId: null, ...activeChange(active, next) });
@@ -1100,8 +1341,10 @@ export const useStore = create<AppState>()((set, get, api) => {
       set({ editingTextId: null, ...activeChange(id, get().panes) });
     },
     setPaneSheet: (paneId, sheetId) => {
+      const docId = docOfSheet(sheetId);
+      if (!docId) return;
       set((s) => ({
-        panes: s.panes.map((p) => (p.id === paneId ? showIn(p, sheetId, s.doc) : p)),
+        panes: s.panes.map((p) => (p.id === paneId ? showIn(p, docId, sheetId) : p)),
         ...(paneId === s.activePaneId ? { currentSheetId: sheetId, editingTextId: null } : {}),
       }));
     },
@@ -1115,6 +1358,10 @@ export const useStore = create<AppState>()((set, get, api) => {
       const layout = target.detached ? paneLayout : layoutFor(attachedPanes(rest).length, paneLayout);
       const active = rest.some((p) => p.id === activePaneId) ? activePaneId : attachedPanes(rest)[0].id;
       set({ panes: rest, paneLayout: layout, editingTextId: null, ...activeChange(active, rest) });
+      // Documents shown only in that pane stay open: they get a tab in the active pane.
+      const shown = new Set(rest.flatMap((p) => p.tabs.map((t) => t.docId)));
+      const orphans = target.tabs.filter((t) => !shown.has(t.docId));
+      if (orphans.length) set((s) => ({ panes: s.panes.map((p) => (p.id === active ? { ...p, tabs: [...p.tabs, ...orphans] } : p)) }));
     },
     detachPane: (id, mode = 'window') => {
       const { panes, paneLayout } = get();
@@ -1146,42 +1393,43 @@ export const useStore = create<AppState>()((set, get, api) => {
     setPaneWindow: (id, patch) =>
       set((s) => ({ panes: s.panes.map((p) => (p.id === id && p.detached ? { ...p, detached: { ...p.detached, ...patch } } : p)) })),
 
-    openTab: (paneId, fileId) => {
-      const { panes, doc } = get();
-      const pane = panes.find((p) => p.id === paneId);
-      if (!pane) return;
-      const tab = pane.tabs.find((t) => t.fileId === fileId);
-      const sheetId = tab && doc.sheets.some((s) => s.id === tab.sheetId) ? tab.sheetId : doc.sheets.find((s) => s.fileId === fileId)?.id;
+    openTab: (paneId, docId) => {
+      const s = get();
+      const pane = s.panes.find((p) => p.id === paneId);
+      const doc = docById(s, docId);
+      if (!pane || !doc) return;
+      const tab = pane.tabs.find((t) => t.docId === docId);
+      const sheetId = tab && doc.sheets.some((x) => x.id === tab.sheetId) ? tab.sheetId : doc.sheets[0]?.id;
       if (!sheetId) return;
       get().setActivePane(paneId);
       get().setPaneSheet(paneId, sheetId);
     },
-    closeTab: (paneId, fileId) => {
-      const { panes, doc, activePaneId } = get();
+    closeTab: (paneId, docId) => {
+      const { panes } = get();
       const pane = panes.find((p) => p.id === paneId);
-      const at = pane?.tabs.findIndex((t) => t.fileId === fileId) ?? -1;
+      const at = pane?.tabs.findIndex((t) => t.docId === docId) ?? -1;
       if (!pane || at < 0) return;
-      const tabs = pane.tabs.filter((t) => t.fileId !== fileId);
-      if (!tabs.length) {
-        if (pane.detached || attachedPanes(panes).length > 1) get().closePane(paneId);
-        else get().toast('The main window keeps at least one document open.');
+      // The document's last tab: close the document.
+      if (!panes.some((p) => p.id !== paneId && p.tabs.some((t) => t.docId === docId))) {
+        get().closeDocument(docId);
         return;
       }
-      const showing = fileOfSheet(doc, pane.sheetId) === fileId;
-      const sheetId = showing ? tabs[Math.min(at, tabs.length - 1)].sheetId : pane.sheetId;
-      const next = panes.map((p) => (p.id === paneId ? { ...p, tabs, sheetId } : p));
-      set({ panes: next, ...(paneId === activePaneId && showing ? { currentSheetId: sheetId, editingTextId: null } : {}) });
+      const tabs = pane.tabs.filter((t) => t.docId !== docId);
+      const showing = pane.docId === docId;
+      const next = tabs.length && showing ? tabs[Math.min(at, tabs.length - 1)] : null;
+      set({ panes: panes.map((p) => (p.id === paneId ? { ...p, tabs, ...(next ? { docId: next.docId, sheetId: next.sheetId } : showing ? { docId: null, sheetId: null } : {}) } : p)) });
+      syncPanes();
     },
-    moveTab: (fileId, fromPaneId, toPaneId, opts) => {
-      const { panes, doc } = get();
+    moveTab: (docId, fromPaneId, toPaneId, opts) => {
+      const { panes } = get();
       const from = panes.find((p) => p.id === fromPaneId);
       const to = panes.find((p) => p.id === toPaneId);
-      const tab = from?.tabs.find((t) => t.fileId === fileId);
+      const tab = from?.tabs.find((t) => t.docId === docId);
       if (!from || !to || !tab) return;
       // Put the tab before the one at `index` (at the end without one; where it is if already there).
       const place = (tabs: PaneTab[], t: PaneTab) => {
-        const j = tabs.findIndex((x) => x.fileId === t.fileId);
-        const rest = tabs.filter((x) => x.fileId !== t.fileId);
+        const j = tabs.findIndex((x) => x.docId === t.docId);
+        const rest = tabs.filter((x) => x.docId !== t.docId);
         let i = opts?.index ?? (j >= 0 ? j : rest.length);
         if (opts?.index !== undefined && j >= 0 && j < i) i--;
         i = Math.max(0, Math.min(rest.length, i));
@@ -1191,17 +1439,18 @@ export const useStore = create<AppState>()((set, get, api) => {
         set({ panes: panes.map((p) => (p.id === from.id ? { ...p, tabs: place(p.tabs, tab) } : p)) });
         return;
       }
-      const moved = tab;
       // Leaving the main window without a document is not allowed: the tab is copied instead.
       const keepSource = opts?.copy || (from.tabs.length === 1 && !from.detached && attachedPanes(panes).length === 1);
       const closeSource = !keepSource && from.tabs.length === 1;
-      let next = panes.map((p) => (p.id === to.id ? showIn({ ...p, tabs: place(p.tabs, moved) }, moved.sheetId, doc) : p));
+      let next = panes.map((p) => (p.id === to.id ? showIn({ ...p, tabs: place(p.tabs, tab) }, docId, tab.sheetId) : p));
       if (!keepSource && !closeSource) {
         next = next.map((p) => {
           if (p.id !== from.id) return p;
-          const at = p.tabs.findIndex((t) => t.fileId === fileId);
-          const tabs = p.tabs.filter((t) => t.fileId !== fileId);
-          return fileOfSheet(doc, p.sheetId) === fileId ? { ...p, tabs, sheetId: tabs[Math.min(at, tabs.length - 1)].sheetId } : { ...p, tabs };
+          const at = p.tabs.findIndex((t) => t.docId === docId);
+          const tabs = p.tabs.filter((t) => t.docId !== docId);
+          if (p.docId !== docId) return { ...p, tabs };
+          const show = tabs[Math.min(at, tabs.length - 1)];
+          return { ...p, tabs, docId: show.docId, sheetId: show.sheetId };
         });
       }
       set({ panes: next, editingTextId: null });
@@ -1211,10 +1460,10 @@ export const useStore = create<AppState>()((set, get, api) => {
       const shown = get().panes.find((p) => p.id === to.id)?.sheetId ?? null;
       if (get().currentSheetId !== shown) set({ currentSheetId: shown });
     },
-    tabToNewPane: (paneId, fileId) => {
+    tabToNewPane: (paneId, docId) => {
       const { panes, paneLayout } = get();
       const from = panes.find((p) => p.id === paneId);
-      if (!from?.tabs.some((t) => t.fileId === fileId)) return;
+      if (!from?.tabs.some((t) => t.docId === docId)) return;
       if (attachedPanes(panes).length >= 4) {
         get().toast('The main window already shows four panes. Drag the tab onto one of them instead.', 'error');
         return;
@@ -1223,7 +1472,7 @@ export const useStore = create<AppState>()((set, get, api) => {
       const attached = [...attachedPanes(panes), pane];
       set({ panes: [...attached, ...panes.filter((p) => p.detached)], paneLayout: layoutFor(attached.length, paneLayout) });
       // Moving the only tab out of a pane would close it again: keep it there and open it in the new one too.
-      get().moveTab(fileId, paneId, pane.id, { copy: from.tabs.length === 1 });
+      get().moveTab(docId, paneId, pane.id, { copy: from.tabs.length === 1 });
     },
 
     splitCount: (id, pointIndex) => {

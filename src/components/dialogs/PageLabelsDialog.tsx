@@ -20,7 +20,6 @@ const ROLES: { id: LabelRole; label: string }[] = [
 
 export function PageLabelsDialog({ region }: { region?: { purpose: 'number' | 'title' | 'label'; rect: Rect } }) {
   const sheets = useStore((s) => s.doc.sheets);
-  const files = useStore((s) => s.doc.files);
   const currentSheetId = useStore((s) => s.currentSheetId);
   const [drafts, setDrafts] = useState<Drafts>(() => pending?.drafts ?? Object.fromEntries(sheets.map((s) => [s.id, { number: s.number, title: s.title }])));
   // Pages to read and number: all to start with.
@@ -106,7 +105,6 @@ export function PageLabelsDialog({ region }: { region?: { purpose: 'number' | 't
   };
 
   const changed = sheets.filter((s) => drafts[s.id] && (drafts[s.id].number !== s.number || drafts[s.id].title !== s.title));
-  const fileName = (id: string) => files.find((f) => f.id === id)?.name ?? '';
   const pick = (ids: string[]) => setPicked(new Set(ids));
   const unlabelled = useMemo(() => sheets.filter((s) => /^\d+$/.test(s.number) || / – Page \d+$/.test(s.title)).map((s) => s.id), [sheets]);
 
@@ -215,11 +213,6 @@ export function PageLabelsDialog({ region }: { region?: { purpose: 'number' | 't
         <button className="btn sm narrow" onClick={() => pick([])} data-testid="labels-pick-none">
           None
         </button>
-        {cur && files.length > 1 && (
-          <button className="btn sm narrow" onClick={() => pick(sheets.filter((s) => s.fileId === cur.fileId).map((s) => s.id))}>
-            This File
-          </button>
-        )}
         <button className="btn sm narrow" disabled={!unlabelled.length} onClick={() => pick(unlabelled)} title="Pages still numbered 1, 2, 3… or titled by file name">
           Unlabelled ({unlabelled.length})
         </button>
@@ -233,7 +226,7 @@ export function PageLabelsDialog({ region }: { region?: { purpose: 'number' | 't
             <tr>
               <th style={{ width: 28 }} />
               <th style={{ width: 34 }}>#</th>
-              <th style={{ width: 150 }}>Source</th>
+              <th style={{ width: 60 }}>Page</th>
               {box && <th style={{ width: 170 }}>In the box</th>}
               <th style={{ width: 130 }}>Sheet Number</th>
               <th>Sheet Title</th>
@@ -259,9 +252,7 @@ export function PageLabelsDialog({ region }: { region?: { purpose: 'number' | 't
                     />
                   </td>
                   <td className="hint">{i + 1}</td>
-                  <td className="hint" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }} title={fileName(s.fileId)}>
-                    {fileName(s.fileId)} p.{s.pageIndex + 1}
-                  </td>
+                  <td className="hint">p.{s.pageIndex + 1}</td>
                   {box && (
                     <td className="hint pl-read" title={boxText[s.id]} data-testid="label-box-text">
                       {boxText[s.id] ?? ''}

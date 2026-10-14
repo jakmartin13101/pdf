@@ -38,10 +38,11 @@ const MARKUP_KEYS: [MarkupType, string, string][] = [
 ];
 
 export const COMMANDS: CommandDef[] = [
-  { id: 'file.openPdf', label: 'Open PDF (in a New Tab)…', group: 'File', keys: ['Ctrl+O'], anywhere: true },
-  { id: 'file.newProject', label: 'New Project from PDF…', group: 'File', keys: [] },
-  { id: 'file.addPdf', label: 'Add PDF to Set…', group: 'File', keys: [] },
-  { id: 'file.save', label: 'Save Project', group: 'File', keys: ['Ctrl+S'], anywhere: true },
+  { id: 'file.openPdf', label: 'Open PDF…', group: 'File', keys: ['Ctrl+O'], anywhere: true },
+  { id: 'file.save', label: 'Save', group: 'File', keys: ['Ctrl+S'], anywhere: true },
+  { id: 'file.saveAs', label: 'Save As…', group: 'File', keys: ['Ctrl+Shift+S'], anywhere: true },
+  { id: 'file.saveAll', label: 'Save All', group: 'File', keys: [] },
+  { id: 'file.close', label: 'Close Document', group: 'File', keys: [] },
   { id: 'file.exportPdf', label: 'Export Flattened PDF…', group: 'File', keys: [] },
   { id: 'app.settings', label: 'Settings & Preferences', group: 'File', keys: ['Ctrl+,'], anywhere: true },
 

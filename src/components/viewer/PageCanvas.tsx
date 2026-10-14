@@ -3,11 +3,12 @@ import type { RenderTask } from 'pdfjs-dist';
 import type { Rect, Sheet } from '../../types';
 import { renderPage } from '../../core/pdf';
 import { cachedRender, keepRender, mainRenderDone, mainRenderStarted, prefetch, renderAhead } from '../../core/renderCache';
-import { getState, useStore } from '../../store/store';
+import { docById, findSheet, getState, useStore } from '../../store/store';
 
 /** The sheets before and after this one (in set order), to render ahead. */
 function neighbours(sheet: Sheet) {
-  const list = getState().doc.sheets;
+  const st = getState();
+  const list = docById(st, findSheet(st, sheet.id)?.docId)?.sheets ?? [];
   const i = list.findIndex((s) => s.id === sheet.id);
   return [list[i + 1], list[i - 1]].filter(Boolean).map((s) => ({ fileId: s.fileId, pageIndex: s.pageIndex }));
 }

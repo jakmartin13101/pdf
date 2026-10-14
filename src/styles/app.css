@@ -433,7 +433,7 @@ input[type='range'] {
   border-bottom: 1px solid var(--border);
 }
 
-.doc-tab {
+.docbar-sheet {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -448,7 +448,7 @@ input[type='range'] {
   max-width: 520px;
 }
 
-.doc-tab .sheet-sub {
+.docbar-sheet .sheet-sub {
   font-weight: 400;
   color: var(--text-dim);
   overflow: hidden;
@@ -2516,6 +2516,13 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.doc-tab-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
 .doc-tab-x {
   display: inline-grid;
   place-items: center;
@@ -3695,4 +3702,37 @@ button.linkish {
 }
 .set-gpu td {
   padding: 2px 12px 2px 0;
+}
+
+/* markups list: header layout */
+.grid th.drop-before {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.grid th.drop-after {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+.grid th[draggable='true'] {
+  cursor: grab;
+}
+.th-rename {
+  width: 100%;
+  min-width: 40px;
+  padding: 0 4px;
+  height: 20px;
+  font: inherit;
+}
+.col-item .col-name {
+  cursor: text;
+}
+
+.set-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.set-chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  font-size: 12px;
 }

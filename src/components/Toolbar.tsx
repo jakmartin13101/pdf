@@ -6,7 +6,7 @@ import type { MarkupType } from '../types';
 import { useStore, getState, type ToolMode, type PanelId } from '../store/store';
 import { TYPE_ICON } from './icons';
 import { TYPE_INFO } from '../core/markupTypes';
-import { cmdOpenPdf, cmdSaveProject, view } from '../store/commands';
+import { cmdOpenPdf, cmdSave, view } from '../store/commands';
 import { exportPdf } from './MenuBar';
 import { useShortcuts } from './useShortcuts';
 
@@ -84,8 +84,8 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
       </div>
       <div className="tb-group">
         <div className="tb-row">
-          <TB icon={FolderOpen} label="Open" onClick={cmdOpenPdf} title={keyed('Open PDF drawings in a new tab', 'file.openPdf')} />
-          <TB icon={Save} label="Save" onClick={cmdSaveProject} disabled={!loaded} title={keyed('Save project file', 'file.save')} />
+          <TB icon={FolderOpen} label="Open" onClick={cmdOpenPdf} title={keyed('Open PDF drawings (each in its own tab)', 'file.openPdf')} />
+          <TB icon={Save} label="Save" onClick={() => void cmdSave()} disabled={!loaded} title={keyed('Save the takeoff into the PDF', 'file.save')} />
           <TB icon={FileDown} label="Export" onClick={exportPdf} disabled={!loaded} title="Export flattened PDF with markups" />
           <TB icon={Undo2} label="Undo" onClick={() => st().undo()} disabled={!canUndo} title={keyed('Undo', 'edit.undo')} />
           <TB icon={Redo2} label="Redo" onClick={() => st().redo()} disabled={!canRedo} title={keyed('Redo', 'edit.redo')} />

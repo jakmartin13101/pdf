@@ -24,7 +24,7 @@ export function toCsv(table: string[][]): string {
 
 /** Markups list export: visible columns, raw numeric values for measurement columns. */
 export function markupsCsv(rows: Row[], columnIds: string[], doc: DocState): string {
-  const cols = allColumns(doc.columns);
+  const cols = allColumns(doc.columns, doc.listStyle?.labels);
   const specs = columnIds.map((id) => cols.find((c) => c.id === id)).filter(Boolean) as ReturnType<typeof allColumns>;
   const header = specs.map((c) => {
     const u = c.numeric ? columnUnit(c.id, doc) : '';

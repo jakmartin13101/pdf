@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowLeft,
@@ -17,9 +17,10 @@ import {
   Wand2,
 } from 'lucide-react';
 import type { SheetCompare } from '../../types';
-import { currentSheet, getState, useStore } from '../../store/store';
+import { currentSheet, docTitle, findSheet, getState, overlayCandidates, useStore } from '../../store/store';
+import { cmdOpenPdf } from '../../store/commands';
 import { PanelHeader } from '../dock/PanelHeader';
-import { sheetLongName } from '../../core/columns';
+import { sheetDisplayName, sheetLongName } from '../../core/columns';
 import { COMPARE_PRESETS, autoAlign, findSheetChanges, transformKey, type Sensitivity } from '../../core/compare';
 import { CommitInput } from '../fields';
 
@@ -86,6 +87,10 @@ function LayerRow({ which, cmp, sheetId, label }: { which: 'A' | 'B'; cmp: Sheet
 export function ComparePanel() {
   const sheet = useStore(currentSheet);
   const doc = useStore((s) => s.doc);
+  const docs = useStore((s) => s.docs);
+  const activeDocId = useStore((s) => s.activeDocId);
+  const foundSheet = useStore((s) => findSheet(s, sheet?.compare?.sheetId)?.sheet);
+  const candidates = useMemo(() => overlayCandidates({ doc, docs, activeDocId }), [doc, docs, activeDocId]);
   const tool = useStore((s) => s.tool);
   const changes = useStore((s) => (sheet ? s.compareChanges[sheet.id] : undefined));
   const [busy, setBusy] = useState<string | null>(null);
@@ -104,8 +109,10 @@ export function ComparePanel() {
     );
   }
   const cmp = sheet.compare;
-  const other = cmp ? doc.sheets.find((s) => s.id === cmp.sheetId) : undefined;
+  const other = cmp ? foundSheet : undefined;
   const overlaid = doc.sheets.filter((s) => s.compare);
+  // The overlay is a sheet of another document that is not open.
+  const missing = cmp && !other ? cmp.docName ?? 'its document' : null;
 
   if (!cmp || !other) {
     return (
@@ -117,6 +124,17 @@ export function ComparePanel() {
               Overlay another sheet on <b>{sheetLongName(sheet, doc)}</b> to compare revisions: each sheet's line work is drawn in its own colour, so unchanged work
               shows dark and changes show in colour.
             </div>
+            {missing && (
+              <div className="set-clash" data-testid="compare-missing">
+                The overlay on this sheet is from <b>{missing}</b>, which is not open. Open it to show the overlay.
+                <button className="btn sm narrow" onClick={() => void cmdOpenPdf()}>
+                  Open…
+                </button>
+                <button className="btn sm narrow" onClick={() => st.setCompare(sheet.id, null)}>
+                  Remove Overlay
+                </button>
+              </div>
+            )}
             <button className="btn primary" onClick={() => st.setDialog({ kind: 'compare', sheetId: sheet.id })} data-testid="compare-start">
               <GitCompareArrows size={14} /> Compare / Overlay Sheets…
             </button>
@@ -230,11 +248,11 @@ export function ComparePanel() {
                   onChange={(e) => st.updateCompare(sheet.id, { sheetId: e.target.value, transform: { scale: 1, rotation: 0, tx: 0, ty: 0 }, alignedBy: null, agreement: undefined })}
                   data-testid="compare-sheet-b"
                 >
-                  {doc.sheets
-                    .filter((s) => s.id !== sheet.id)
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {sheetLongName(s, doc)}
+                  {candidates
+                    .filter((c) => c.sheet.id !== sheet.id)
+                    .map((c) => (
+                      <option key={c.sheet.id} value={c.sheet.id}>
+                        {c.docName ? `${sheetDisplayName(c.sheet)} · ${docTitle(c.docName)}` : sheetLongName(c.sheet, doc)}
                       </option>
                     ))}
                 </select>

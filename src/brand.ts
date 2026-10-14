@@ -10,14 +10,18 @@ export const APP_VERSION = version;
 /** Bridge exposed by the Windows desktop app's preload script (electron/preload.cjs). */
 export interface DesktopBridge {
   platform: string;
-  /** Shows a native Save dialog and writes the file. Resolves false when the user cancels. */
-  saveFile(name: string, data: Uint8Array): Promise<boolean>;
+  /** Shows a native Save dialog and writes the file. Resolves to its path (true from older versions), or false when cancelled. */
+  saveFile(name: string, data: Uint8Array): Promise<string | boolean>;
+  /** Native Open dialog: the chosen files with their paths. */
+  openFilesDialog?(): Promise<DesktopFile[]>;
+  /** Writes a file the user opened or saved (Save). Resolves false when that is not possible. */
+  writeFile?(path: string, data: Uint8Array): Promise<boolean>;
   /** Opens an HTML report in its own window. */
   openReport(html: string): Promise<boolean>;
   /** Files passed on the command line at launch ("Open with"). */
-  takeOpenFiles(): Promise<{ name: string; data: Uint8Array }[]>;
+  takeOpenFiles(): Promise<DesktopFile[]>;
   /** Files sent from a second launch while the app is already open. Returns an unsubscribe function. */
-  onOpenFiles(callback: (files: { name: string; data: Uint8Array }[]) => void): () => void;
+  onOpenFiles(callback: (files: DesktopFile[]) => void): () => void;
   /** Graphics card use: the mode running now, the one saved for the next start, and Chromium's feature status. */
   graphics?(): Promise<{ mode: GpuMode; saved: GpuMode; status: Record<string, string>; gpu: { vendorId: number; deviceId: number; driver: string } | null }>;
   setGraphics?(mode: GpuMode): Promise<boolean>;
@@ -25,6 +29,12 @@ export interface DesktopBridge {
 }
 
 export type GpuMode = 'auto' | 'off' | 'force';
+
+export interface DesktopFile {
+  name: string;
+  data: Uint8Array;
+  path?: string;
+}
 
 export const desktop: DesktopBridge | undefined = typeof window !== 'undefined' ? (window as unknown as { buildsuite?: DesktopBridge }).buildsuite : undefined;
 

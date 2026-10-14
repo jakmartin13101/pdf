@@ -1,5 +1,8 @@
-import { Info, Keyboard } from 'lucide-react';
-import { getState, useStore } from '../../store/store';
+import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { FileWarning, Info, Keyboard } from 'lucide-react';
+import { getState, isDirty, useStore } from '../../store/store';
+import { saveDocument } from '../../store/project';
 import { COMMANDS, chordLabel, resolveBindings } from '../../core/keymap';
 import { Modal } from './Modal';
 import { APP_VERSION, FULL_NAME, SUITE_NAME, isDesktop } from '../../brand';
@@ -31,6 +34,71 @@ export function ConfirmDialog({ title, message, onConfirm }: { title: string; me
       }
     >
       <div>{message}</div>
+    </Modal>
+  );
+}
+
+/** Documents about to close have unsaved changes: save them first, close without saving, or cancel. */
+export function UnsavedDialog({ docIds, then }: { docIds: string[]; then: () => void }) {
+  const st = getState();
+  const names = useStore(useShallow((s) => docIds.map((id) => s.docs.find((d) => d.id === id)?.name ?? '').filter(Boolean)));
+  const [busy, setBusy] = useState(false);
+  const close = () => st.setDialog(null);
+  const save = async () => {
+    setBusy(true);
+    for (const id of docIds) {
+      if (!isDirty(getState(), id)) continue;
+      if (!(await saveDocument(id))) {
+        setBusy(false);
+        return; // cancelled or failed: nothing closes
+      }
+    }
+    close();
+    then();
+  };
+  return (
+    <Modal
+      title="Unsaved Changes"
+      icon={<FileWarning size={16} />}
+      onClose={close}
+      footer={
+        <>
+          <button className="btn" onClick={close} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              close();
+              then();
+            }}
+            disabled={busy}
+            data-testid="unsaved-discard"
+          >
+            Don't Save
+          </button>
+          <button className="btn primary" autoFocus onClick={() => void save()} disabled={busy} data-testid="unsaved-save">
+            Save
+          </button>
+        </>
+      }
+    >
+      <div data-testid="unsaved-message">
+        {names.length === 1 ? (
+          <>
+            Save the changes to <b>{names[0]}</b> before closing it? The takeoff is saved inside the PDF.
+          </>
+        ) : (
+          <>
+            Save the changes to these documents before closing them? Each takeoff is saved inside its PDF.
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {names.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
     </Modal>
   );
 }
