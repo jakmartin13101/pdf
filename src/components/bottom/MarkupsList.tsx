@@ -6,6 +6,8 @@ import type { Markup, MarkupStatus } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, listStyleOf, useStore, type ListState } from '../../store/store';
 import { listStyleMenuItems } from '../../store/commands';
+import { SubjectSelect } from '../fields';
+import { findSubject } from '../../core/subjects';
 import { allColumns, formatTotal, isSummable, type ColumnSpec, type Row } from '../../core/columns';
 import { buildTakeoffRows } from '../../core/details';
 import { TYPE_ICON } from '../icons';
@@ -32,15 +34,18 @@ export function useFilteredRows() {
   const filtered = useMemo(() => {
     const q = list.search.trim().toLowerCase();
     const filters = Object.entries(list.filters).filter(([, v]) => v && v.length >= 0);
+    const hit = (r: Row) =>
+      `${r.markup.subject} ${r.markup.label} ${r.markup.comments} ${r.markup.text ?? ''} ${r.display.page} ${r.display.type} ${Object.values(r.markup.custom).join(' ')}`
+        .toLowerCase()
+        .includes(q);
+    // Material rows come along with a markup the search finds.
+    const found = q ? new Set(rows.filter((r) => !r.detail && hit(r)).map((r) => r.markup.id)) : null;
     let out = rows.filter((r) => {
       if (list.scope === 'page' && r.markup.sheetId !== currentSheetId) return false;
       for (const [col, allowed] of filters) {
         if (!allowed.includes(r.display[col] ?? '')) return false;
       }
-      if (q) {
-        const hay = `${r.markup.subject} ${r.markup.label} ${r.markup.comments} ${r.markup.text ?? ''} ${r.display.page} ${r.display.type} ${Object.values(r.markup.custom).join(' ')}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
+      if (q && !(r.detail ? found!.has(r.detail.parentId) || hit(r) : found!.has(r.markup.id))) return false;
       return true;
     });
     if (list.sort) {
@@ -166,6 +171,24 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
     if (e.key === 'Enter') commit();
     if (e.key === 'Escape') onDone();
   };
+  if (col.id === 'subject') {
+    // Subjects are shapes from the user's list (Settings → Subjects).
+    return (
+      <SubjectSelect
+        className="cell-edit"
+        autoFocus
+        value={v}
+        editList
+        onChange={(val) => {
+          setV(val);
+          commit(val);
+        }}
+        onBlur={() => commit()}
+        onKeyDown={keys}
+        data-testid="cell-subject"
+      />
+    );
+  }
   if (col.editor === 'status') {
     return (
       <select
@@ -243,6 +266,12 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
   return <input className="cell-edit" autoFocus value={v} onChange={(e) => setV(e.target.value)} onBlur={() => commit()} onKeyDown={keys} onFocus={(e) => e.target.select()} />;
 }
 
+/** A markup's subject; one not in the user's subject list is shown as such. */
+function SubjectCell({ subject }: { subject: string }) {
+  const listed = useStore((s) => !subject || !!findSubject(subject, s.prefs.subjects));
+  return listed ? <>{subject}</> : <span className="subject-other" title="Not in your subject list (Settings → Subjects)">{subject}</span>;
+}
+
 function Cell({ col, row, editing }: { col: ColumnSpec; row: Row; editing: boolean }) {
   const m = row.markup;
   if (editing) return null;
@@ -270,7 +299,7 @@ function Cell({ col, row, editing }: { col: ColumnSpec; row: Row; editing: boole
     case 'checkmark':
       return row.detail ? null : <input type="checkbox" checked={m.checked} readOnly style={{ pointerEvents: 'none' }} />;
     case 'subject':
-      return row.detail ? <span className="detail-subject">↳ {row.display.subject}</span> : <>{row.display.subject}</>;
+      return row.detail ? <span className="detail-subject">↳ {row.display.subject}</span> : <SubjectCell subject={m.subject} />;
     default:
       return <>{row.display[col.id] ?? ''}</>;
   }

@@ -4,7 +4,7 @@ import { allColumns, columnUnit, sheetDisplayName, type Row } from './columns';
 import { buildSummary, columnName, primaryQuantity, summableCustomColumns } from './summary';
 import { centroid, dist, labelPoint } from './geometry';
 import { computeMeasure, drawingLabelLines, scaleForMarkup } from './measure';
-import { TYPE_INFO } from './markupTypes';
+import { TYPE_INFO, textColor } from './markupTypes';
 import { calloutAnchor, calloutBox, dashArray, markupRect, polylineLabelAnchor, stampFontSize, uprightAngle, wrapText } from './shapes';
 import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, fmtNumber } from './units';
 import { getPage } from './pdf';
@@ -353,7 +353,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
   const pts = m.points;
   const labelBlock = (at: Pt, lines: string[], size = fs) => {
     const lh = size * 1.18;
-    lines.forEach((l, i) => p.text(l, { x: at.x, y: at.y - ((lines.length - 1) * lh) / 2 + i * lh + size * 0.35 }, { size, color: s.color, align: 'center', bold: s.fontBold !== false, family: s.fontFamily, halo: true }));
+    lines.forEach((l, i) => p.text(l, { x: at.x, y: at.y - ((lines.length - 1) * lh) / 2 + i * lh + size * 0.35 }, { size, color: textColor(s), align: 'center', bold: s.fontBold !== false, family: s.fontFamily, halo: true }));
   };
   switch (m.type) {
     case 'length':
@@ -372,7 +372,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
         const off = fs * 0.55 + s.lineWidth;
         labelLines.forEach((l, i) => {
           const k = off + (labelLines.length - 1 - i) * fs * 1.18;
-          p.text(l, { x: anc.p.x + Math.sin(anc.angle) * k, y: anc.p.y - Math.cos(anc.angle) * k }, { size: fs, color: s.color, angle: anc.angle, align: 'center', bold: s.fontBold !== false, family: s.fontFamily, halo: true });
+          p.text(l, { x: anc.p.x + Math.sin(anc.angle) * k, y: anc.p.y - Math.cos(anc.angle) * k }, { size: fs, color: textColor(s), angle: anc.angle, align: 'center', bold: s.fontBold !== false, family: s.fontFamily, halo: true });
         });
       }
       break;
@@ -406,7 +406,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
       if (last && labelLines.length) {
         const size = Math.max(8, r * 1.2);
         labelLines.forEach((l, i) =>
-          p.text(l, { x: last.x + r * 1.5, y: last.y - r * 0.8 - (labelLines.length - 1 - i) * size * 1.18 }, { size, color: s.color, bold: s.fontBold !== false, family: s.fontFamily, halo: true }),
+          p.text(l, { x: last.x + r * 1.5, y: last.y - r * 0.8 - (labelLines.length - 1 - i) * size * 1.18 }, { size, color: textColor(s), bold: s.fontBold !== false, family: s.fontFamily, halo: true }),
         );
       }
       break;
@@ -447,7 +447,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
       const lines = wrapText(m.text ?? '', r.w - pad * 2, (t) => tf.widthOfTextAtSize(sanitize(t), fs));
       lines.forEach((l, i) => {
         const y = r.y + pad + fs * 0.9 + i * fs * 1.2;
-        if (y < r.y + r.h + fs * 0.2) p.text(l, { x: r.x + pad, y }, { size: fs, color: s.color, opacity: o, bold: !!s.fontBold, family: s.fontFamily });
+        if (y < r.y + r.h + fs * 0.2) p.text(l, { x: r.x + pad, y }, { size: fs, color: textColor(s), opacity: o, bold: !!s.fontBold, family: s.fontFamily });
       });
       break;
     }
@@ -460,7 +460,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
       const text = m.text || 'STAMP';
       const sf = p.fontFor(s.fontFamily, true);
       const size = Math.min(stampFontSize(text, r), (r.w * 0.86) / Math.max(1, sf.widthOfTextAtSize(sanitize(text), 1) * 1.12));
-      p.text(text, { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.35 }, { size, color: s.color, align: 'center', bold: true, family: s.fontFamily, opacity: o });
+      p.text(text, { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.35 }, { size, color: textColor(s), align: 'center', bold: true, family: s.fontFamily, opacity: o });
       break;
     }
   }

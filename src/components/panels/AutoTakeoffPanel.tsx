@@ -16,7 +16,7 @@ import { MEMBER_FAMILIES, existingMeasurements, extendMember, findMemberLabels, 
 import { findPreset, fmtNumber, formatLength, isMetric, lengthToReport, parseLength, scaleFromPreset, LENGTH_SUFFIX } from '../../core/units';
 
 /** Markup fields for a member: from its Tool Chest tool when there is one, else plain steel. */
-function markupFields(doc: DocState, tool: ChestTool | undefined, style: MarkupStyle, m: AutoMember): Partial<Markup> {
+function markupFields(doc: DocState, tool: ChestTool | undefined, style: MarkupStyle, m: AutoMember, subjects: string[]): Partial<Markup> {
   const byName = new Map(doc.columns.map((c) => [normName(c.name), c]));
   const custom: Record<string, CustomValue> = {};
   const put = (name: string, v: CustomValue) => {
@@ -33,7 +33,7 @@ function markupFields(doc: DocState, tool: ChestTool | undefined, style: MarkupS
   const layers = new Set(doc.layers.map((l) => l.id));
   const layer = tool?.layer && layers.has(tool.layer) ? tool.layer : layers.has('layer-takeoff') ? 'layer-takeoff' : '';
   return {
-    subject: autoSubject(tool, m.size),
+    subject: autoSubject(m.size, subjects),
     label: m.size,
     style,
     custom,
@@ -159,7 +159,7 @@ export function AutoTakeoffPanel() {
     const items = included.map((m) => {
       const sh = sheetsById.get(m.sheetId)!;
       const look = looks.get(m.size) ?? autoLook(chest, prefs, m.size);
-      return { sheetId: m.sheetId, points: pointsFor(m, scaleFor(sh, m)), extra: markupFields(doc, look.tool, look.style, m) };
+      return { sheetId: m.sheetId, points: pointsFor(m, scaleFor(sh, m)), extra: markupFields(doc, look.tool, look.style, m, prefs.subjects) };
     });
     st.setTool({ kind: 'select' });
     const made = st.applyAutoTakeoff(items, scales);

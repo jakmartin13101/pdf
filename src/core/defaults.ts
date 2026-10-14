@@ -1,6 +1,7 @@
 import type { ChestTool, CountSymbol, CustomColumn, Layer, MarkupStyle, MarkupType, ToolSet } from '../types';
 import { defaultStyle } from './markupTypes';
 import { uid } from './ids';
+import { DEFAULT_SUBJECTS, subjectFor, subjectForSize } from './subjects';
 
 /** Structural-steel estimating column template (custom columns). */
 export function defaultColumns(): CustomColumn[] {
@@ -65,13 +66,16 @@ function tool(
 ): ChestTool {
   const base = defaultStyle(type);
   const { subject, depth, text, ...styleExtra } = extra;
+  // Subjects are shapes: the one given, else the shape of the tool's Member Size (W24x55 → W), else none.
+  const size = custom['Member Size'];
+  const shape = subjectFor(subject, DEFAULT_SUBJECTS) || (size ? subjectForSize(String(size), DEFAULT_SUBJECTS) : undefined) || '';
   // Measurement fills follow the tool colour; text boxes and callouts keep their white background.
   const fill = base.fillColor && base.fillColor !== '#ffffff' ? color : base.fillColor;
   return {
     id: uid(),
     name,
     type,
-    subject: subject ?? name,
+    subject: shape,
     depth,
     text,
     style: { ...base, color, fillColor: fill, ...styleExtra },
@@ -116,7 +120,7 @@ export function defaultToolChest(): ToolSet[] {
       tools: [
         tool('Joist 24K6', 'length', '#8338ec', steel('24K6', { Category: 'Joists & Deck', Grade: '' }), { subject: 'Joist 24K6', lineStyle: 'dashed', lineWidth: 2 }),
         tool('Metal Deck', 'area', '#3a86ff', { Category: 'Joists & Deck', Material: 'Galvanized Steel', Qty: 1, 'Member Size': '1.5B 20ga' }, { fillOpacity: 0.18 }),
-        tool('Base Plate', 'count', '#ef476f', steel('PL3/4x12', { Category: 'Structural Steel', Connection: 'Base Plate' }), { symbol: 'square', symbolSize: 8 }),
+        tool('Base Plate', 'count', '#ef476f', steel('PL3/4x12', { Category: 'Structural Steel', Connection: 'Base Plate' }), { subject: 'BP', symbol: 'square', symbolSize: 8 }),
         tool('Anchor Bolts', 'count', '#118ab2', { Category: 'Structural Steel', Material: 'Steel', Grade: 'F1554 Gr. 36', Qty: 4, 'Member Size': '3/4" AB' }, { symbol: 'cross', symbolSize: 8 }),
         tool('Clip Angle', 'count', '#06d6a0', steel('L4x4x3/8', { Connection: 'Clip Angle', Category: 'Misc Metals' }), { symbol: 'triangle', symbolSize: 8 }),
         tool('Embed Plate', 'count', '#9c6644', steel('PL1/2x8', { Connection: 'Embed Plate', Category: 'Misc Metals' }), { symbol: 'diamond', symbolSize: 8 }),

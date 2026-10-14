@@ -193,8 +193,9 @@ export function ComparePanel() {
           { x: c.x, y: c.y + c.h },
         ],
         extra: {
-          subject: 'Revision Change',
-          label: `Δ${i + 1}`,
+          // Subjects are shapes; a revision cloud has none. Its label numbers it.
+          subject: '',
+          label: `Δ${i + 1} Revision change`,
           layer: doc.layers.some((l) => l.id === 'layer-review') ? 'layer-review' : '',
           comments: `${c.kind === 'added' ? 'Only on' : c.kind === 'removed' ? 'Not on' : 'Changed on'} ${sheetLongName(other, doc)}`,
         },

@@ -28,7 +28,7 @@ test('size tool keeps its typed size as the label until it is changed', async ({
 
   const rows = page.getByTestId('markup-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.locator('[data-col=subject]')).toHaveText(['W24x68', 'W21x44']);
+  await expect(rows.locator('[data-col=subject]')).toHaveText(['W', 'W']);
   await expect(rows.locator('[data-col="c:member_size"]')).toHaveText(['W24x68', 'W21x44']);
   // 23'-0" at 68 and 44 plf
   await expect(rows.locator('[data-col="c:weight"]')).toHaveText(['1,564 lbs', '1,012 lbs']);

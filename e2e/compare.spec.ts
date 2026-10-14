@@ -56,7 +56,8 @@ test('overlays a revision, aligns it automatically and finds the changes', async
   await page.getByTestId('compare-clouds').click();
   const rows = page.getByTestId('markup-row');
   await expect(rows).toHaveCount(8);
-  await expect(rows.first().locator('[data-col=subject]')).toHaveText('Revision Change');
+  await expect(rows.first().locator('[data-col=subject]')).toHaveText('');
+  await expect(rows.first().locator('[data-col=type]')).toContainText('Cloud');
   // One undo removes them all.
   await page.keyboard.press('Control+z');
   await expect(rows).toHaveCount(0);

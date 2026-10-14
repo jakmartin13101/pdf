@@ -43,7 +43,7 @@ test('tool chest tools carry subject and data; formula column computes weight', 
   await page.keyboard.press('Escape');
   const rows = page.getByTestId('markup-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.first().locator('[data-col=subject]')).toHaveText('W18x35');
+  await expect(rows.first().locator('[data-col=subject]')).toHaveText('W'); // the shape; the size is the Member Size
   await expect(rows.first().locator('[data-col="c:member_size"]')).toHaveText('W18x35');
   // 23'-0" x 35 plf = 805 lbs each
   await expect(rows.first().locator('[data-col="c:weight"]')).toHaveText('805 lbs');

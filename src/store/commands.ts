@@ -2,6 +2,8 @@
 import type { MarkupType } from '../types';
 import { defaultListStyle, getState, isDirty, listStyleOf, liveSlots, type ViewRequest } from './store';
 import { builtInListStyle, listStyleFile, parseListStyle, styleOfDoc } from '../core/listStyle';
+import { splitOldSubject } from '../core/subjects';
+import { normName } from '../core/formula';
 import { closeDocument, fileBytes, openExampleTakeoff, openFiles, openProjectFile, openSample, safeName, saveDocument } from './project';
 import { offerFile } from './files';
 import { exportFlattenedPdf } from '../core/export';
@@ -344,4 +346,36 @@ export function listStyleMenuItems(): { label?: string; onClick?: () => void; se
     { label: 'Import Style…', onClick: () => void cmdImportListStyle(false) },
     { label: 'Import as Default Style…', onClick: () => void cmdImportListStyle(true) },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Subjects (shapes)
+
+/**
+ * Turn this document's subjects from before subjects were shapes into shapes: W24x55 → W (the size
+ * goes to Member Size when that is empty). With `clearOthers`, subjects that name no shape in the list
+ * (Metal Deck…) are cleared. One undo step; returns how many markups changed.
+ */
+export function cmdConvertSubjects(clearOthers = false): number {
+  const st = getState();
+  const subjects = st.prefs.subjects;
+  const sizeCol = st.doc.columns.find((c) => normName(c.name) === 'membersize');
+  const now = Date.now();
+  let changed = 0;
+  const markups = st.doc.markups.map((m) => {
+    if (!m.subject) return m;
+    const split = splitOldSubject(m.subject, subjects);
+    if (!split) {
+      if (!clearOthers) return m;
+      changed++;
+      return { ...m, subject: '', modified: now };
+    }
+    if (split.subject === m.subject) return m;
+    changed++;
+    const custom = sizeCol && split.size && !String(m.custom[sizeCol.id] ?? '').trim() ? { ...m.custom, [sizeCol.id]: split.size } : m.custom;
+    return { ...m, subject: split.subject, custom, modified: now };
+  });
+  if (changed) st.commit((d) => ({ ...d, markups }));
+  st.toast(changed ? `Changed the subject of ${changed} markup${changed === 1 ? '' : 's'}` : 'All subjects are already shapes from the list', changed ? 'success' : 'info');
+  return changed;
 }

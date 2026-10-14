@@ -88,12 +88,20 @@ export function EndAdjuster({ names, metric, onAdjust, testId = 'adjust' }: { na
 }
 
 /** A short sample of a line style. */
-export function LineSample({ style, width = 34 }: { style: Pick<MarkupStyle, 'color' | 'lineWidth' | 'lineStyle' | 'opacity'>; width?: number }) {
+/** A short sample of a line style; with `label`, a sample label above it in the text colour. */
+export function LineSample({ style, width = 34, label }: { style: Pick<MarkupStyle, 'color' | 'lineWidth' | 'lineStyle' | 'opacity' | 'fontColor'>; width?: number; label?: boolean }) {
   const lw = Math.min(Math.max(style.lineWidth, 0.5), 8);
   const dash = dashArray({ ...style, lineWidth: lw } as MarkupStyle);
+  const h = label ? 22 : 12;
+  const y = label ? 16 : 6;
   return (
-    <svg className="line-sample" width={width} height={12} viewBox={`0 0 ${width} 12`} aria-hidden>
-      <line x1={3} y1={6} x2={width - 3} y2={6} stroke={style.color} strokeWidth={lw} strokeOpacity={style.opacity} strokeDasharray={dash?.join(' ')} strokeLinecap="round" />
+    <svg className="line-sample" width={width} height={h} viewBox={`0 0 ${width} ${h}`} aria-hidden>
+      {label && (
+        <text x={width / 2} y={9} textAnchor="middle" fontSize={9} fontWeight={700} fill={style.fontColor || style.color}>
+          W24
+        </text>
+      )}
+      <line x1={3} y1={y} x2={width - 3} y2={y} stroke={style.color} strokeWidth={lw} strokeOpacity={style.opacity} strokeDasharray={dash?.join(' ')} strokeLinecap="round" />
     </svg>
   );
 }

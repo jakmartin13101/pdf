@@ -11,6 +11,7 @@ import type { DetailCondition, DetailItem, DetailOp, DocState, Markup, StandardD
 import { allColumns, buildRows, customColId, rowBuilder, type ColumnSpec, type Row } from './columns';
 import { normName, toNum } from './formula';
 import { fmtNumber, formatLength, parseLength } from './units';
+import { TYPE_INFO } from './markupTypes';
 
 export const DETAIL_OPS: { id: DetailOp; label: string }[] = [
   { id: 'eq', label: '=' },
@@ -311,6 +312,8 @@ export function exampleDetails(doc: DocState): StandardDetail[] {
   const byNorm = new Map(doc.columns.map((c) => [normName(c.name), c]));
   const size = byNorm.get('membersize');
   const sizeCol = size ? customColId(size) : 'subject';
+  const category = byNorm.get('category');
+  const catCol = category ? customColId(category) : 'layer';
   return [
     newDetail({
       name: 'W24 beam end connections',
@@ -320,19 +323,28 @@ export function exampleDetails(doc: DocState): StandardDetail[] {
     }),
     newDetail({
       name: 'Deck edge angle',
-      conditions: [{ column: 'subject', op: 'eq', value: 'Metal Deck' }],
+      conditions: [
+        { column: catCol, op: 'eq', value: 'Joists & Deck' },
+        { column: 'type', op: 'eq', value: TYPE_INFO.area.listName },
+      ],
       items: [newDetailItem({ subject: 'Edge Angle', size: 'L3x3x1/4', rule: 'full', value: '1' })],
       category: 'Joists & Deck',
     }),
     newDetail({
       name: 'Footing dowels',
-      conditions: [{ column: 'subject', op: 'eq', value: 'Continuous Footing' }],
+      conditions: [
+        { column: catCol, op: 'eq', value: 'Concrete' },
+        { column: 'type', op: 'eq', value: TYPE_INFO.polylength.listName },
+      ],
       items: [newDetailItem({ subject: 'Dowel', size: '#5 Rebar', length: `3'-0"`, rule: 'spacing', value: '24', addEnd: true })],
       category: 'Concrete',
     }),
     newDetail({
       name: 'HSS column base',
-      conditions: [{ column: 'subject', op: 'eq', value: 'HSS Column' }],
+      conditions: [
+        { column: 'subject', op: 'eq', value: 'HSS' },
+        { column: 'type', op: 'eq', value: TYPE_INFO.count.listName },
+      ],
       items: [
         newDetailItem({ subject: 'Base Plate', size: 'PL3/4x12', length: `1'-0"`, rule: 'each', value: '1' }),
         newDetailItem({ subject: 'Anchor Rod', size: 'ROD3/4', length: `1'-6"`, rule: 'each', value: '4' }),

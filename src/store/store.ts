@@ -26,11 +26,12 @@ import { applyDetailAssignments, type DetailAssignment } from '../core/details';
 import { MEMBER_FAMILIES, type FoundMember, type MemberFamily } from '../core/autoTakeoff';
 import { defaultAutoStyles } from '../core/autoStyles';
 import { DEFAULT_VISIBLE_COLUMNS, defaultColumns, defaultLayers, defaultToolChest } from '../core/defaults';
-import { defaultStyle, TYPE_INFO } from '../core/markupTypes';
+import { defaultStyle } from '../core/markupTypes';
 import { uid } from '../core/ids';
 import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
+import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
 
 export type ToolMode =
   | { kind: 'select' }
@@ -221,6 +222,8 @@ export interface Prefs {
   perf: PerfPrefs;
   /** Markups List style that files opened from now on start with (null: the built-in one). */
   listStyle: MarkupListStyle | null;
+  /** The subjects markups can have: shapes such as W, HSS, L, BP, C (Settings → Subjects). */
+  subjects: string[];
 }
 
 export interface PerfPrefs {
@@ -244,7 +247,7 @@ export interface AutoOptions {
   useprinted: boolean;
 }
 
-export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'list' | 'auto' | 'speed' | 'workspace';
+export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'subjects' | 'list' | 'auto' | 'speed' | 'workspace';
 
 interface TypeDefault {
   style: MarkupStyle;
@@ -652,6 +655,7 @@ const defaultPrefs = (): Prefs => ({
   keys: {},
   perf: { hwa: true, cache: 'normal', prefetch: true, backgroundLabels: true },
   listStyle: null,
+  subjects: [...DEFAULT_SUBJECTS],
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -668,6 +672,7 @@ function loadPrefs(): Prefs {
     keys: { ...saved.keys },
     perf: { ...d.perf, ...saved.perf },
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
+    subjects: Array.isArray(saved.subjects) ? cleanSubjects(saved.subjects.map(String)) : d.subjects,
   };
 }
 
@@ -711,12 +716,20 @@ export const useStore = create<AppState>()((set, get, api) => {
       const col = doc.columns.find((c) => normName(c.name) === 'membersize');
       if (col) custom[col.id] = size;
     }
+    // The subject is a shape from the user's list: a size tool's size's shape, else the tool's own
+    // subject when it is one, else the shape of the tool's Member Size (W24x55 → W), else none.
+    const toolSize = chestTool && Object.entries(chestTool.custom).find(([k]) => normName(k) === 'membersize')?.[1];
+    const subject =
+      (size ? subjectForSize(size, prefs.subjects) : undefined) ??
+      (findSubject(chestTool?.subject ?? '', prefs.subjects) || undefined) ??
+      (toolSize ? subjectForSize(String(toolSize), prefs.subjects) : undefined) ??
+      (subjectFor(chestTool?.subject ?? td?.subject, prefs.subjects) || '');
     const m: Markup = {
       id: uid('m'),
       sheetId,
       type,
       points,
-      subject: (size && chestTool?.sizeTool?.setSubject ? size : chestTool?.subject) ?? td?.subject ?? TYPE_INFO[type].listName,
+      subject,
       label: size || chestTool?.label || '',
       comments: '',
       author: prefs.author,

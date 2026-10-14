@@ -5,7 +5,8 @@ import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2, X } from 'lucide
 import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolveBindings } from '../../core/keymap';
 import type { AutoStyleRule, LineStyle, ProjectSettings } from '../../types';
 import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
-import { cmdExportListStyle, cmdImportListStyle, cmdSaveDefaultListStyle } from '../../store/commands';
+import { cmdConvertSubjects, cmdExportListStyle, cmdImportListStyle, cmdSaveDefaultListStyle } from '../../store/commands';
+import { DEFAULT_SUBJECTS, cleanSubjects, findSubject } from '../../core/subjects';
 import { allColumns } from '../../core/columns';
 import { desktop, type GpuMode } from '../../brand';
 import { AUTO_MATCH, autoStyleFor, defaultAutoStyles, isAutoMarkup, newAutoStyle, withRule } from '../../core/autoStyles';
@@ -20,6 +21,7 @@ const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'units', label: 'Units & Totals', hint: 'This project' },
   { id: 'editing', label: 'Drawing & Editing', hint: 'Snapping and adjusting' },
   { id: 'keys', label: 'Keyboard', hint: 'Shortcuts for commands' },
+  { id: 'subjects', label: 'Subjects', hint: 'Shapes markups can have' },
   { id: 'list', label: 'Markups List', hint: 'Default columns for new files' },
   { id: 'auto', label: 'Auto Takeoff', hint: 'Line styles by subject' },
   { id: 'speed', label: 'Speed & Graphics', hint: 'Graphics card, rendering' },
@@ -324,6 +326,16 @@ function RuleRow({ r, i, n, onChange, onMove, onRemove }: { r: AutoStyleRule; i:
       </select>
       <input value={r.text} placeholder="e.g. W" onChange={(e) => onChange({ text: e.target.value })} data-testid="rule-text" />
       <input type="color" value={r.color} onChange={(e) => onChange({ color: e.target.value })} title="Line colour" data-testid="rule-color" />
+      <span className="rule-font" title="Colour of the measurement label (the size)">
+        <input type="color" value={r.fontColor || r.color} onChange={(e) => onChange({ fontColor: e.target.value })} data-testid="rule-font-color" />
+        {r.fontColor ? (
+          <button className="icon-btn" title="Same colour as the line" onClick={() => onChange({ fontColor: undefined })} data-testid="rule-font-same">
+            <X size={11} />
+          </button>
+        ) : (
+          <small className="hint">line</small>
+        )}
+      </span>
       <input
         type="number"
         min={0.5}
@@ -348,7 +360,7 @@ function RuleRow({ r, i, n, onChange, onMove, onRemove }: { r: AutoStyleRule; i:
           </option>
         ))}
       </select>
-      <LineSample style={r} width={44} />
+      <LineSample style={r} width={44} label />
       <span className="set-rule-btns">
         <button className="icon-btn" title="Move up (checked first)" disabled={i === 0} onClick={() => onMove(-1)}>
           <ArrowUp size={13} />
@@ -402,6 +414,7 @@ function AutoTakeoff() {
           <span>Subject</span>
           <span />
           <span>Colour</span>
+          <span>Text</span>
           <span>Width</span>
           <span>Line</span>
           <span>Opacity</span>
@@ -585,6 +598,93 @@ function Speed() {
   );
 }
 
+/** The subjects markups can have: shapes, added and removed by the user. */
+function Subjects() {
+  const subjects = useStore((s) => s.prefs.subjects);
+  const markups = useStore((s) => s.doc.markups);
+  const loaded = useStore((s) => s.loaded);
+  const [add, setAdd] = useState('');
+  const st = getState();
+  const set = (list: string[]) => st.setPrefs({ subjects: cleanSubjects(list) });
+  const used = (s: string) => markups.filter((m) => findSubject(m.subject, [s])).length;
+  const others = markups.filter((m) => m.subject && !findSubject(m.subject, subjects)).length;
+  const adding = add.trim();
+  const clash = !!adding && !!findSubject(adding, subjects);
+  const doAdd = () => {
+    if (!adding || clash) return;
+    set([...subjects, adding]);
+    setAdd('');
+  };
+  const move = (i: number, d: -1 | 1) => {
+    const n = [...subjects];
+    [n[i], n[i + d]] = [n[i + d], n[i]];
+    set(n);
+  };
+  return (
+    <>
+      <div className="hint">
+        A markup's subject is the shape it takes off. These are the subjects to pick from (in the Markups List, Properties and the Tool Chest editor). New markups
+        get the shape of their size: W24x55 → W, HSS6x6x3/8 → HSS. The size itself is the Member Size and the label, and the Takeoff Summary lists each size on its
+        own line. The list is yours: it applies to every file.
+      </div>
+      <div className="set-subjects" data-testid="subject-list">
+        {subjects.map((s, i) => (
+          <div key={s} className="set-subject" data-testid="subject-item">
+            <b>{s}</b>
+            <span className="hint">{loaded ? `${used(s)} used` : ''}</span>
+            <span className="set-rule-btns">
+              <button className="icon-btn" title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>
+                <ArrowUp size={13} />
+              </button>
+              <button className="icon-btn" title="Move down" disabled={i === subjects.length - 1} onClick={() => move(i, 1)}>
+                <ArrowDown size={13} />
+              </button>
+              <button className="icon-btn" title={`Remove ${s}`} onClick={() => set(subjects.filter((x) => x !== s))} data-testid="subject-remove">
+                <X size={13} />
+              </button>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="field-row" style={{ justifyContent: 'flex-start' }}>
+        <input
+          className="narrow"
+          style={{ width: 120 }}
+          value={add}
+          placeholder="e.g. WT, RB, FB"
+          onChange={(e) => setAdd(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && doAdd()}
+          data-testid="subject-add-input"
+        />
+        <button className="btn sm narrow primary" disabled={!adding || clash} onClick={doAdd} data-testid="subject-add">
+          <Plus size={12} /> Add
+        </button>
+        <button className="btn sm narrow" onClick={() => set([...DEFAULT_SUBJECTS])} data-testid="subject-reset">
+          <RotateCcw size={12} /> Reset to Defaults
+        </button>
+        {clash && <span className="hint">Already in the list.</span>}
+      </div>
+
+      <h4 className="set-h">This file</h4>
+      <div className="hint" data-testid="subject-others">
+        {loaded
+          ? others
+            ? `${others} markup${others === 1 ? ' has a subject' : 's have subjects'} that ${others === 1 ? 'is' : 'are'} not in the list (shown in italics in the Markups List), e.g. from before subjects were shapes.`
+            : 'Every markup in this file has a subject from the list (or none).'
+          : 'Open a file to check its subjects.'}
+      </div>
+      <div className="field-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+        <button className="btn sm narrow" disabled={!loaded || !others} onClick={() => cmdConvertSubjects(false)} title="W24x55 → W (the size goes to Member Size when it is empty)" data-testid="subject-convert">
+          Change Sizes to Shapes
+        </button>
+        <button className="btn sm narrow" disabled={!loaded || !others} onClick={() => cmdConvertSubjects(true)} title="Also clear subjects that name no shape in the list" data-testid="subject-convert-clear">
+          … and Clear the Rest
+        </button>
+      </div>
+    </>
+  );
+}
+
 /** The Markups List style files opened from now on start with. */
 function ListDefaults() {
   const prefs = useStore((s) => s.prefs);
@@ -687,6 +787,7 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
           {tab === 'units' && <Units />}
           {tab === 'editing' && <Editing />}
           {tab === 'keys' && <Keyboard />}
+          {tab === 'subjects' && <Subjects />}
           {tab === 'list' && <ListDefaults />}
           {tab === 'auto' && <AutoTakeoff />}
           {tab === 'speed' && <Speed />}

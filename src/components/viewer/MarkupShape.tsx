@@ -1,6 +1,7 @@
 import { memo, type CSSProperties } from 'react';
 import type { FontFamily, Markup, Pt } from '../../types';
 import { cloudPath, labelPoint, pointsToPath } from '../../core/geometry';
+import { textColor } from '../../core/markupTypes';
 import {
   calloutAnchor,
   calloutBox,
@@ -114,7 +115,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
   const pts = m.points;
   const lines = showLabels && label ? label.split('\n') : [];
   const fs = m.style.fontSize;
-  const labelColor = m.style.color;
+  const labelColor = textColor(m.style);
   const ff = cssFontFamily(m.style.fontFamily);
   const fw = m.style.fontBold === false ? 400 : 600;
 
@@ -305,7 +306,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
           <foreignObject x={r.x} y={r.y} width={Math.max(1, r.w)} height={Math.max(1, r.h)} style={{ pointerEvents: 'none' }}>
             <div
               className="mk-text"
-              style={{ fontSize: fs, color: m.style.color, fontFamily: ff, fontWeight: m.style.fontBold ? 700 : 400, padding: Math.max(2, fs * 0.25), lineHeight: 1.2 }}
+              style={{ fontSize: fs, color: labelColor, fontFamily: ff, fontWeight: m.style.fontBold ? 700 : 400, padding: Math.max(2, fs * 0.25), lineHeight: 1.2 }}
             >
               {m.text}
             </div>
@@ -337,7 +338,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
             fontWeight={800}
             textAnchor="middle"
             dominantBaseline="central"
-            fill={m.style.color}
+            fill={labelColor}
             letterSpacing={size * 0.04}
           >
             {text}

@@ -7,11 +7,11 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.6.0**: **every PDF is its own document** – its markups, scales, columns and standard details belong to
-> that file and are **saved inside the PDF** (open it again and the takeoff is back); each document has its own undo,
-> its own tab and its own **Markups List layout**, which can be **saved as the default** for new files and
-> **exported / imported** (1.5.0: document tabs, Add Detail, custom shortcuts, flatten, page labels from a box, faster
-> rendering; 1.4: Settings menu, auto takeoff line styles; 1.3.0: automatic takeoff) – see the [changelog](CHANGELOG.md).
+> **Version 1.7.0**: a markup's **subject is its shape** (W, HSS, L, BP, C, BO…), picked from a list each user can
+> add to and take from (*Settings → Subjects*), with the size as Member Size – and **labels and text have their own
+> colour**, also in the automatic takeoff line styles (1.6.0: every PDF is its own document with its takeoff saved
+> inside it, Markups List layouts with a default; 1.5.0: document tabs, Add Detail, custom shortcuts, flatten, page labels
+> from a box, faster rendering) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -63,9 +63,9 @@ A five-minute tour with the sample set:
 3. Open **S1.02 Roof Framing Plan**. In the **Tool Chest** (right) click **W24x55** and click beam ends along a grid
    line. Click **HSS6x6x3/8 Column** and click each column – every click adds to one count. Use **Metal Deck** to trace
    the roof area (double-click or Enter to finish).
-4. The **Markups List** (bottom) now holds every takeoff object with Subject, Sheet, Length/Area/Count, Category,
+4. The **Markups List** (bottom) now holds every takeoff object with Subject (the shape: W, HSS…), Sheet, Length/Area/Count, Category,
    Member Size, Qty and a computed **Weight**. Click a row to jump to the markup; click a markup to find its row.
-5. Open **Takeoff Summary** for totals by category/subject (e.g. `W24x55 — 24 EA · 552.00 LF`, `30,360 lbs`), then
+5. Open **Takeoff Summary** for totals by category and size (e.g. `W24x55 — 24 EA · 552.00 LF`, `30,360 lbs`), then
    export CSV, a printable report, or a flattened PDF.
 
 ## How the requested workflow maps to the app
@@ -78,16 +78,17 @@ A five-minute tour with the sample set:
 | **4. Area & perimeter** | Area (with perimeter shown), Perimeter, Volume (area × depth, CY/CF/m³), Angle; area **cutouts** for openings. |
 | **5. Count** | Count tool: every click adds a symbol to the same count markup (circle, square, triangle, diamond, star, check, cross). |
 | **6. Custom markup tools** | **Tool Chest** with default sets (Structural Steel, Joists/Deck/Connections, Misc Metals, Concrete, Architectural & MEP, Review). Each tool stores type, subject, appearance, layer, depth and **column values** (Member Size, Grade, Category, Qty…). Create tools from scratch or from any markup, edit, duplicate, move between sets, import/export JSON. *Apply Tool Properties* restyles existing markups. |
-| **7. Editable Markup List** | Bottom panel. Double-click cells to edit Subject, Label, Comments, Status, Layer, Color, Author, Depth and every custom column; checkmark toggles. Multi-select edits apply to all selected rows. Undo/redo everything. |
+| **7. Editable Markup List** | Bottom panel. Double-click cells to edit Subject (a shape from your list), Label, Comments, Status, Layer, Color, Author, Depth and every custom column; checkmark toggles. Multi-select edits apply to all selected rows. Undo/redo everything. |
 | **8. Custom columns & data fields** | *Manage Columns*: Text, Number, Choice and **Formula** columns, ships with a structural-steel template (Piece Mark, Member Size, Material, Grade, Qty, Weight, Level, Grid, Detail, Connection, Labor Category, Notes, Category). Show/hide and reorder any column, resize by dragging headers. |
 | **9. Sort, filter, group** | Click headers to sort, funnel icons for per-column value filters, search box, *Current Sheet* scope, *Group by* any text/choice column with per-group subtotals and a totals row. |
 | **10. Drawing ⇄ data link** | Selecting a row navigates to its sheet, zooms and flashes the markup; selecting on the drawing highlights and scrolls to the row. Hover a markup for a quick readout. |
-| **11. Takeoff summary** | Totals per subject grouped by Category (or any column): pieces (EA), length (LF), area (SF), volume (CY), Qty and every numeric/formula column (e.g. weight in lbs and tons). Click a line to select its markups. |
+| **11. Takeoff summary** | Totals per subject and size (W24x55, HSS6x6x3/8…) grouped by Category (or any column): pieces (EA), length (LF), area (SF), volume (CY), Qty and every numeric/formula column (e.g. weight in lbs and tons). Click a line to select its markups. |
 | **12. Export / report** | Markups CSV, summary CSV, printable summary report (save as PDF from the print dialog), flattened PDF with markups and measurement labels burned in. The takeoff itself is saved **inside each PDF**. |
 | **Overlay / compare** | *Document → Compare / Overlay Sheets*: two sheets in their own colours, auto-aligned (text or image) or aligned by points / by hand, with change detection and revision clouds. See [Overlay / compare](#overlay--compare-sheets). |
 | **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length – or add a detail by hand to any selected markups. See [Standard details](#standard-details). |
 | **Automatic takeoff** | *Auto* button (*Tools → Automatic Takeoff*): finds the member-size labels on a plan (W24x55, HSS8x4x1/4, Pipe 4 Std…), measures the line each one labels at the sheet's scale and creates labelled length measurements, drawn by line style rules (*Settings → Auto Takeoff Line Styles*). See [Automatic takeoff](#automatic-takeoff-beams-and-tubing). |
-| **Settings & preferences** | *Settings* menu (`Ctrl+,`): general preferences, the project's units and totals, snapping and fine adjustment, **keyboard shortcuts**, auto takeoff line styles, **speed & graphics**, workspace. See [Settings](#settings--preferences). |
+| **Subjects** | A markup's subject is its shape (W, HSS, L, BP, C, BO…) from a list you keep in *Settings → Subjects*. See [Subjects](#subjects-shapes). |
+| **Settings & preferences** | *Settings* menu (`Ctrl+,`): general preferences, the project's units and totals, snapping and fine adjustment, **keyboard shortcuts**, **subjects**, auto takeoff line styles, **speed & graphics**, workspace. See [Settings](#settings--preferences). |
 | **Documents** | Every PDF is its own document: its takeoff is saved inside it, with its own undo and Markups List layout; each has a tab, and tabs drag between panes and windows. See [Documents and tabs](#documents-and-tabs). |
 | **Markups List layout** | Rename, move, show and hide columns per file; save the layout as the default for new files; export / import it. See [Markups List layout](#markups-list-layout). |
 | **Flatten markups** | *Edit → Flatten Markups…* (or right-click): draws markups into the drawing itself. See [Flatten markups](#flatten-markups). |
@@ -97,8 +98,9 @@ A five-minute tour with the sample set:
 * **Steel shape / size tools** – *Tools → New Steel Shape / Size Tool…* (or the I-beam button in the Tool Chest). Pick
   a shape family (W, HSS, L, C, MC, WT, S, HP, PL, Pipe, joists, or *Other* for any label), the measurement type
   (length, polylength, area, perimeter, volume, count…), line colour/width/style/ends, fill, symbol, layer and the label
-  **font, size and bold**. The tool shows a size box in the Tool Chest: type `24x68` (normalised to `W24x68`) and every
-  markup placed with the tool is labelled `W24x68`, gets it as Subject and Member Size (so weights compute), and the
+  **font, size, bold and colour**. The tool shows a size box in the Tool Chest: type `24x68` (normalised to `W24x68`) and
+  every markup placed with the tool is labelled `W24x68`, gets it as Member Size (so weights compute) and its shape **W**
+  as Subject, and the
   size **stays with the tool – across sessions – until you type a different one**. Enter in the size box starts the tool.
 * **Hide tools** – right-click a tool or set → *Hide Tool* / *Hide Set*. The eye button in the Tool Chest header shows
   hidden tools (dimmed) with per-tool and per-set eye toggles to bring them back.
@@ -121,9 +123,9 @@ Select a count markup (or right-click it on the drawing or in the list):
 markup's Properties) defines rules that add material wherever the takeoff matches:
 
 ```
-IF [Member Size] = "W24x55"     → ADD Clip Angle  L4x4x3/8  × 0'-11 1/2"  × 4 EA
-IF [Subject] = "Handrail"       → ADD Post  HSS1-1/2x1-1/2x1/8  × 3'-6"  @ 4'-0" OC (+1)
-IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
+IF [Member Size] = "W24x55"                          → ADD Clip Angle  L4x4x3/8  × 0'-11 1/2"  × 4 EA
+IF [Subject] = "HSS" AND [Type] = "Count Measurement" → ADD Base Plate  PL3/4x12  × 1'-0"  × 1 EA
+IF [Subject] = "PIPE" AND [Category] = "Misc Metals"  → ADD Post  HSS1-1/2x1-1/2x1/8  × 3'-6"  @ 4'-0" OC (+1)
 ```
 
 * **IF** – pick the column from a drop-down, then the value from a drop-down of the values that column holds in the
@@ -185,11 +187,12 @@ Open the **Auto** panel (toolbar, or *Tools → Automatic Takeoff (Beams & Tubin
   right (or top / bottom) end and both ends, with a step from 1/16" to 1'-0". Adjusted members are marked and can be
   put back as found.
 * **Line styles** – *Settings → Auto Takeoff Line Styles* sets the line by subject: rules such as *starts with* **W** →
-  green solid, *starts with* **HSS** → blue dashed (colour, width, solid/dashed/dotted, opacity). The first matching rule
+  green solid, *starts with* **HSS** → blue dashed (colour, **text colour** for the size label – or the same as the line –,
+  width, solid/dashed/dotted, opacity). The first matching rule
   wins; without one, the Tool Chest tool for the size (e.g. *W24x55*) or a colour per size is used. *Apply to Existing
   Auto Measurements* restyles the ones already made.
-* **Create** – one length measurement per member in one undo step, labelled with its size, with the size as Subject and
-  Member Size (so Weight computes and standard details apply). When the Tool Chest has a length tool for the size, its
+* **Create** – one length measurement per member in one undo step, labelled with its size, with the size as Member Size
+  and its shape (W, HSS…) as Subject (so Weight computes and standard details apply). When the Tool Chest has a length tool for the size, its
   layer and column values are used. Afterwards, any straight length measurement (or several at once) can be adjusted in
   **Properties → Adjust Ends**: − / + per end by the step, or type an exact length.
 
@@ -213,6 +216,7 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
   *Default* to put a command back, *Reset All*. Single keys (like `L`) work on the drawing; add Ctrl, Shift or Alt for
   more. A key already used by another command is flagged, with the choice to move it. Search by command or by key.
   The menus, tooltips and *Help → Keyboard Shortcuts* show your keys.
+* **Subjects** – the shapes markups can have as subject (see [Subjects](#subjects-shapes)).
 * **Auto Takeoff** – line styles by subject (above) and the defaults for finding members.
 * **Speed & Graphics** – see [Speed and graphics](#speed-and-graphics).
 * **Workspace** – lock the layout, toolbar position, reset the layout.
@@ -223,6 +227,31 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
   [Markups List layout](#markups-list-layout)).
 
 Preferences are kept on the computer and apply to every document; the units belong to the document.
+
+### Subjects (shapes)
+
+A markup's **subject is the shape** it takes off – **W, HSS, L, C, MC, WT, S, HP, PL, BP, BO, PIPE** to start with – and
+the size itself (`W24x55`) is its Member Size and label. Subjects are picked from a list (the Subject cell of the
+Markups List, *Properties* and the Tool Chest tool editor) rather than typed.
+
+<img src="docs/screenshot-subjects.png" width="560" alt="Settings: the list of subjects (shapes)">
+
+* *Settings → Subjects* is your list: **add** a shape (e.g. RB, FB), **remove** one, reorder them, or reset to the
+  defaults; it applies to every file. The list shows how many markups in the open file use each one.
+* New markups get the shape of their size from the list: a size tool's size, else the Tool Chest tool's own subject,
+  else the shape of its Member Size (W24x55 → W, HSS6x6x3/8 → HSS, MC12x10.6 → MC, Pipe 4 Std → PIPE). Markups whose
+  size has no shape in the list (deck, joists, notes, clouds) have no subject. The automatic takeoff does the same.
+* The **Takeoff Summary** puts each size on its own line (`W24x55`, `W18x35`…, or the shape and the size, e.g.
+  `BP PL1/2x8`).
+* Files from before have subjects such as `W24x55` or `HSS Column`; the Markups List shows subjects not in the list in
+  italics. *Settings → Subjects → Change Sizes to Shapes* turns them into shapes (W24x55 → W, the size going into Member
+  Size when that is empty); *… and Clear the Rest* also clears the ones that name no shape. One undo step.
+
+### Labels and text colour
+
+Labels and text have their own colour, separate from the line: *Properties → Text colour* (tick *Same as line* to
+follow the line again), the Tool Chest tool editor and size tools (*Label colour*), and each automatic takeoff line
+style rule (*Text*). Measurement labels, text boxes, callouts and stamps use it, on the drawing and in flattened PDFs.
 
 ### Overlay / compare sheets
 
@@ -398,7 +427,7 @@ tool active), **LABELS** (measurement labels on the drawing).
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff (sample set + addendum; needs `npm run dev` running)
@@ -437,6 +466,7 @@ src/
     export.ts        CSV, printable report, flattened PDF (also used to flatten markups into a document)
     embed.ts         the takeoff saved inside its PDF (an embedded file), and read back
     listStyle.ts     Markups List styles: the file format, built-in style
+    subjects.ts      subjects as shapes: the default list, the shape of a size, older subjects
   store/           Zustand store (open documents, each with its undo history; panes and tabs), project.ts
                    (opening, saving into the PDF, closing, autosave), commands
                    (menu and keyboard commands), flatten (markups into new versions of the PDFs)

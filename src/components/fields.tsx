@@ -1,4 +1,6 @@
-import { useEffect, useState, type InputHTMLAttributes } from 'react';
+import { useEffect, useState, type InputHTMLAttributes, type SelectHTMLAttributes } from 'react';
+import { getState, useStore } from '../store/store';
+import { findSubject } from '../core/subjects';
 
 /** Text input that keeps local state and commits on blur / Enter (one undo step per edit). */
 export function CommitInput({
@@ -86,5 +88,67 @@ export function ColorField({ value, onChange, allowNone }: { value: string | nul
       </div>
       <input type="color" className="narrow" value={value ?? '#ffffff'} onChange={(e) => onChange(e.target.value)} title="Custom color" />
     </div>
+  );
+}
+
+/**
+ * Colour of a style's labels and text, separate from its line: a colour, or (unticked colour)
+ * the same as the line.
+ */
+export function TextColorField({ color, fontColor, onChange, testId }: { color: string; fontColor?: string; onChange: (v: string | undefined) => void; testId?: string }) {
+  return (
+    <div className="field-row" style={{ justifyContent: 'flex-start' }}>
+      <input
+        type="color"
+        className="narrow"
+        value={fontColor || color}
+        onChange={(e) => onChange(e.target.value)}
+        title="Text colour (labels and text)"
+        data-testid={testId}
+      />
+      <label className="narrow" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+        <input type="checkbox" checked={!fontColor} onChange={(e) => onChange(e.target.checked ? undefined : fontColor || color)} data-testid={testId ? `${testId}-same` : undefined} />
+        Same as line
+      </label>
+    </div>
+  );
+}
+
+const EDIT_SUBJECTS = '\u0000edit';
+
+/**
+ * Subject picker: the shapes in the user's list (Settings → Subjects). A subject from before, not in
+ * the list, shows as such until it is changed. With `editList`, the last entry opens the list.
+ */
+export function SubjectSelect({
+  value,
+  onChange,
+  editList,
+  multiple,
+  ...rest
+}: { value: string; onChange: (v: string) => void; editList?: boolean; multiple?: boolean } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'multiple'>) {
+  const subjects = useStore((s) => s.prefs.subjects);
+  const listed = findSubject(value, subjects);
+  const other = !!value.trim() && !listed;
+  return (
+    <select
+      {...rest}
+      value={multiple ? '' : listed ?? value}
+      onChange={(e) => {
+        if (e.target.value === EDIT_SUBJECTS) getState().setDialog({ kind: 'settings', tab: 'subjects' });
+        else onChange(e.target.value);
+      }}
+      title={other ? `“${value}” is not in your subject list (Settings → Subjects)` : rest.title}
+    >
+      {multiple && <option value="">(multiple)</option>}
+      <option value="">(none)</option>
+      {other && !multiple && <option value={value}>{value} – not in list</option>}
+      {subjects.map((s) => (
+        <option key={s} value={s}>
+          {s}
+        </option>
+      ))}
+      {editList && <option value={EDIT_SUBJECTS}>Edit list…</option>}
+    </select>
   );
 }

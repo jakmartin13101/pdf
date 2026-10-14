@@ -120,6 +120,8 @@ export interface MarkupStyle {
   lineStyle: LineStyle;
   fontSize: number;
   fontFamily?: FontFamily;
+  /** Colour of labels and text; undefined: the line colour. */
+  fontColor?: string;
   /** Undefined: measurement labels bold, text boxes regular. */
   fontBold?: boolean;
   symbol: CountSymbol;
@@ -173,6 +175,8 @@ export interface AutoStyleRule {
   match: 'starts' | 'contains' | 'is';
   text: string;
   color: string;
+  /** Colour of the measurement label; undefined: the line colour. */
+  fontColor?: string;
   lineWidth: number;
   lineStyle: LineStyle;
   /** 0..1 */

@@ -4,7 +4,7 @@ import type { ChestTool, CountSymbol, FontFamily, LineStyle, MarkupType } from '
 import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
 import { defaultStyle, MARKUP_TYPES, MEASURE_TYPES, STAMP_TEXTS, TYPE_INFO } from '../../core/markupTypes';
-import { ColorField } from '../fields';
+import { ColorField, SubjectSelect, TextColorField } from '../fields';
 import { ToolSwatch } from '../icons';
 import { uid } from '../../core/ids';
 import { formatLength, parseLength } from '../../core/units';
@@ -21,7 +21,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
       const t = st.toolFromMarkup(fromMarkupId);
       if (t) return t;
     }
-    return { id: uid('tool'), name: 'New Tool', type: 'length', subject: 'New Tool', style: defaultStyle('length'), custom: {} };
+    return { id: uid('tool'), name: 'New Tool', type: 'length', subject: '', style: defaultStyle('length'), custom: {} };
   });
   const [targetSet, setTargetSet] = useState(sets.some((s) => s.id === setId) ? setId : sets[0]?.id ?? '');
   const [depthText, setDepthText] = useState(formatLength(tool.depth ?? 4, 'ft-in', 8));
@@ -35,7 +35,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
     if (!setIdToUse) setIdToUse = st.addToolSet('My Tools');
     const depth = tool.type === 'volume' ? parseLength(depthText, 'in') ?? 4 : undefined;
     const custom = Object.fromEntries(Object.entries(tool.custom).filter(([, v]) => v !== '' && v != null));
-    st.upsertTool(setIdToUse, { ...tool, name: tool.name.trim() || tool.subject, depth, custom });
+    st.upsertTool(setIdToUse, { ...tool, name: tool.name.trim() || tool.subject || 'New Tool', depth, custom });
     st.toast(`${existing ? 'Updated' : 'Added'} tool “${tool.name}”`, 'success');
     close();
   };
@@ -105,7 +105,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
           </div>
           <div className="field">
             <label>Subject</label>
-            <input value={tool.subject} onChange={(e) => setTool({ ...tool, subject: e.target.value })} placeholder="e.g. W18x35" data-testid="tool-subject" />
+            <SubjectSelect value={tool.subject} onChange={(v) => setTool({ ...tool, subject: v })} data-testid="tool-subject" />
           </div>
           <div className="field">
             <label>Label</label>
@@ -194,6 +194,10 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
                   Bold
                 </label>
               </div>
+            </div>
+            <div className="field">
+              <label>Text colour</label>
+              <TextColorField color={s.color} fontColor={s.fontColor} onChange={(v) => setStyle({ fontColor: v })} testId="tool-font-color" />
             </div>
           </div>
           <div className="form-section">

@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.7.0 – 2026-10-14
+
+### Subjects are shapes
+- A markup's subject is the shape it takes off – W, HSS, L, C, MC, WT, S, HP, PL, BP, BO, PIPE to start with – picked
+  from a list rather than typed (Subject cell of the Markups List, Properties, Tool Chest tool editor). The size is
+  the Member Size and the label.
+- *Settings → Subjects*: add and remove shapes, reorder, reset to the defaults; the list is per user and applies to
+  every file. Each shows how many markups in the open file use it.
+- New markups, size tools and the automatic takeoff take the shape of their size from the list (W24x55 → W,
+  HSS6x6x3/8 → HSS, MC12x10.6 → MC). Markups whose size has no shape in the list have no subject. The built-in Tool
+  Chest tools have shape subjects (Base Plate: BP).
+- The Takeoff Summary lists each size on its own line (W24x55, W18x35…).
+- Subjects from earlier files (W24x55, HSS Column…) show in italics; *Change Sizes to Shapes* turns them into shapes
+  (the size goes into Member Size), *… and Clear the Rest* clears subjects that name no shape. Revision clouds from
+  overlay compare have no subject (their label says what they are).
+- The built-in standard detail examples match on Subject, Category and Type; searching the Markups List keeps the
+  material standard details add with the markups it finds. The example takeoff was made again with shape subjects.
+
+### Text colour
+- Labels and text have their own colour, separate from the line: *Properties → Text colour* (or *Same as line*), the
+  Tool Chest tool editor, size tools (*Label colour*) and each automatic takeoff line style rule (*Text*). Used on the
+  drawing and in flattened PDFs.
+
 ## 1.6.0 – 2026-10-14
 
 ### Every PDF is its own document

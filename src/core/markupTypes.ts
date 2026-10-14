@@ -51,6 +51,9 @@ export const BASE_STYLE: MarkupStyle = {
   lineEnd: 'none',
 };
 
+/** The colour labels and text are drawn in: their own, else the line colour. */
+export const textColor = (s: Pick<MarkupStyle, 'color' | 'fontColor'>) => s.fontColor || s.color;
+
 export function defaultStyle(type: MarkupType): MarkupStyle {
   switch (type) {
     case 'length':

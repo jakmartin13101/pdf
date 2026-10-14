@@ -4,9 +4,10 @@ import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
 import { defaultStyle, MEASURE_TYPES, TYPE_INFO } from '../../core/markupTypes';
 import { normalizeSize, plf, psf, SHAPE_FAMILIES } from '../../core/steelShapes';
-import { ColorField } from '../fields';
+import { ColorField, TextColorField } from '../fields';
 import { ToolSwatch } from '../icons';
 import { uid } from '../../core/ids';
+import { subjectForSize } from '../../core/subjects';
 import { BeamIcon } from '../panels/ToolChestPanel';
 
 const GRADE_BY_FAMILY: Record<string, string> = { W: 'A992', WT: 'A992', HP: 'A572 Gr. 50', HSS: 'A500 Gr. C', Pipe: 'A53 Gr. B' };
@@ -38,7 +39,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
           id: uid('tool'),
           name: 'W Shape',
           type: 'length',
-          subject: 'W Shape',
+          subject: 'W',
           style: { ...defaultStyle('length'), color: '#e8112d', lineWidth: 3, fontFamily: 'Helvetica', fontBold: true },
           layer: 'layer-takeoff',
           custom: { Category: 'Structural Steel', Material: 'Steel', Grade: 'A992', Qty: 1 },
@@ -53,6 +54,8 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
   const close = () => st.setDialog(null);
   const size = normalizeSize(cfg.family, cfg.value);
   const weight = plf(size) || psf(size);
+  const subjects = useStore((x) => x.prefs.subjects);
+  const shape = subjectForSize(size, subjects) ?? '';
   const isSteel = !!family.id || family.example === '24K6';
 
   const pickFamily = (i: number) => {
@@ -63,7 +66,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
     setTool({
       ...tool,
       name: existing ? tool.name : name,
-      subject: existing ? tool.subject : name,
+      subject: existing ? tool.subject : subjectForSize(f.example || f.id, subjects) ?? '',
       custom: steel
         ? { ...tool.custom, Category: tool.custom.Category ?? 'Structural Steel', Grade: GRADE_BY_FAMILY[f.id] ?? tool.custom.Grade ?? 'A36' }
         : tool.custom,
@@ -76,13 +79,13 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
     setTool({
       ...tool,
       type,
-      style: { ...d, color: s.color, fillColor: d.fillColor ? s.color : null, lineWidth: type === 'count' ? d.lineWidth : s.lineWidth, fontFamily: s.fontFamily, fontBold: s.fontBold, fontSize: s.fontSize },
+      style: { ...d, color: s.color, fillColor: d.fillColor ? s.color : null, lineWidth: type === 'count' ? d.lineWidth : s.lineWidth, fontFamily: s.fontFamily, fontBold: s.fontBold, fontSize: s.fontSize, fontColor: s.fontColor },
     });
   };
 
   const save = () => {
     const id = targetSet || st.addToolSet('My Tools');
-    st.upsertTool(id, { ...tool, name: tool.name.trim() || 'Size Tool', sizeTool: { ...cfg, value: size } });
+    st.upsertTool(id, { ...tool, name: tool.name.trim() || 'Size Tool', subject: shape, sizeTool: { ...cfg, value: size } });
     st.toast(`${existing ? 'Updated' : 'Added'} size tool “${tool.name}”. Type a size in its box in the Tool Chest.`, 'success');
     close();
   };
@@ -98,7 +101,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
           <div className="left">
             <ToolSwatch tool={tool} size={30} />
             <span className="hint">
-              Label on drawing: <b style={{ color: s.color, fontFamily: s.fontFamily === 'Times' ? 'Times New Roman, serif' : s.fontFamily === 'Courier' ? 'Courier New, monospace' : undefined }}>{size || '—'}</b>
+              Label on drawing: <b style={{ color: s.fontColor || s.color, fontFamily: s.fontFamily === 'Times' ? 'Times New Roman, serif' : s.fontFamily === 'Courier' ? 'Courier New, monospace' : undefined }}>{size || '—'}</b>
               {weight ? ` · ${weight} ${psf(size) && !plf(size) ? 'lb/sf' : 'lb/ft'}` : ''}
             </span>
           </div>
@@ -156,11 +159,20 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
             </select>
           </div>
           <div className="field">
+            <label>Subject</label>
+            <div className="hint" data-testid="shape-subject">
+              {shape ? (
+                <>
+                  <b>{shape}</b> – the shape of the size, from your subject list
+                </>
+              ) : (
+                <>No shape in your subject list for {size || 'this size'} – add it in Settings → Subjects</>
+              )}
+            </div>
+          </div>
+          <div className="field">
             <label>Size is also</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input type="checkbox" checked={cfg.setSubject} onChange={(e) => setCfg({ setSubject: e.target.checked })} /> the Subject (groups the takeoff by size)
-              </label>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input type="checkbox" checked={cfg.setMemberSize} onChange={(e) => setCfg({ setMemberSize: e.target.checked })} /> Member Size (drives weight)
               </label>
@@ -258,6 +270,10 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
                 <input type="checkbox" checked={s.fontBold !== false} onChange={(e) => setStyle({ fontBold: e.target.checked })} /> Bold
               </label>
             </div>
+          </div>
+          <div className="field">
+            <label>Label colour</label>
+            <TextColorField color={s.color} fontColor={s.fontColor} onChange={(v) => setStyle({ fontColor: v })} testId="shape-font-color" />
           </div>
         </div>
       </div>

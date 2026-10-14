@@ -1947,7 +1947,7 @@ table.grid {
 
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 6px;
   margin-bottom: 10px;
 }
@@ -3479,7 +3479,7 @@ button.linkish {
 }
 .set-rule {
   display: grid;
-  grid-template-columns: 22px 104px minmax(60px, 1fr) 40px 58px 82px 66px 48px 78px;
+  grid-template-columns: 22px 104px minmax(60px, 1fr) 40px 62px 58px 82px 66px 48px 78px;
   gap: 5px;
   align-items: center;
   padding: 4px 6px;
@@ -3499,6 +3499,11 @@ button.linkish {
 }
 .set-rule input[type='color'] {
   width: 36px;
+}
+.rule-font {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .set-rule-btns {
   display: flex;
@@ -3735,4 +3740,33 @@ button.linkish {
   border-radius: 10px;
   background: var(--bg-hover);
   font-size: 12px;
+}
+
+.subject-other {
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.set-subjects {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 4px;
+}
+.set-subject {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.set-subject b {
+  min-width: 40px;
+}
+.set-subject .hint {
+  flex: 1;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

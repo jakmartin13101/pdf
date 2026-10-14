@@ -44,7 +44,7 @@ test('a standard detail adds material to every markup whose column matches the c
 
   // Material rows follow each beam in the Markups List.
   await expect(rows).toHaveCount(6);
-  await expect(rows.locator('[data-col=subject]')).toHaveText(['W24x55', '↳ Clip Angle', '↳ Shear Stud', 'W24x55', '↳ Clip Angle', '↳ Shear Stud']);
+  await expect(rows.locator('[data-col=subject]')).toHaveText(['W', '↳ Clip Angle', '↳ Shear Stud', 'W', '↳ Clip Angle', '↳ Shear Stud']);
   await expect(rows.nth(1).locator('[data-col=count]')).toHaveText('4');
   await expect(rows.nth(1).locator('[data-col="c:member_size"]')).toHaveText('L4x4x3/8');
   await expect(page.getByTestId('list-count')).toContainText('2 markups + 4 detail items');
@@ -108,14 +108,14 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await expect(page.getByTestId('detail-formula')).toHaveText(`BY HAND → ADD Bearing Plate PL1/2x8 × 0'-10" × 2 EA`);
   await expect(page.getByTestId('detail-preview').locator('tbody tr td').nth(1)).toHaveText('4');
   await page.getByTestId('details-save').click();
-  await expect(subjects()).toHaveText(['W24x55', '↳ Bearing Plate', 'W24x55', 'W18x35', '↳ Bearing Plate']);
+  await expect(subjects()).toHaveText(['W', '↳ Bearing Plate', 'W', 'W', '↳ Bearing Plate']);
 
   // Add it to the other W24x55 from its right-click menu.
   await rows.nth(2).click();
   await rows.nth(2).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Standard Details', exact: true }).hover();
   await page.locator('.submenu .menu-item', { hasText: 'Bearing plates' }).click();
-  await expect(subjects()).toHaveText(['W24x55', '↳ Bearing Plate', 'W24x55', '↳ Bearing Plate', 'W18x35', '↳ Bearing Plate']);
+  await expect(subjects()).toHaveText(['W', '↳ Bearing Plate', 'W', '↳ Bearing Plate', 'W', '↳ Bearing Plate']);
 
   // Properties of all three: ticked; untick takes it off every one of them. One undo puts it back.
   await page.keyboard.press('Control+a');
@@ -137,7 +137,7 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await rows.nth(0).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Standard Details', exact: true }).hover();
   await page.locator('.submenu .menu-item', { hasText: 'Bearing plates' }).click();
-  await expect(subjects()).toHaveText(['W24x55', 'W24x55', '↳ Bearing Plate', 'W18x35', '↳ Bearing Plate']);
+  await expect(subjects()).toHaveText(['W', 'W', '↳ Bearing Plate', 'W', '↳ Bearing Plate']);
   await expect(page.getByTestId('prop-details')).toContainText('Bearing plates');
   await expect(check).not.toBeChecked();
   // Back to Rules Only drops the by-hand change.

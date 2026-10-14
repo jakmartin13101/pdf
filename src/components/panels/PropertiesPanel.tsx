@@ -5,8 +5,8 @@ import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { buildRows, customColId, type Row } from '../../core/columns';
 import { detailApplies, detailRows } from '../../core/details';
-import { TYPE_INFO, STAMP_TEXTS } from '../../core/markupTypes';
-import { CommitInput, CommitRange, ColorField } from '../fields';
+import { TYPE_INFO, STAMP_TEXTS, textColor } from '../../core/markupTypes';
+import { CommitInput, CommitRange, ColorField, SubjectSelect } from '../fields';
 import { formatLength, isMetric, parseLength } from '../../core/units';
 import { scaleForMarkup, viewportAt } from '../../core/measure';
 import { extendSegment } from '../../core/geometry';
@@ -153,7 +153,13 @@ export function PropertiesPanel() {
             <h4>General</h4>
             <div className="field">
               <label>Subject</label>
-              <CommitInput value={common(items, (m) => m.subject) ?? ''} placeholder={items.length > 1 ? '(multiple)' : ''} onCommit={(v) => set({ subject: v })} data-testid="prop-subject" />
+              <SubjectSelect
+                value={common(items, (m) => m.subject) ?? ''}
+                multiple={common(items, (m) => m.subject) === undefined}
+                onChange={(v) => set({ subject: v })}
+                editList
+                data-testid="prop-subject"
+              />
             </div>
             <div className="field">
               <label>Label</label>
@@ -314,6 +320,30 @@ export function PropertiesPanel() {
                       onChange={(e) => setStyle('fontBold', e.target.checked)}
                     />
                     Bold
+                  </label>
+                </div>
+              </div>
+            )}
+            {(hasText || types.has('count') || types.has('stamp')) && (
+              <div className="field">
+                <label>Text colour</label>
+                <div className="field-row" style={{ justifyContent: 'flex-start' }}>
+                  <input
+                    type="color"
+                    className="narrow"
+                    value={common(items, (m) => textColor(m.style)) ?? '#000000'}
+                    onChange={(e) => setStyle('fontColor', e.target.value)}
+                    title="Colour of the label or text (separate from the line)"
+                    data-testid="prop-font-color"
+                  />
+                  <label className="narrow" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={items.every((m) => !m.style.fontColor)}
+                      onChange={(e) => setStyle('fontColor', e.target.checked ? undefined : common(items, (m) => textColor(m.style)) ?? items[0]?.style.color)}
+                      data-testid="prop-font-same"
+                    />
+                    Same as line
                   </label>
                 </div>
               </div>

@@ -5,6 +5,7 @@ import type { AutoStyleRule, ChestTool, Markup, MarkupStyle, ToolSet } from '../
 import { normName } from './formula';
 import { defaultStyle } from './markupTypes';
 import { sizeColor } from './autoTakeoff';
+import { DEFAULT_SUBJECTS, subjectForSize } from './subjects';
 
 export const AUTO_MATCH: { id: AutoStyleRule['match']; label: string }[] = [
   { id: 'starts', label: 'starts with' },
@@ -43,7 +44,14 @@ export function autoStyleFor(rules: AutoStyleRule[], subject: string): AutoStyle
   });
 }
 
-export const withRule = (style: MarkupStyle, r: AutoStyleRule): MarkupStyle => ({ ...style, color: r.color, lineWidth: r.lineWidth, lineStyle: r.lineStyle, opacity: r.opacity });
+export const withRule = (style: MarkupStyle, r: AutoStyleRule): MarkupStyle => ({
+  ...style,
+  color: r.color,
+  fontColor: r.fontColor || undefined,
+  lineWidth: r.lineWidth,
+  lineStyle: r.lineStyle,
+  opacity: r.opacity,
+});
 
 const same = (a: string, b: string) => normName(a) === normName(b);
 
@@ -55,20 +63,21 @@ export function chestToolForSize(chest: ToolSet[], size: string): ChestTool | un
   return hits.find((t) => t.type === 'length') ?? hits[0];
 }
 
-/** Subject an auto takeoff member gets: its tool's subject, or the size. */
-export const autoSubject = (tool: ChestTool | undefined, size: string) => (tool && !tool.sizeTool ? tool.subject : size);
+/** Subject an auto takeoff member gets: the shape of its size from the user's subjects (W24x55 → W). */
+export const autoSubject = (size: string, subjects: string[] = DEFAULT_SUBJECTS) => subjectForSize(size, subjects) ?? '';
 
 export interface AutoLookPrefs {
   autoStyles: AutoStyleRule[];
   /** Without a matching rule: the Tool Chest tool's look for the size (true) or a colour per size. */
   autoUseToolStyle: boolean;
+  subjects?: string[];
 }
 
 /** The line a member of this size will be drawn with. */
 export function autoLook(chest: ToolSet[], prefs: AutoLookPrefs, size: string): { style: MarkupStyle; tool?: ChestTool; rule?: AutoStyleRule } {
   const tool = chestToolForSize(chest, size);
   const base: MarkupStyle = tool && prefs.autoUseToolStyle ? { ...tool.style } : { ...defaultStyle('length'), color: sizeColor(size), lineWidth: 3 };
-  const rule = autoStyleFor(prefs.autoStyles, autoSubject(tool, size)) ?? autoStyleFor(prefs.autoStyles, size);
+  const rule = autoStyleFor(prefs.autoStyles, autoSubject(size, prefs.subjects)) ?? autoStyleFor(prefs.autoStyles, size);
   return { style: rule ? withRule(base, rule) : base, tool, rule };
 }
 

@@ -3,7 +3,7 @@ import type { Markup, MarkupType, Pt, Rect, Sheet } from '../../types';
 import { findSheet, getState, paneDoc, useStore, type ToolMode, type ViewRequest } from '../../store/store';
 import { MarkupShape } from './MarkupShape';
 import { PageCanvas } from './PageCanvas';
-import { defaultStyle as defaultStyleFor, TYPE_INFO } from '../../core/markupTypes';
+import { defaultStyle as defaultStyleFor, TYPE_INFO, textColor } from '../../core/markupTypes';
 import { computeMeasure, drawingLabelLines, measurementText, scaleAt, scaleForMarkup } from '../../core/measure';
 import { bbox, constrainAngle, dist, expandRect, rectFromPoints, rectsIntersect, rectContains, simplify, translate } from '../../core/geometry';
 import { calloutBox, markupRect, RECT_TYPES } from '../../core/shapes';
@@ -1288,7 +1288,7 @@ function TextEditor({ m, zoom }: { m: Markup; zoom: number }) {
         width: Math.max(60, r.w * zoom),
         height: Math.max(24, r.h * zoom),
         fontSize: m.style.fontSize * zoom,
-        color: m.style.color,
+        color: textColor(m.style),
         padding: Math.max(2, m.style.fontSize * 0.25) * zoom,
       }}
     />

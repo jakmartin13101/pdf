@@ -1,6 +1,7 @@
 import type { DocState, MarkupType } from '../types';
 import { allColumns, customColId, type Row } from './columns';
 import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, fmtNumber } from './units';
+import { normName } from './formula';
 
 export interface SummaryLine {
   subject: string;
@@ -34,8 +35,22 @@ export function summableCustomColumns(doc: DocState) {
   return doc.columns.filter((c) => c.kind === 'number' || c.kind === 'formula');
 }
 
+/**
+ * The summary line a markup goes on: its subject (a shape such as W) and its Member Size, so each size
+ * gets its own line (W24x55, W18x35…). A size that already names the subject stands on its own.
+ */
+export function summaryKey(subject: string, size: string): string {
+  const s = subject.trim();
+  const z = size.trim();
+  if (!z) return s || '(no subject)';
+  if (!s || normName(z).startsWith(normName(s))) return z;
+  return `${s} ${z}`;
+}
+
 export function buildSummary(rows: Row[], doc: DocState, groupBy: string | null): { groups: SummaryGroup[]; total: SummaryLine } {
   const extras = summableCustomColumns(doc).map(customColId);
+  const sizeCol = doc.columns.find((c) => normName(c.name) === 'membersize');
+  const sizeOf = (r: Row) => (sizeCol ? String(r.values[customColId(sizeCol)] ?? '') : '');
   const groups = new Map<string, Map<string, SummaryLine>>();
   const typeCounts = new Map<SummaryLine, Record<string, number>>();
   const total = emptyLine('Total');
@@ -45,7 +60,7 @@ export function buildSummary(rows: Row[], doc: DocState, groupBy: string | null)
     const g = groupBy ? String(r.display[groupBy] ?? r.values[groupBy] ?? '') || '(none)' : '';
     let gm = groups.get(g);
     if (!gm) groups.set(g, (gm = new Map()));
-    const key = r.detail ? r.detail.summaryKey : m.subject || '(no subject)';
+    const key = r.detail ? r.detail.summaryKey : summaryKey(m.subject, sizeOf(r));
     // Material lines stay separate from drawn markups that happen to share the subject.
     const mapKey = `${r.detail ? 'detail' : 'markup'}:${key}`;
     let line = gm.get(mapKey);
