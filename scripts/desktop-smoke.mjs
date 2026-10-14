@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const shots = process.argv[2];
 const samplePdf = join(root, 'public', 'samples', 'Sample-Structural-Set.pdf');
+const addendumPdf = join(root, 'public', 'samples', 'Sample-S1.02-Addendum-2.pdf');
 
 let failed = 0;
 const check = (ok, what) => {
@@ -120,13 +121,21 @@ async function launch(extraArgs = []) {
   await app.close();
 }
 
-// 2. "Open with": a PDF passed on the command line opens at launch.
+// 2. "Open with": PDFs passed on the command line open at launch, each in its own document tab.
 {
-  const { app, win } = await launch([samplePdf]);
+  const { app, win } = await launch([samplePdf, addendumPdf]);
   await win.waitForSelector('.pane canvas', { timeout: 30000 });
   await win.waitForTimeout(500);
   const name = await win.locator('.project-name').textContent();
   check(name?.includes('Sample-Structural-Set') ?? false, `PDF given on the command line opens on launch (${name})`);
+  const tabs = await win.getByTestId('doc-tab').allTextContents();
+  check(tabs.length === 2, `each PDF opens in its own document tab (${tabs.join(' | ')})`);
+  const activeTab = () => win.locator('[data-testid=doc-tab][aria-selected=true]').textContent();
+  const before = await activeTab();
+  await win.keyboard.press('Control+Tab');
+  await win.waitForTimeout(300);
+  const after = await activeTab();
+  check(!!before && !!after && before !== after, `Ctrl+Tab switches document tabs (${before} → ${after})`);
   await app.close();
 }
 

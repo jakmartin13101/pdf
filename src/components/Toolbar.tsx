@@ -8,6 +8,7 @@ import { TYPE_ICON } from './icons';
 import { TYPE_INFO } from '../core/markupTypes';
 import { cmdOpenPdf, cmdSaveProject, view } from '../store/commands';
 import { exportPdf } from './MenuBar';
+import { useShortcuts } from './useShortcuts';
 
 const MARKUP_GROUP: MarkupType[] = ['text', 'callout', 'cloud', 'highlight', 'pen', 'line', 'arrow', 'polyline', 'rectangle', 'ellipse', 'polygon', 'stamp'];
 const MEASURE_GROUP: MarkupType[] = ['length', 'polylength', 'area', 'perimeter', 'volume', 'count', 'angle'];
@@ -46,6 +47,9 @@ export function usePanelOpen(id: PanelId) {
 export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | 'float' }) {
   const tool = useStore((s) => s.tool);
   const loaded = useStore((s) => s.loaded);
+  const sc = useShortcuts();
+  /** A tooltip with the command's (possibly customized) keys. */
+  const keyed = (label: string, id: string) => (sc(id) ? `${label} (${sc(id)})` : label);
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
   const markupsOpen = usePanelOpen('markups');
@@ -80,21 +84,21 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
       </div>
       <div className="tb-group">
         <div className="tb-row">
-          <TB icon={FolderOpen} label="Open" onClick={cmdOpenPdf} title="Open PDF drawings (Ctrl+O)" />
-          <TB icon={Save} label="Save" onClick={cmdSaveProject} disabled={!loaded} title="Save project file (Ctrl+S)" />
+          <TB icon={FolderOpen} label="Open" onClick={cmdOpenPdf} title={keyed('Open PDF drawings in a new tab', 'file.openPdf')} />
+          <TB icon={Save} label="Save" onClick={cmdSaveProject} disabled={!loaded} title={keyed('Save project file', 'file.save')} />
           <TB icon={FileDown} label="Export" onClick={exportPdf} disabled={!loaded} title="Export flattened PDF with markups" />
-          <TB icon={Undo2} label="Undo" onClick={() => st().undo()} disabled={!canUndo} title="Undo (Ctrl+Z)" />
-          <TB icon={Redo2} label="Redo" onClick={() => st().redo()} disabled={!canRedo} title="Redo (Ctrl+Y)" />
+          <TB icon={Undo2} label="Undo" onClick={() => st().undo()} disabled={!canUndo} title={keyed('Undo', 'edit.undo')} />
+          <TB icon={Redo2} label="Redo" onClick={() => st().redo()} disabled={!canRedo} title={keyed('Redo', 'edit.redo')} />
         </div>
         <div className="tb-caption">File</div>
       </div>
       <div className="tb-group">
         <div className="tb-row">
-          <TB icon={MousePointer2} label="Select" active={tool.kind === 'select'} onClick={() => set({ kind: 'select' })} title="Select (V)" />
+          <TB icon={MousePointer2} label="Select" active={tool.kind === 'select'} onClick={() => set({ kind: 'select' })} title={keyed('Select', 'tool.select')} />
           <TB icon={Hand} label="Pan" active={tool.kind === 'pan'} onClick={() => set({ kind: 'pan' })} title="Pan (hold Space)" />
-          <TB icon={ZoomIn} label="Zoom" active={tool.kind === 'zoomrect'} onClick={() => set({ kind: 'zoomrect' })} disabled={!loaded} title="Zoom rectangle (Z)" />
-          <TB icon={ZoomOut} small onClick={() => view('zoomBy', 0.8)} disabled={!loaded} title="Zoom out (Ctrl+-)" />
-          <TB icon={Maximize} small onClick={() => view('fit')} disabled={!loaded} title="Fit page (Ctrl+0)" />
+          <TB icon={ZoomIn} label="Zoom" active={tool.kind === 'zoomrect'} onClick={() => set({ kind: 'zoomrect' })} disabled={!loaded} title={keyed('Zoom rectangle', 'tool.zoomrect')} />
+          <TB icon={ZoomOut} small onClick={() => view('zoomBy', 0.8)} disabled={!loaded} title={keyed('Zoom out', 'view.zoomOut')} />
+          <TB icon={Maximize} small onClick={() => view('fit')} disabled={!loaded} title={keyed('Fit page', 'view.fit')} />
         </div>
         <div className="tb-caption">Navigate</div>
       </div>
@@ -104,7 +108,7 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
             <TB
               key={t}
               icon={TYPE_ICON[t]}
-              title={`${TYPE_INFO[t].label}${TYPE_INFO[t].shortcut ? ` (${TYPE_INFO[t].shortcut})` : ''}`}
+              title={`${TYPE_INFO[t].label}${sc(`tool.${t}`) ? ` (${sc(`tool.${t}`)})` : ''}`}
               label={t === 'text' || t === 'callout' || t === 'cloud' || t === 'highlight' ? TYPE_INFO[t].label.replace(' Box', '') : undefined}
               small={!(t === 'text' || t === 'callout' || t === 'cloud' || t === 'highlight')}
               active={tool.kind === 'markup' && tool.type === t && !tool.chestToolId}
@@ -117,14 +121,14 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
       </div>
       <div className="tb-group">
         <div className="tb-row">
-          <TB icon={DraftingCompass} label="Calibrate" active={tool.kind === 'calibrate'} onClick={() => set({ kind: 'calibrate' })} disabled={!loaded} title="Calibrate scale from a known dimension (Shift+Alt+K)" />
+          <TB icon={DraftingCompass} label="Calibrate" active={tool.kind === 'calibrate'} onClick={() => set({ kind: 'calibrate' })} disabled={!loaded} title={keyed('Calibrate scale from a known dimension', 'tool.calibrate')} />
           <TB icon={Frame} label="Viewport" active={tool.kind === 'viewport'} onClick={() => set({ kind: 'viewport' })} disabled={!loaded} title="Draw a viewport with its own scale" />
           {MEASURE_GROUP.map((t) => (
             <TB
               key={t}
               icon={TYPE_ICON[t]}
               label={TYPE_INFO[t].label}
-              title={`${TYPE_INFO[t].label} measurement${TYPE_INFO[t].shortcut ? ` (${TYPE_INFO[t].shortcut})` : ''}`}
+              title={`${TYPE_INFO[t].label} measurement${sc(`tool.${t}`) ? ` (${sc(`tool.${t}`)})` : ''}`}
               active={tool.kind === 'markup' && tool.type === t && !tool.chestToolId}
               disabled={!loaded}
               onClick={() => set({ kind: 'markup', type: t })}

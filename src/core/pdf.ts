@@ -3,15 +3,23 @@ import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { Pt, Rect } from '../types';
 import { extractVectors, placeText, type Box, type PlacedText, type Stroke } from './autoTakeoff';
+import { forgetRenders } from './renderCache';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const docs = new Map<string, Promise<PDFDocumentProxy>>();
 const pages = new Map<string, Promise<PDFPageProxy>>();
 
+/** Rendering options (Settings → Speed & Graphics). */
+const pdfOptions = { hwa: true };
+export function setPdfOptions(o: Partial<typeof pdfOptions>) {
+  Object.assign(pdfOptions, o);
+}
+
 export function registerPdf(fileId: string, bytes: Uint8Array): Promise<PDFDocumentProxy> {
-  // pdf.js transfers the buffer to its worker, so hand it a copy.
-  const p = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
+  // pdf.js transfers the buffer to its worker, so hand it a copy. enableHWA lets pdf.js keep its
+  // canvases on the graphics card.
+  const p = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, enableHWA: pdfOptions.hwa }).promise;
   docs.set(fileId, p);
   p.catch(() => docs.delete(fileId));
   return p;
@@ -23,6 +31,7 @@ export async function unregisterPdf(fileId: string) {
   for (const cache of [pages, textCache, snapCache, vectorCache] as Map<string, unknown>[]) {
     for (const k of [...cache.keys()]) if (k.startsWith(fileId + '#')) cache.delete(k);
   }
+  forgetRenders(fileId);
   if (p) (await p).destroy();
 }
 
@@ -48,12 +57,19 @@ export interface PageInfo {
   rotation: number;
 }
 
+/** Page sizes, read in parallel (in batches, so a large set does not flood the worker). */
 export async function pageInfos(doc: PDFDocumentProxy): Promise<PageInfo[]> {
-  const out: PageInfo[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const vp = page.getViewport({ scale: 1 });
-    out.push({ width: vp.width, height: vp.height, rotation: vp.rotation });
+  const out: PageInfo[] = new Array(doc.numPages);
+  const BATCH = 24;
+  for (let start = 1; start <= doc.numPages; start += BATCH) {
+    const n = Math.min(BATCH, doc.numPages - start + 1);
+    await Promise.all(
+      Array.from({ length: n }, async (_, k) => {
+        const page = await doc.getPage(start + k);
+        const vp = page.getViewport({ scale: 1 });
+        out[start + k - 1] = { width: vp.width, height: vp.height, rotation: vp.rotation };
+      }),
+    );
   }
   return out;
 }
@@ -69,7 +85,7 @@ export async function renderPage(
   scale: number,
   region?: Rect,
   onTask?: (t: RenderTask) => void,
-): Promise<void> {
+): Promise<HTMLCanvasElement> {
   const page = await getPage(fileId, pageIndex);
   const viewport = page.getViewport({ scale });
   const w = Math.max(1, Math.floor(region ? region.w * scale : viewport.width));
@@ -92,6 +108,7 @@ export async function renderPage(
   canvas.width = w;
   canvas.height = h;
   canvas.getContext('2d')!.drawImage(off, 0, 0);
+  return off;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +164,11 @@ export function pageText(fileId: string, pageIndex: number): Promise<TextItem[]>
 }
 
 function joinLines(items: TextItem[]): string {
+  return groupLines(items).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Text items grouped into lines, top to bottom, each line read left to right. */
+function groupLines(items: TextItem[]): string[] {
   const sorted = [...items].sort((a, b) => a.y - b.y || a.x - b.x);
   const lines: TextItem[][] = [];
   for (const it of sorted) {
@@ -159,15 +181,20 @@ function joinLines(items: TextItem[]): string {
       l
         .sort((a, b) => a.x - b.x)
         .map((i) => i.str.trim())
-        .join(' '),
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
     )
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .filter(Boolean);
 }
 
 /** Text whose centre lies inside a rectangle given as fractions of the page size. */
 export async function textInRegion(fileId: string, pageIndex: number, frac: Rect, pageW: number, pageH: number): Promise<string> {
+  return (await linesInRegion(fileId, pageIndex, frac, pageW, pageH)).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/** The lines of text (top to bottom) inside a rectangle given as fractions of the page size. */
+export async function linesInRegion(fileId: string, pageIndex: number, frac: Rect, pageW: number, pageH: number): Promise<string[]> {
   const items = await pageText(fileId, pageIndex);
   const r = { x: frac.x * pageW, y: frac.y * pageH, w: frac.w * pageW, h: frac.h * pageH };
   const inside = items.filter((i) => {
@@ -175,7 +202,7 @@ export async function textInRegion(fileId: string, pageIndex: number, frac: Rect
     const cy = i.y + i.h / 2;
     return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
   });
-  return joinLines(inside);
+  return groupLines(inside);
 }
 
 const SHEET_NO = /^[A-Z]{1,3}[-.\s]?\d{1,3}(?:[.-]\d{1,3})?[A-Z]?$/;

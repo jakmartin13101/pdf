@@ -116,3 +116,39 @@ test('auto takeoff lines follow the style rules, and can be fine-adjusted before
   await page.getByTestId('settings-done').click();
   await expect(page.locator('.mk-length').first().locator('path:not(.mk-hit)').first()).toHaveCSS('stroke', 'rgb(209, 25, 154)');
 });
+
+test('keyboard shortcuts can be changed in Settings → Keyboard', async ({ page }) => {
+  await openSample(page);
+  await gotoSheet(page, 1);
+  await page.keyboard.press('Control+,');
+  await page.getByTestId('set-tab-keys').click();
+  const length = page.locator('[data-testid=key-row][data-command="tool.length"]');
+  await expect(length.locator('kbd')).toHaveText(['Shift+Alt+L']);
+  // Give Length the F2 key.
+  await length.getByTestId('key-add').click();
+  await page.getByTestId('key-record').press('F2');
+  await expect(length.locator('kbd')).toHaveText(['Shift+Alt+L', 'F2']);
+  // Ctrl+D is Duplicate: taking it for "Add Detail to Selection" asks first.
+  const addDetail = page.locator('[data-testid=key-row][data-command="takeoff.addDetail"]');
+  await addDetail.getByTestId('key-add').click();
+  await page.getByTestId('key-record').press('Control+d');
+  await expect(page.getByTestId('keys-clash')).toContainText('Duplicate');
+  await page.getByTestId('keys-replace').click();
+  await expect(addDetail.locator('kbd')).toHaveText(['Ctrl+D']);
+  await expect(page.locator('[data-testid=key-row][data-command="edit.duplicate"] kbd')).toHaveCount(0);
+  await page.getByTestId('settings-done').click();
+
+  // The new keys work, and menus show them.
+  await page.keyboard.press('F2');
+  await expect(page.getByTestId('tb-length')).toHaveClass(/active/);
+  await page.keyboard.press('Escape');
+  await page.locator('.menu-btn', { hasText: /^Measure$/ }).click();
+  await expect(page.locator('.dropdown .menu-item', { hasText: /^Length/ }).locator('.menu-shortcut')).toHaveText('Shift+Alt+L');
+  await page.locator('.menu-btn', { hasText: /^Measure$/ }).click();
+
+  // Reset All brings the defaults back.
+  await page.keyboard.press('Control+,');
+  await page.getByTestId('set-tab-keys').click();
+  await page.getByTestId('keys-reset-all').click();
+  await expect(page.locator('[data-testid=key-row][data-command="edit.duplicate"] kbd')).toHaveText(['Ctrl+D']);
+});

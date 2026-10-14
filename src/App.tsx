@@ -13,6 +13,8 @@ import { ColumnsDialog } from './components/dialogs/ColumnsDialog';
 import { ToolEditDialog } from './components/dialogs/ToolEditDialog';
 import { AboutDialog, ConfirmDialog, ShortcutsDialog } from './components/dialogs/MiscDialogs';
 import { SettingsDialog } from './components/dialogs/SettingsDialog';
+import { AddDetailDialog } from './components/dialogs/AddDetailDialog';
+import { FlattenDialog } from './components/dialogs/FlattenDialog';
 import { TermsDialog } from './components/dialogs/TermsDialog';
 import { StandardDetailsDialog } from './components/dialogs/StandardDetailsDialog';
 import { CompareDialog } from './components/dialogs/CompareDialog';
@@ -20,6 +22,8 @@ import { openPdfFiles, openProjectFile, restoreAutosave, startAutosave } from '.
 import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, handleAppShortcut } from './store/commands';
 import { sheetDisplayName } from './core/columns';
 import { downloadsCapability } from './core/persistence';
+import { setPdfOptions } from './core/pdf';
+import { setRenderCacheSize } from './core/renderCache';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME, desktop } from './brand';
 
 function StartScreen() {
@@ -149,6 +153,10 @@ function Dialogs() {
       return <ColumnsDialog />;
     case 'compare':
       return <CompareDialog sheetId={d.sheetId} />;
+    case 'flatten':
+      return <FlattenDialog markupIds={d.markupIds} />;
+    case 'addDetail':
+      return <AddDetailDialog markupIds={d.markupIds} />;
     case 'details':
       return <StandardDetailsDialog detailId={d.detailId} newForMarkupId={d.newForMarkupId} newForMarkupIds={d.newForMarkupIds} />;
     case 'shapeTool':
@@ -240,6 +248,13 @@ export function App() {
     // Desktop: files opened from Explorer while the app is already running.
     return desktop?.onOpenFiles((files) => void openGivenFiles(files.map((f) => new File([f.data], f.name))));
   }, []);
+
+  // Speed & graphics settings.
+  const perf = useStore((s) => s.prefs.perf);
+  useEffect(() => {
+    setPdfOptions({ hwa: perf.hwa });
+    setRenderCacheSize(perf.cache);
+  }, [perf]);
 
   // Global shortcuts that are not tied to the drawing (detached panes bind the same handler).
   useEffect(() => {

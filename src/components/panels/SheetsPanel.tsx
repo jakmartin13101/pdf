@@ -3,7 +3,7 @@ import { FilePlus2, Files, GitCompareArrows, LayoutGrid, List, Search, Tags } fr
 import { PanelHeader } from '../dock/PanelHeader';
 import type { Sheet } from '../../types';
 import { getState, useStore } from '../../store/store';
-import { renderPage } from '../../core/pdf';
+import { cachedRender, renderInBackground } from '../../core/renderCache';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { cmdAddPdf } from '../../store/commands';
 import { sheetLabel } from '../../core/columns';
@@ -19,15 +19,30 @@ function useThumb(sheet: Sheet, visible: boolean) {
       return;
     }
     let alive = true;
-    const canvas = document.createElement('canvas');
     const scale = 360 / Math.max(sheet.width, sheet.height);
-    renderPage(sheet.fileId, sheet.pageIndex, canvas, scale)
-      .then(() => {
-        const u = canvas.toDataURL('image/png');
+    const canvas = document.createElement('canvas');
+    const done = (c: HTMLCanvasElement) =>
+      c.toBlob((b) => {
+        if (!b) return;
+        const u = URL.createObjectURL(b);
         thumbCache.set(key, u);
         if (alive) setUrl(u);
-      })
-      .catch(() => {});
+      });
+    void (async () => {
+      // A page already rendered for the drawing makes the thumbnail without asking pdf.js again;
+      // otherwise wait until the sheet on screen has rendered.
+      const kept = cachedRender(sheet.fileId, sheet.pageIndex, scale);
+      if (kept) {
+        canvas.width = Math.max(1, Math.round(sheet.width * scale));
+        canvas.height = Math.max(1, Math.round(sheet.height * scale));
+        const ctx = canvas.getContext('2d')!;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(kept.bmp, 0, 0, canvas.width, canvas.height);
+        return done(canvas);
+      }
+      const off = await renderInBackground(sheet.fileId, sheet.pageIndex, scale, () => alive);
+      if (off && alive) done(off);
+    })();
     return () => {
       alive = false;
     };

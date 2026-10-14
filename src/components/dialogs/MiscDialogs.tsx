@@ -1,5 +1,6 @@
 import { Info, Keyboard } from 'lucide-react';
-import { getState } from '../../store/store';
+import { getState, useStore } from '../../store/store';
+import { COMMANDS, chordLabel, resolveBindings } from '../../core/keymap';
 import { Modal } from './Modal';
 import { APP_VERSION, FULL_NAME, SUITE_NAME, isDesktop } from '../../brand';
 
@@ -34,42 +35,51 @@ export function ConfirmDialog({ title, message, onConfirm }: { title: string; me
   );
 }
 
-const SHORTCUTS: [string, string][] = [
-  ['V', 'Select tool'],
+/** Keys that are not commands (Settings → Keyboard lists the rest). */
+const FIXED_KEYS: [string, string][] = [
   ['Space (hold) / middle mouse', 'Pan'],
-  ['Mouse wheel', 'Zoom at cursor (configurable)'],
-  ['Z', 'Zoom rectangle'],
-  ['Ctrl+0 / Ctrl+9', 'Fit page / Fit width'],
-  ['Ctrl+= / Ctrl+-', 'Zoom in / out'],
-  ['PgUp / PgDn', 'Previous / next sheet'],
-  ['Shift+Alt+K', 'Calibrate'],
-  ['Shift+Alt+L', 'Length'],
-  ['Shift+Alt+M', 'Polylength'],
-  ['Shift+Alt+A', 'Area'],
-  ['Shift+Alt+P', 'Perimeter'],
-  ['Shift+Alt+V', 'Volume'],
-  ['Shift+Alt+C', 'Count'],
-  ['Shift+Alt+G', 'Angle'],
-  ['T Q C R E L A N G P H', 'Text, Callout, Cloud, Rectangle, Ellipse, Line, Arrow, Polyline, Polygon, Pen, Highlight'],
+  ['Mouse wheel', 'Zoom at cursor (Settings → General)'],
   ['Enter / double-click / right-click', 'Finish polyline, area, perimeter…'],
   ['Backspace', 'Remove last vertex while drawing'],
   ['Shift while drawing', 'Constrain to 45°'],
   ['Esc', 'Cancel drawing / deselect / back to Select'],
-  ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
-  ['Ctrl+C / Ctrl+V / Ctrl+D', 'Copy / paste / duplicate'],
-  ['Delete', 'Delete selected markups'],
   ['Arrow keys (Shift)', 'Nudge selected markups (step in Settings → Drawing & Editing)'],
-  ['Ctrl+,', 'Settings & Preferences'],
-  ['Ctrl+O / Ctrl+S', 'Open PDF / save project'],
 ];
 
 export function ShortcutsDialog() {
   const st = getState();
+  const keys = useStore((s) => s.prefs.keys);
+  const bindings = resolveBindings(keys);
+  const rows = COMMANDS.filter((c) => bindings.get(c.id)?.length);
   return (
-    <Modal title="Keyboard Shortcuts" icon={<Keyboard size={16} />} size="mid" onClose={() => st.setDialog(null)}>
+    <Modal
+      title="Keyboard Shortcuts"
+      icon={<Keyboard size={16} />}
+      size="mid"
+      onClose={() => st.setDialog(null)}
+      footer={
+        <button className="btn" onClick={() => st.setDialog({ kind: 'settings', tab: 'keys' })} data-testid="shortcuts-customize">
+          Customize…
+        </button>
+      }
+    >
       <table className="shortcuts">
         <tbody>
-          {SHORTCUTS.map(([k, d]) => (
+          {rows.map((c) => (
+            <tr key={c.id}>
+              <td>
+                {bindings.get(c.id)!.map((k) => (
+                  <kbd key={k} style={{ marginRight: 4 }}>
+                    {chordLabel(k)}
+                  </kbd>
+                ))}
+              </td>
+              <td>
+                {c.label} <small className="hint">· {c.group}</small>
+              </td>
+            </tr>
+          ))}
+          {FIXED_KEYS.map(([k, d]) => (
             <tr key={k}>
               <td>
                 <kbd>{k}</kbd>

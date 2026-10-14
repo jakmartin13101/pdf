@@ -516,6 +516,9 @@ function DetailSection({ items, rows }: { items: Markup[]; rows: Row[] }) {
         </div>
       ))}
       <div className="field-row" style={{ flexWrap: 'wrap' }}>
+        <button className="btn sm" onClick={() => st.setDialog({ kind: 'addDetail', markupIds: ids })} data-testid="btn-add-detail">
+          Add Detail…
+        </button>
         <button
           className="btn sm"
           onClick={() => st.setDialog(ids.length === 1 ? { kind: 'details', newForMarkupId: ids[0] } : { kind: 'details', newForMarkupIds: ids })}

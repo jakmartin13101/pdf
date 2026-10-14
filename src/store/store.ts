@@ -37,7 +37,7 @@ export type ToolMode =
   | { kind: 'markup'; type: MarkupType; chestToolId?: string; resumeId?: string }
   | { kind: 'calibrate' }
   | { kind: 'viewport' }
-  | { kind: 'region'; purpose: 'number' | 'title' }
+  | { kind: 'region'; purpose: 'number' | 'title' | 'label' }
   | { kind: 'cutout'; markupId: string }
   /** Overlay alignment: click `count` points on this sheet (A), then the same points on the overlaid sheet (B). */
   | { kind: 'alignPoints'; sheetId: string; count: 2 | 3; ptsA: Pt[]; ptsB: Pt[] }
@@ -61,9 +61,11 @@ export type DialogState =
   | { kind: 'calibrate'; sheetId: string; pts: [Pt, Pt] }
   | { kind: 'viewport'; sheetId: string; rect?: Rect; viewportId?: string }
   | { kind: 'scale'; sheetId: string }
-  | { kind: 'pageLabels'; region?: { purpose: 'number' | 'title'; rect: Rect } }
+  | { kind: 'pageLabels'; region?: { purpose: 'number' | 'title' | 'label'; rect: Rect } }
   | { kind: 'columns' }
   | { kind: 'details'; detailId?: string; newForMarkupId?: string; newForMarkupIds?: string[] }
+  | { kind: 'addDetail'; markupIds: string[] }
+  | { kind: 'flatten'; markupIds?: string[] }
   | { kind: 'compare'; sheetId?: string }
   | { kind: 'toolEdit'; setId: string; toolId?: string; fromMarkupId?: string }
   | { kind: 'shapeTool'; setId?: string; toolId?: string }
@@ -157,9 +159,17 @@ export interface PaneWindow {
   h: number;
 }
 
+/** A document tab in a pane: an open file, and the sheet of it last shown in that pane. */
+export interface PaneTab {
+  fileId: string;
+  sheetId: string;
+}
+
 export interface Pane {
   id: string;
   sheetId: string | null;
+  /** Open documents, in tab order. The active tab is the file of `sheetId`. */
+  tabs: PaneTab[];
   detached?: PaneWindow;
 }
 
@@ -183,6 +193,21 @@ export interface Prefs {
   nudge: { unit: 'px' | 'real'; px: number; real: number };
   /** Step for fine adjustment of measurement ends, in real inches. */
   adjustStep: number;
+  /** Keyboard shortcuts changed in Settings → Keyboard: command id → its keys (overrides the defaults). */
+  keys: Record<string, string[]>;
+  /** Speed & graphics (Settings → Speed & Graphics). */
+  perf: PerfPrefs;
+}
+
+export interface PerfPrefs {
+  /** pdf.js draws with canvases kept on the graphics card. */
+  hwa: boolean;
+  /** How many rendered pages are kept for instant redisplay. */
+  cache: 'small' | 'normal' | 'large';
+  /** Render the next and previous sheets ahead. */
+  prefetch: boolean;
+  /** Read sheet numbers from title blocks after the drawing is shown, instead of before. */
+  backgroundLabels: boolean;
 }
 
 export interface AutoOptions {
@@ -195,7 +220,7 @@ export interface AutoOptions {
   useprinted: boolean;
 }
 
-export type SettingsTab = 'general' | 'units' | 'editing' | 'auto' | 'workspace';
+export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'auto' | 'speed' | 'workspace';
 
 interface TypeDefault {
   style: MarkupStyle;
@@ -263,6 +288,13 @@ export interface AppState {
   // navigation & view
   setCurrentSheet: (id: string) => void;
   gotoSheetOffset: (delta: number) => void;
+  /**
+   * Sheet labels read in the background after opening: applied to this and the undo history, but only
+   * to sheets whose labels are still as they were (`before`), so nothing typed meanwhile is lost.
+   */
+  applyReadLabels: (labels: Record<string, { number: string; title: string }>, before: Record<string, { number: string; title: string }>) => void;
+  /** Switch to the next (1) or previous (-1) document tab of the active pane. */
+  cycleTab: (dir: 1 | -1) => void;
   requestView: (r: Omit<ViewRequest, 'nonce'> & { kind: ViewRequest['kind'] }) => void;
   setZoom: (z: number) => void;
   setCursor: (p: Pt | null) => void;
@@ -349,6 +381,17 @@ export interface AppState {
   detachPane: (id: string, mode?: PaneWindow['mode']) => void;
   attachPane: (id: string) => void;
   setPaneWindow: (id: string, patch: Partial<PaneWindow>) => void;
+  /** Show a document (file) in a pane: its tab, opened there if it is not yet. */
+  openTab: (paneId: string, fileId: string) => void;
+  /** Close a document tab in a pane (the file stays in the project). A pane left without tabs closes. */
+  closeTab: (paneId: string, fileId: string) => void;
+  /**
+   * Move a document tab to another pane (or to another place in the same pane). With `copy`, the
+   * tab stays where it was too. The main window keeps at least one document.
+   */
+  moveTab: (fileId: string, fromPaneId: string, toPaneId: string, opts?: { index?: number; copy?: boolean }) => void;
+  /** Split the view and move a document tab into the new pane. */
+  tabToNewPane: (paneId: string, fileId: string) => void;
 
   // counts
   splitCount: (id: string, pointIndex: number | 'all') => void;
@@ -464,6 +507,20 @@ function loadLayout(): LayoutState {
   };
 }
 
+const fileOfSheet = (doc: DocState, sheetId: string | null) => (sheetId ? doc.sheets.find((s) => s.id === sheetId)?.fileId : undefined);
+
+/** A pane showing a sheet, with that sheet's document as its active tab (opened at the end if needed). */
+function showIn(p: Pane, sheetId: string | null, doc: DocState): Pane {
+  const fileId = fileOfSheet(doc, sheetId);
+  if (!sheetId || !fileId) return p.sheetId === sheetId ? p : { ...p, sheetId };
+  const at = p.tabs.findIndex((t) => t.fileId === fileId);
+  if (p.sheetId === sheetId && at >= 0 && p.tabs[at].sheetId === sheetId) return p;
+  const tabs = at >= 0 ? p.tabs.map((t, i) => (i === at ? { fileId, sheetId } : t)) : [...p.tabs, { fileId, sheetId }];
+  return { ...p, sheetId, tabs };
+}
+
+export const newPane = (id: string): Pane => ({ id, sheetId: null, tabs: [] });
+
 const PANE_COUNT: Record<PaneLayout, number> = { single: 1, vertical: 2, horizontal: 2, grid: 4 };
 const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
 /** Layout for the panes left in the main window (three attached panes use the grid: two over one). */
@@ -482,6 +539,8 @@ const defaultPrefs = (): Prefs => ({
   auto: { families: MEMBER_FAMILIES.filter((f) => f.on).map((f) => f.id), scope: 'sheet', skipExisting: true, extend: '', useprinted: true },
   nudge: { unit: 'px', px: 1, real: 1 },
   adjustStep: 1,
+  keys: {},
+  perf: { hwa: true, cache: 'normal', prefetch: true, backgroundLabels: true },
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -495,6 +554,8 @@ function loadPrefs(): Prefs {
     ...saved,
     auto: { ...d.auto, ...oldAuto, ...saved.auto },
     nudge: { ...d.nudge, ...saved.nudge },
+    keys: { ...saved.keys },
+    perf: { ...d.perf, ...saved.perf },
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
   };
 }
@@ -502,7 +563,7 @@ function loadPrefs(): Prefs {
 
 let clipboard: Markup[] = [];
 
-export const useStore = create<AppState>()((set, get) => {
+export const useStore = create<AppState>()((set, get, api) => {
   const toolChestFromStorage = lsGet<ToolSet[] | null>('ts.toolchest', null);
 
   const commit = (fn: (d: DocState) => DocState) => {
@@ -573,19 +634,62 @@ export const useStore = create<AppState>()((set, get) => {
     set({ layout });
   };
 
-  /** Keep every split pane pointing at an existing sheet. */
   /** State change for a new active pane: its sheet becomes the current sheet, and counts start over. */
   const activeChange = (id: string, panes: Pane[]) =>
     id === get().activePaneId
       ? { activePaneId: id }
       : { activePaneId: id, activeEpoch: get().activeEpoch + 1, currentSheetId: panes.find((p) => p.id === id)?.sheetId ?? get().currentSheetId };
+
+  // Files that have had a tab: a file new to the project opens as a tab in the active pane once, so a
+  // tab the user closes stays closed.
+  let tabbed = new Set<string>();
+
+  /**
+   * Keep panes and their document tabs in step with the project: tabs follow their files (a flattened
+   * file is a new version of the same document), close with removed files, every pane shows a sheet
+   * of one of its tabs, and files new to the project open as tabs in the active pane.
+   */
   const syncPanes = () => {
     const { panes, doc, currentSheetId, activePaneId } = get();
-    const ids = new Set(doc.sheets.map((s) => s.id));
-    const fallback = currentSheetId && ids.has(currentSheetId) ? currentSheetId : doc.sheets[0]?.id ?? null;
-    const next = panes.map((p) => (p.id === activePaneId ? { ...p, sheetId: fallback } : p.sheetId && ids.has(p.sheetId) ? p : { ...p, sheetId: fallback }));
-    set({ panes: next, currentSheetId: next.find((p) => p.id === activePaneId)?.sheetId ?? fallback });
+    const sheetIds = new Set(doc.sheets.map((s) => s.id));
+    const fileIds = new Set(doc.files.map((f) => f.id));
+    const firstSheet = (fileId: string) => doc.sheets.find((s) => s.fileId === fileId)?.id;
+    const fixTab = (t: PaneTab): PaneTab | null => {
+      const fileId = fileIds.has(t.fileId) ? t.fileId : sheetIds.has(t.sheetId) ? fileOfSheet(doc, t.sheetId) : undefined;
+      if (!fileId) return null;
+      const sheetId = sheetIds.has(t.sheetId) && fileOfSheet(doc, t.sheetId) === fileId ? t.sheetId : firstSheet(fileId);
+      return sheetId ? { fileId, sheetId } : null;
+    };
+    const inTabs = new Set<string>();
+    let next = panes.map((p) => {
+      const tabs: PaneTab[] = [];
+      let activeTab: PaneTab | null = null;
+      for (const t of p.tabs) {
+        const f = fixTab(t);
+        if (f && t.sheetId === p.sheetId) activeTab = f;
+        if (f && !tabs.some((x) => x.fileId === f.fileId)) tabs.push(f);
+      }
+      tabs.forEach((t) => inTabs.add(t.fileId));
+      return { pane: { ...p, tabs }, activeTab };
+    });
+    tabbed = new Set([...tabbed].filter((id) => fileIds.has(id)));
+    const fresh = doc.files.filter((f) => !tabbed.has(f.id) && !inTabs.has(f.id) && firstSheet(f.id));
+    for (const f of doc.files) if (inTabs.has(f.id) || fresh.includes(f)) tabbed.add(f.id);
+    next = next.map((n) => (n.pane.id === activePaneId ? { ...n, pane: { ...n.pane, tabs: [...n.pane.tabs, ...fresh.map((f) => ({ fileId: f.id, sheetId: firstSheet(f.id)! }))] } } : n));
+    const result = next.map(({ pane, activeTab }) => {
+      const want = pane.id === activePaneId ? currentSheetId : pane.sheetId;
+      const sheet = want && sheetIds.has(want) ? want : activeTab?.sheetId ?? pane.tabs[0]?.sheetId ?? doc.sheets[0]?.id ?? null;
+      return showIn(pane, sheet, doc);
+    });
+    const cur = result.find((p) => p.id === activePaneId)?.sheetId ?? null;
+    const same = result.length === panes.length && result.every((p, i) => JSON.stringify(p) === JSON.stringify(panes[i]));
+    if (!same) set({ panes: result });
+    if (cur !== currentSheetId) set({ currentSheetId: cur });
   };
+  // Sheets and files change in many ways (undo and redo, flattening, deleting): panes follow.
+  api.subscribe((s, prev) => {
+    if (s.doc.sheets !== prev.doc.sheets || s.doc.files !== prev.doc.files) syncPanes();
+  });
 
   const pruneSelection = (doc: DocState, sel: string[]) => {
     const ids = new Set(doc.markups.map((m) => m.id));
@@ -612,7 +716,7 @@ export const useStore = create<AppState>()((set, get) => {
     ui: { ...defaultUI, ...lsGet<Partial<UIState>>('ts.ui', {}) },
     layout: loadLayout(),
     panelDrag: null,
-    panes: [{ id: 'pane-1', sheetId: null }],
+    panes: [newPane('pane-1')],
     paneLayout: 'single',
     activePaneId: 'pane-1',
     activeEpoch: 0,
@@ -649,7 +753,10 @@ export const useStore = create<AppState>()((set, get) => {
     },
 
     loadDoc: (doc, name, opts) => {
+      // A new project starts its tabs over: every document opens as a tab in the active pane.
+      if (!opts?.keepHistory) tabbed = new Set();
       set((s) => ({
+        ...(opts?.keepHistory ? {} : { panes: s.panes.map((p) => ({ ...p, tabs: [] })) }),
         doc,
         projectName: name,
         loaded: true,
@@ -674,13 +781,34 @@ export const useStore = create<AppState>()((set, get) => {
     setCurrentSheet: (id) => {
       const { currentSheetId, panes, activePaneId } = get();
       if (id === currentSheetId && panes.find((p) => p.id === activePaneId)?.sheetId === id) return;
-      set({ currentSheetId: id, editingTextId: null, panes: panes.map((p) => (p.id === activePaneId ? { ...p, sheetId: id } : p)) });
+      const doc = get().doc;
+      set({ currentSheetId: id, editingTextId: null, panes: panes.map((p) => (p.id === activePaneId ? showIn(p, id, doc) : p)) });
     },
     gotoSheetOffset: (delta) => {
       const { doc, currentSheetId } = get();
       const i = doc.sheets.findIndex((s) => s.id === currentSheetId);
       const n = doc.sheets[Math.max(0, Math.min(doc.sheets.length - 1, i + delta))];
       if (n) get().setCurrentSheet(n.id);
+    },
+    applyReadLabels: (labels, before) => {
+      const fix = (d: DocState): DocState => ({
+        ...d,
+        sheets: d.sheets.map((s) => {
+          const l = labels[s.id];
+          const b = before[s.id];
+          return l && b && s.number === b.number && s.title === b.title ? { ...s, number: l.number, title: l.title } : s;
+        }),
+      });
+      const { doc, past, future } = get();
+      set({ doc: fix(doc), past: past.map(fix), future: future.map(fix) });
+    },
+    cycleTab: (dir) => {
+      const { doc, panes, activePaneId } = get();
+      const pane = panes.find((p) => p.id === activePaneId);
+      if (!pane || pane.tabs.length < 2) return;
+      const cur = fileOfSheet(doc, pane.sheetId);
+      const i = pane.tabs.findIndex((t) => t.fileId === cur);
+      get().openTab(pane.id, pane.tabs[(i + dir + pane.tabs.length) % pane.tabs.length].fileId);
     },
     requestView: (r) => set({ viewRequest: { ...(r as ViewRequest), paneId: get().activePaneId, nonce: Date.now() + Math.random() } }),
     setZoom: (zoom) => set({ zoom }),
@@ -721,8 +849,12 @@ export const useStore = create<AppState>()((set, get) => {
       const idx = doc.sheets.findIndex((s) => s.id === id);
       commit((d) => ({ ...d, sheets: d.sheets.filter((s) => s.id !== id), markups: d.markups.filter((m) => m.sheetId !== id) }));
       if (currentSheetId === id) {
+        // The next sheet of the same document, else the next one in the set.
         const sheets = get().doc.sheets;
-        set({ currentSheetId: sheets[Math.min(idx, sheets.length - 1)]?.id ?? null, selection: [] });
+        const fileId = doc.sheets[idx]?.fileId;
+        const same = sheets.filter((s) => s.fileId === fileId);
+        const before = doc.sheets.slice(0, idx).filter((s) => s.fileId === fileId).length;
+        set({ currentSheetId: same[Math.min(before, same.length - 1)]?.id ?? sheets[Math.min(idx, sheets.length - 1)]?.id ?? null, selection: [] });
       }
       syncPanes();
     },
@@ -958,7 +1090,7 @@ export const useStore = create<AppState>()((set, get) => {
       let keep = attached.slice(0, n);
       const act = attached.find((p) => p.id === activePaneId);
       if (act && !keep.includes(act)) keep = [...keep.slice(0, n - 1), act];
-      while (keep.length < n) keep.push({ id: uid('pane'), sheetId: currentSheetId });
+      while (keep.length < n) keep.push(showIn(newPane(uid('pane')), currentSheetId, get().doc));
       const next = [...keep, ...panes.filter((p) => p.detached)];
       const active = next.some((p) => p.id === activePaneId) ? activePaneId : keep[0].id;
       set({ paneLayout, panes: next, editingTextId: null, ...activeChange(active, next) });
@@ -969,7 +1101,7 @@ export const useStore = create<AppState>()((set, get) => {
     },
     setPaneSheet: (paneId, sheetId) => {
       set((s) => ({
-        panes: s.panes.map((p) => (p.id === paneId ? { ...p, sheetId } : p)),
+        panes: s.panes.map((p) => (p.id === paneId ? showIn(p, sheetId, s.doc) : p)),
         ...(paneId === s.activePaneId ? { currentSheetId: sheetId, editingTextId: null } : {}),
       }));
     },
@@ -1013,6 +1145,86 @@ export const useStore = create<AppState>()((set, get) => {
     },
     setPaneWindow: (id, patch) =>
       set((s) => ({ panes: s.panes.map((p) => (p.id === id && p.detached ? { ...p, detached: { ...p.detached, ...patch } } : p)) })),
+
+    openTab: (paneId, fileId) => {
+      const { panes, doc } = get();
+      const pane = panes.find((p) => p.id === paneId);
+      if (!pane) return;
+      const tab = pane.tabs.find((t) => t.fileId === fileId);
+      const sheetId = tab && doc.sheets.some((s) => s.id === tab.sheetId) ? tab.sheetId : doc.sheets.find((s) => s.fileId === fileId)?.id;
+      if (!sheetId) return;
+      get().setActivePane(paneId);
+      get().setPaneSheet(paneId, sheetId);
+    },
+    closeTab: (paneId, fileId) => {
+      const { panes, doc, activePaneId } = get();
+      const pane = panes.find((p) => p.id === paneId);
+      const at = pane?.tabs.findIndex((t) => t.fileId === fileId) ?? -1;
+      if (!pane || at < 0) return;
+      const tabs = pane.tabs.filter((t) => t.fileId !== fileId);
+      if (!tabs.length) {
+        if (pane.detached || attachedPanes(panes).length > 1) get().closePane(paneId);
+        else get().toast('The main window keeps at least one document open.');
+        return;
+      }
+      const showing = fileOfSheet(doc, pane.sheetId) === fileId;
+      const sheetId = showing ? tabs[Math.min(at, tabs.length - 1)].sheetId : pane.sheetId;
+      const next = panes.map((p) => (p.id === paneId ? { ...p, tabs, sheetId } : p));
+      set({ panes: next, ...(paneId === activePaneId && showing ? { currentSheetId: sheetId, editingTextId: null } : {}) });
+    },
+    moveTab: (fileId, fromPaneId, toPaneId, opts) => {
+      const { panes, doc } = get();
+      const from = panes.find((p) => p.id === fromPaneId);
+      const to = panes.find((p) => p.id === toPaneId);
+      const tab = from?.tabs.find((t) => t.fileId === fileId);
+      if (!from || !to || !tab) return;
+      // Put the tab before the one at `index` (at the end without one; where it is if already there).
+      const place = (tabs: PaneTab[], t: PaneTab) => {
+        const j = tabs.findIndex((x) => x.fileId === t.fileId);
+        const rest = tabs.filter((x) => x.fileId !== t.fileId);
+        let i = opts?.index ?? (j >= 0 ? j : rest.length);
+        if (opts?.index !== undefined && j >= 0 && j < i) i--;
+        i = Math.max(0, Math.min(rest.length, i));
+        return [...rest.slice(0, i), t, ...rest.slice(i)];
+      };
+      if (from.id === to.id) {
+        set({ panes: panes.map((p) => (p.id === from.id ? { ...p, tabs: place(p.tabs, tab) } : p)) });
+        return;
+      }
+      const moved = tab;
+      // Leaving the main window without a document is not allowed: the tab is copied instead.
+      const keepSource = opts?.copy || (from.tabs.length === 1 && !from.detached && attachedPanes(panes).length === 1);
+      const closeSource = !keepSource && from.tabs.length === 1;
+      let next = panes.map((p) => (p.id === to.id ? showIn({ ...p, tabs: place(p.tabs, moved) }, moved.sheetId, doc) : p));
+      if (!keepSource && !closeSource) {
+        next = next.map((p) => {
+          if (p.id !== from.id) return p;
+          const at = p.tabs.findIndex((t) => t.fileId === fileId);
+          const tabs = p.tabs.filter((t) => t.fileId !== fileId);
+          return fileOfSheet(doc, p.sheetId) === fileId ? { ...p, tabs, sheetId: tabs[Math.min(at, tabs.length - 1)].sheetId } : { ...p, tabs };
+        });
+      }
+      set({ panes: next, editingTextId: null });
+      if (closeSource) get().closePane(from.id);
+      get().setActivePane(to.id);
+      // The target is active now; make sure the current sheet is the one it shows.
+      const shown = get().panes.find((p) => p.id === to.id)?.sheetId ?? null;
+      if (get().currentSheetId !== shown) set({ currentSheetId: shown });
+    },
+    tabToNewPane: (paneId, fileId) => {
+      const { panes, paneLayout } = get();
+      const from = panes.find((p) => p.id === paneId);
+      if (!from?.tabs.some((t) => t.fileId === fileId)) return;
+      if (attachedPanes(panes).length >= 4) {
+        get().toast('The main window already shows four panes. Drag the tab onto one of them instead.', 'error');
+        return;
+      }
+      const pane = newPane(uid('pane'));
+      const attached = [...attachedPanes(panes), pane];
+      set({ panes: [...attached, ...panes.filter((p) => p.detached)], paneLayout: layoutFor(attached.length, paneLayout) });
+      // Moving the only tab out of a pane would close it again: keep it there and open it in the new one too.
+      get().moveTab(fileId, paneId, pane.id, { copy: from.tabs.length === 1 });
+    },
 
     splitCount: (id, pointIndex) => {
       const m = get().doc.markups.find((x) => x.id === id);

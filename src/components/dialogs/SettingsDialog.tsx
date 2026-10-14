@@ -1,9 +1,11 @@
 // Settings & Preferences (Settings menu): personal preferences, the project's units, drawing and
 // editing behaviour, automatic takeoff line styles and the workspace.
-import { useState } from 'react';
-import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2, X } from 'lucide-react';
+import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolveBindings } from '../../core/keymap';
 import type { AutoStyleRule, LineStyle, ProjectSettings } from '../../types';
-import { getState, useStore, type SettingsTab } from '../../store/store';
+import { getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
+import { desktop, type GpuMode } from '../../brand';
 import { AUTO_MATCH, autoStyleFor, defaultAutoStyles, isAutoMarkup, newAutoStyle, withRule } from '../../core/autoStyles';
 import { MEMBER_FAMILIES } from '../../core/autoTakeoff';
 import { formatLength, parseLength } from '../../core/units';
@@ -15,7 +17,9 @@ const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'general', label: 'General', hint: 'You, theme and tools' },
   { id: 'units', label: 'Units & Totals', hint: 'This project' },
   { id: 'editing', label: 'Drawing & Editing', hint: 'Snapping and adjusting' },
+  { id: 'keys', label: 'Keyboard', hint: 'Shortcuts for commands' },
   { id: 'auto', label: 'Auto Takeoff', hint: 'Line styles by subject' },
+  { id: 'speed', label: 'Speed & Graphics', hint: 'Graphics card, rendering' },
   { id: 'workspace', label: 'Workspace', hint: 'Panels and toolbar' },
 ];
 
@@ -182,6 +186,123 @@ function Editing() {
       </div>
       <div className="hint">
         The step for the − / + buttons that lengthen or shorten a measurement's ends (Properties → <i>Adjust Ends</i>, and members in the Auto Takeoff panel).
+      </div>
+    </>
+  );
+}
+
+/** Settings → Keyboard: every command's shortcuts; record new ones, remove or reset them. */
+function Keyboard() {
+  const overrides = useStore((s) => s.prefs.keys);
+  const st = getState();
+  const bindings = resolveBindings(overrides);
+  const [filter, setFilter] = useState('');
+  const [recording, setRecording] = useState<string | null>(null);
+  const [clash, setClash] = useState<{ id: string; chord: string; others: string[] } | null>(null);
+  const setKeys = (id: string, keys: string[]) => st.setPrefs({ keys: { ...overrides, [id]: keys } });
+  const add = (id: string, chord: string, replace = false) => {
+    const others = conflicts(chord, bindings, id);
+    if (others.length && !replace) {
+      setClash({ id, chord, others });
+      return;
+    }
+    const next = { ...overrides };
+    for (const o of others) next[o] = (bindings.get(o) ?? []).filter((k) => k !== chord);
+    next[id] = [...(bindings.get(id) ?? []).filter((k) => k !== chord), chord];
+    st.setPrefs({ keys: next });
+    setClash(null);
+    setRecording(null);
+  };
+  const q = filter.trim().toLowerCase();
+  const groups = [...new Set(COMMANDS.map((c) => c.group))];
+  const changed = Object.keys(overrides).length;
+  return (
+    <>
+      <div className="field-row">
+        <input placeholder="Search commands or keys" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="keys-search" />
+        <button className="btn sm narrow" disabled={!changed} onClick={() => st.setPrefs({ keys: {} })} data-testid="keys-reset-all">
+          <RotateCcw size={12} /> Reset All
+        </button>
+      </div>
+      <div className="hint">
+        Click <b>+</b> next to a command and press the keys. Single keys (like <kbd>L</kbd>) work on the drawing; add Ctrl, Shift or Alt for more. Fixed keys: Space (hold) pans,
+        Esc cancels, Enter finishes a shape, arrows move the selection.
+      </div>
+      {clash && (
+        <div className="set-clash" data-testid="keys-clash">
+          <b>{chordLabel(clash.chord)}</b> is used by {clash.others.map((o) => COMMAND_BY_ID.get(o)?.label).join(', ')}.
+          <button className="btn sm narrow" onClick={() => add(clash.id, clash.chord, true)} data-testid="keys-replace">
+            Use it for {COMMAND_BY_ID.get(clash.id)?.label}
+          </button>
+          <button className="btn sm narrow" onClick={() => setClash(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
+      <div className="set-keys" data-testid="keys-list">
+        {groups.map((g) => {
+          const cmds = COMMANDS.filter((c) => c.group === g && (!q || c.label.toLowerCase().includes(q) || (bindings.get(c.id) ?? []).some((k) => k.toLowerCase().includes(q))));
+          if (!cmds.length) return null;
+          return (
+            <div key={g} className="set-keys-group">
+              <h4 className="set-h">{g}</h4>
+              {cmds.map((c) => {
+                const keys = bindings.get(c.id) ?? [];
+                const custom = c.id in overrides;
+                return (
+                  <div key={c.id} className={`set-key${custom ? ' custom' : ''}`} data-testid="key-row" data-command={c.id}>
+                    <span className="grow">{c.label}</span>
+                    <span className="set-chords">
+                      {keys.map((k) => (
+                        <span key={k} className="set-chord">
+                          <kbd>{chordLabel(k)}</kbd>
+                          <button className="icon-btn" title="Remove this shortcut" onClick={() => setKeys(c.id, keys.filter((x) => x !== k))} data-testid="key-remove">
+                            <X size={11} />
+                          </button>
+                        </span>
+                      ))}
+                      {recording === c.id ? (
+                        <input
+                          className="set-record"
+                          autoFocus
+                          readOnly
+                          value="Press keys…"
+                          onBlur={() => setRecording(null)}
+                          onKeyDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (e.key === 'Escape') return setRecording(null);
+                            const chord = chordFromEvent(e.nativeEvent);
+                            if (chord) add(c.id, chord);
+                          }}
+                          data-testid="key-record"
+                        />
+                      ) : (
+                        <button className="icon-btn" title="Add a shortcut" onClick={() => (setClash(null), setRecording(c.id))} data-testid="key-add">
+                          <Plus size={12} />
+                        </button>
+                      )}
+                      {custom && (
+                        <button
+                          className="icon-btn"
+                          title="Back to the default"
+                          onClick={() => {
+                            const next = { ...overrides };
+                            delete next[c.id];
+                            st.setPrefs({ keys: next });
+                          }}
+                          data-testid="key-default"
+                        >
+                          <RotateCcw size={11} />
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -361,6 +482,106 @@ function AutoTakeoff() {
   );
 }
 
+const GPU_STATUS: Record<string, string> = {
+  '2d_canvas': '2D canvas (drawings)',
+  gpu_compositing: 'Compositing (pan and zoom)',
+  rasterization: 'Rasterization',
+  webgl: 'WebGL',
+};
+const statusText = (v: string) => (v.startsWith('enabled') ? 'Graphics card' : v.includes('software') ? 'Software' : v.replace(/_/g, ' '));
+
+function Speed() {
+  const perf = useStore((s) => s.prefs.perf);
+  const st = getState();
+  const set = (p: Partial<PerfPrefs>) => st.setPrefs({ perf: { ...perf, ...p } });
+  const [gfx, setGfx] = useState<Awaited<ReturnType<NonNullable<typeof desktop>['graphics'] & {}>> | null>(null);
+  useEffect(() => {
+    void desktop?.graphics?.().then(setGfx);
+  }, []);
+  const renderer = useMemo(() => {
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      if (!gl) return null;
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      return String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    } catch {
+      return null;
+    }
+  }, []);
+  return (
+    <>
+      <h4 className="set-h">Graphics card</h4>
+      {desktop?.graphics ? (
+        <>
+          <div className="field">
+            <label>Hardware acceleration</label>
+            <select
+              value={gfx?.saved ?? 'auto'}
+              onChange={async (e) => {
+                await desktop!.setGraphics!(e.target.value as GpuMode);
+                setGfx(await desktop!.graphics!());
+              }}
+              data-testid="set-gpu"
+            >
+              <option value="auto">On (recommended)</option>
+              <option value="force">On, even for graphics drivers Chromium does not trust</option>
+              <option value="off">Off – software only (for display problems)</option>
+            </select>
+          </div>
+          {gfx && gfx.saved !== gfx.mode && (
+            <div className="set-clash">
+              Restart BuildSuite Takeoff Studio to apply this.
+              <button className="btn sm narrow" onClick={() => void desktop!.relaunch!()}>
+                Restart Now
+              </button>
+            </div>
+          )}
+          {gfx && (
+            <table className="set-gpu" data-testid="gpu-status">
+              <tbody>
+                {Object.entries(GPU_STATUS).map(([k, label]) => (
+                  <tr key={k}>
+                    <td>{label}</td>
+                    <td className={gfx.status[k]?.startsWith('enabled') ? 'ok-text' : 'hint'}>{gfx.status[k] ? statusText(gfx.status[k]) : '–'}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td>Graphics</td>
+                  <td className="hint">{renderer ?? 'not reported'}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </>
+      ) : (
+        <div className="hint" data-testid="gpu-status">
+          In a browser, the browser decides whether to use the graphics card (its <i>Use hardware acceleration</i> setting). Graphics: <b>{renderer ?? 'not reported'}</b>
+        </div>
+      )}
+      <Check checked={perf.hwa} onChange={(v) => set({ hwa: v })} testId="set-hwa">
+        Draw PDFs on graphics-card canvases (applies to drawings opened after the change)
+      </Check>
+
+      <h4 className="set-h">Opening and rendering</h4>
+      <Check checked={perf.prefetch} onChange={(v) => set({ prefetch: v })} testId="set-prefetch">
+        Render the next and previous sheets ahead, so paging through a set is instant
+      </Check>
+      <div className="field">
+        <label>Rendered pages kept</label>
+        <select value={perf.cache} onChange={(e) => set({ cache: e.target.value as PerfPrefs['cache'] })} data-testid="set-cache">
+          <option value="small">Few (about 80 MB of memory)</option>
+          <option value="normal">Normal (about 190 MB)</option>
+          <option value="large">Many (about 440 MB)</option>
+        </select>
+      </div>
+      <Check checked={perf.backgroundLabels} onChange={(v) => set({ backgroundLabels: v })}>
+        Large sets (over 12 pages): show the drawing first, read sheet numbers from the title blocks afterwards
+      </Check>
+      <div className="hint">Kept pages show at once when you come back to them; switching pages and the thumbnails use them too.</div>
+    </>
+  );
+}
+
 function Workspace() {
   const layout = useStore((s) => s.layout);
   const st = getState();
@@ -420,7 +641,9 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
           {tab === 'general' && <General />}
           {tab === 'units' && <Units />}
           {tab === 'editing' && <Editing />}
+          {tab === 'keys' && <Keyboard />}
           {tab === 'auto' && <AutoTakeoff />}
+          {tab === 'speed' && <Speed />}
           {tab === 'workspace' && <Workspace />}
         </div>
       </div>

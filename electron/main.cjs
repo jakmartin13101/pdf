@@ -48,6 +48,29 @@ const CSP = [
 app.setName(PRODUCT);
 if (process.platform === 'win32') app.setAppUserModelId('com.buildsuite.takeoffstudio');
 
+// ---------------------------------------------------------------------------
+// Graphics card (Settings → Speed & Graphics). Read before the GPU process starts, so a change applies
+// after a restart. auto: hardware acceleration with GPU rasterization; off: software only (for
+// problem drivers); force: also use graphics cards Chromium has on its blocklist.
+
+const graphicsFile = () => path.join(app.getPath('userData'), 'graphics.json');
+function readGraphics() {
+  try {
+    return JSON.parse(fs.readFileSync(graphicsFile(), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+const GPU_MODES = ['auto', 'off', 'force'];
+const graphics = { gpu: 'auto', ...readGraphics() };
+if (!GPU_MODES.includes(graphics.gpu)) graphics.gpu = 'auto';
+if (graphics.gpu === 'off') app.disableHardwareAcceleration();
+else {
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
+  if (graphics.gpu === 'force') app.commandLine.appendSwitch('ignore-gpu-blocklist');
+}
+
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
 ]);
@@ -211,6 +234,30 @@ ipcMain.handle('buildsuite:open-report', async (_event, html) => {
   report.on('closed', () => fsp.rm(file, { force: true }).catch(() => {}));
   await report.loadFile(file);
   return true;
+});
+
+ipcMain.handle('buildsuite:graphics', async () => {
+  let gpu = null;
+  try {
+    const info = await app.getGPUInfo('basic');
+    const dev = info?.gpuDevice?.find((d) => d.active) ?? info?.gpuDevice?.[0];
+    gpu = dev ? { vendorId: dev.vendorId, deviceId: dev.deviceId, driver: dev.driverVersion ?? '' } : null;
+  } catch {
+    /* not available */
+  }
+  return { mode: graphics.gpu, saved: { gpu: 'auto', ...readGraphics() }.gpu, status: app.getGPUFeatureStatus(), gpu };
+});
+
+ipcMain.handle('buildsuite:set-graphics', async (_event, mode) => {
+  if (!GPU_MODES.includes(mode)) return false;
+  await fsp.mkdir(path.dirname(graphicsFile()), { recursive: true });
+  await fsp.writeFile(graphicsFile(), JSON.stringify({ ...readGraphics(), gpu: mode }, null, 2));
+  return true;
+});
+
+ipcMain.handle('buildsuite:relaunch', async () => {
+  app.relaunch();
+  app.exit(0);
 });
 
 ipcMain.handle('buildsuite:take-open-files', async () => {

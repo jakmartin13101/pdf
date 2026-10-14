@@ -7,10 +7,11 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.4.1**: the automatic takeoff splits a member line that runs on through its columns at the column
-> symbols (or halfway between labels). **Version 1.4.0** adds a **Settings** menu (settings & preferences in one dialog), **line styles by subject** for
-> automatic takeoff measurements (e.g. W beams as a green line) and **fine adjustment** of measured lines (1.3.0:
-> automatic takeoff of beams and tubing, standard details by hand; 1.2.0: overlay / compare) – see the
+> **Version 1.5.0**: **document tabs** – every PDF opens in its own tab in the active pane, and tabs drag to any
+> other pane or window; **Add Detail…** on the right-click menu of selected markups; **custom keyboard shortcuts**;
+> **Flatten Markups** into the drawing; **page labels from a box** drawn once and read on all or the ticked pages;
+> faster opening and paging with the **graphics card** helping (1.4: Settings menu, auto takeoff line styles by
+> subject, fine adjustment; 1.3.0: automatic takeoff of beams and tubing; 1.2.0: overlay / compare) – see the
 > [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
@@ -71,7 +72,7 @@ A five-minute tour with the sample set:
 
 | Workflow step | Where it lives |
 | --- | --- |
-| **1. Sheet labeling & organization** | Sheets panel: thumbnails/list, search, drag to reorder, double-click to rename. *Document → Page Labels*: auto-detect from title blocks, read number/title from a boxed title-block region on every page, sequential numbering, or edit in a table. Multiple PDFs combine into one sheet set. |
+| **1. Sheet labeling & organization** | Sheets panel: thumbnails/list, search, drag to reorder, double-click to rename. *Document → Page Labels*: auto-detect from title blocks, **box the number and/or title once on any page** and read the same spot on all or the ticked pages, sequential numbering, or edit in a table. Multiple PDFs combine into one sheet set, each in its own **document tab**. |
 | **2. Scale calibration** | *Calibrate* (two points + known distance such as `20'-0"`, `20-6`, `6.1 m`), *Set Scale* (architectural, engineering and metric presets or custom), apply to one / all / unscaled sheets. **Viewports** give a rectangular area of a sheet its own scale (details drawn at 1½" = 1'-0" next to a 1/4" section). Units: ft-in, decimal ft, in, m, cm, mm with selectable precision. |
 | **3. Linear measurements** | Length and Polylength tools; results are persistent markup objects you can select, move, reshape by dragging vertices, restyle and inspect. Snaps to PDF line work (endpoints, midpoints, intersections, lines), to markup vertices, and Shift/ORTHO constrain angles. |
 | **4. Area & perimeter** | Area (with perimeter shown), Perimeter, Volume (area × depth, CY/CF/m³), Angle; area **cutouts** for openings. |
@@ -86,7 +87,9 @@ A five-minute tour with the sample set:
 | **Overlay / compare** | *Document → Compare / Overlay Sheets*: two sheets in their own colours, auto-aligned (text or image) or aligned by points / by hand, with change detection and revision clouds. See [Overlay / compare](#overlay--compare-sheets). |
 | **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length – or add a detail by hand to any selected markups. See [Standard details](#standard-details). |
 | **Automatic takeoff** | *Auto* button (*Tools → Automatic Takeoff*): finds the member-size labels on a plan (W24x55, HSS8x4x1/4, Pipe 4 Std…), measures the line each one labels at the sheet's scale and creates labelled length measurements, drawn by line style rules (*Settings → Auto Takeoff Line Styles*). See [Automatic takeoff](#automatic-takeoff-beams-and-tubing). |
-| **Settings & preferences** | *Settings* menu (`Ctrl+,`): general preferences, the project's units and totals, snapping and fine adjustment, auto takeoff line styles, workspace. See [Settings](#settings--preferences). |
+| **Settings & preferences** | *Settings* menu (`Ctrl+,`): general preferences, the project's units and totals, snapping and fine adjustment, **keyboard shortcuts**, auto takeoff line styles, **speed & graphics**, workspace. See [Settings](#settings--preferences). |
+| **Document tabs** | Each open PDF has a tab in the active pane; drag tabs between panes and detached windows. See [Document tabs](#document-tabs). |
+| **Flatten markups** | *Edit → Flatten Markups…* (or right-click): draws markups into the drawing itself. See [Flatten markups](#flatten-markups). |
 
 ### Tool Chest: size tools and hidden tools
 
@@ -132,8 +135,9 @@ IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
   own lines in the Takeoff Summary and exports. The size fills Member Size, so Weight computes for it (steel shapes,
   plate, pipe, rod and rebar). *Detail material* in the list (or the summary) shows or hides it.
 * **By hand** – select any markups (Ctrl+click or box-select in the drawing or the Markups List), right-click →
-  **Standard Details**: tick a detail to add it to every selected markup (or untick to take it off), or choose
-  **New Detail for These N…** to make a detail for them. The Properties panel shows a checkbox per detail for the
+  **Add Detail to N Markups…**: a window lists every detail already made – tick one to add it to all the selected
+  markups (untick to take it off; a dash means some have it), with a preview of the material it adds – or click
+  **New Detail for These N…** to make a new one for them. The same is under *Properties → Add Detail…*. The Properties panel shows a checkbox per detail for the
   selection, and the editor has **Add to Selected / Take off Selected**. A detail with *Apply automatically* off goes
   only where you add it; one with a rule still lets you add it to other markups or take it off single ones by hand.
   *Back to Rules Only* drops the by-hand changes.
@@ -141,6 +145,8 @@ IF [Subject] = "Metal Deck"     → ADD Edge Angle  L3x3x1/4  full length
   project; export/import them as JSON to reuse on other jobs. The example takeoff includes four.
 
 <img src="docs/screenshot-standard-details.png" width="640" alt="Standard Details dialog">
+
+<img src="docs/screenshot-add-detail.png" width="520" alt="Add Detail: existing details ticked for two selected tubes, with the material they add">
 
 <img src="docs/screenshot-details-by-hand.png" width="640" alt="A standard detail added by hand to three selected tubes">
 
@@ -201,16 +207,23 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
   labels; saved with the project.
 * **Drawing & Editing** – snapping to the drawing and to markups, ortho; what the arrow keys move a selection by (screen
   pixels, or a drawing length such as 1" at each markup's own scale – Shift ×10); the step for adjusting ends.
+* **Keyboard** – every command with its keys: click **+** and press the keys to add a shortcut, × to remove one,
+  *Default* to put a command back, *Reset All*. Single keys (like `L`) work on the drawing; add Ctrl, Shift or Alt for
+  more. A key already used by another command is flagged, with the choice to move it. Search by command or by key.
+  The menus, tooltips and *Help → Keyboard Shortcuts* show your keys.
 * **Auto Takeoff** – line styles by subject (above) and the defaults for finding members.
+* **Speed & Graphics** – see [Speed and graphics](#speed-and-graphics).
 * **Workspace** – lock the layout, toolbar position, reset the layout.
+
+<img src="docs/screenshot-keyboard.png" width="560" alt="Settings: keyboard shortcuts">
 
 Preferences are kept on the computer and apply to every project; the units belong to the project.
 
 ### Overlay / compare sheets
 
 Compare two versions of a drawing: *Document → Compare / Overlay Sheets…* (or the
-**Compare** button). Add the revised PDF to the set first (*File → Add PDF to Set…*); the revision of the same sheet
-number is suggested as the overlay.
+**Compare** button). Open the revised PDF first (*File → Open PDF in a New Tab…*, which adds it to the set); the
+revision of the same sheet number is suggested as the overlay.
 
 ![Addendum 2 of S1.02 overlaid on the original, with the changes boxed](docs/screenshot-overlay.png)
 
@@ -231,11 +244,29 @@ number is suggested as the overlay.
   sheet A. The example takeoff includes Addendum 2 of S1.02 with an overlay ready to switch on (Compare panel →
   *Overlay on*).
 
+### Document tabs
+
+Every PDF in the project has a **tab** across the top of the pane – *File → Open PDF…* (`Ctrl+O`), the Open button or
+dropping PDFs on a pane opens each one in a new tab of that pane (and adds it to the project's sheet set; *File → New
+Project from PDF…* starts over instead).
+
+![Two documents in two panes, each with its own tabs](docs/screenshot-doc-tabs.png)
+
+* Click a tab to show that document; each tab remembers the sheet it was on. The Sheets panel lists the sheets of
+  every document – picking one opens its tab. `Ctrl+Tab` / `Ctrl+Shift+Tab` (also `Ctrl+Shift+]` / `[`) go to the next
+  and previous tab; `Ctrl+F4` or the × closes one, and so does a middle click. Closing a tab does not remove the
+  document from the project: **+** at the end of the tabs (or the Sheets panel) opens it again.
+* **Move a tab to another pane**: drag it onto another pane's tabs or drawing (hold `Ctrl` to keep it in both), or
+  right-click it → *Move to Pane* / *Also Show in Pane* / *Move to New Pane* / *Move to New Window*. Drag along the
+  tabs to reorder them. Tabs drag into detached windows too. A pane whose last tab moves away closes.
+* *Window → Document Tab* has the same commands for the active pane's tab.
+* Flattening markups keeps the tab (the flattened file is a new version of the same document).
+
 ### Split view and workspace layout
 
 * **Split the document**: *Window → Split Vertical / Split Horizontal / Four Ways* or the status-bar
-  buttons. Each pane has its own sheet selector, zoom and pan; the active pane is outlined and receives tools.
-  Drag the divider to resize; close a pane with its ×.
+  buttons. Each pane has its own document tabs, sheet selector, zoom and pan; the active pane is outlined and receives
+  tools. Drag the divider to resize; close a pane with its ×.
 * **Detach a pane** with the ↗ button in its header (or *Window → Detach Active Pane*). In the desktop app it becomes
   its own window you can move to another monitor and resize; in a browser that blocks pop-ups it floats inside the
   app (drag its header to move, the corner to resize). A detached pane uses the main window's toolbar, menus and
@@ -249,6 +280,39 @@ number is suggested as the overlay.
   right or floats the same way.
 * *Window → Lock Workspace Layout* stops accidental moves; *Reset Workspace Layout* restores the default. The layout is
   remembered between sessions.
+
+### Page labels from a box
+
+*Document → Page Labels from a Box…* (or right-click the drawing, or *Read from a Box on the Page…* in *Document →
+Page Labels*): drag a box around the sheet number, the title, or both in one title block. The same spot is read on
+**every page, or only the ticked ones** (*All*, *None*, *This File*, *Unlabelled*, or tick pages one by one), and the
+dialog shows what was in the box on each page next to the number and title it gives. Whether the box holds the number,
+the title or both is guessed from the page you drew it on and can be changed; captions such as *SHEET NUMBER* or
+*DRAWING TITLE* are left out. Review, edit any cell, and *Apply* (one undo step). Scanned pages have no text to read.
+
+<img src="docs/screenshot-page-labels-box.png" width="640" alt="Page labels read from a box in the title block on all seven pages">
+
+### Flatten markups
+
+*Edit → Flatten Markups…* (also right-click a selection, the drawing or a markup row) draws markups into the PDF
+itself – the selected markups, those on this sheet, or all – with or without their measurement labels, optionally
+including hidden layers. The drawing then carries them like any other line work (other programs see them, and page
+labels and snapping read them). Flattened markups leave the Markups List, or choose **Keep them as takeoff data**: they
+stay in the list and totals on a hidden, locked *Flattened* layer so nothing is drawn twice. Undo puts everything back.
+*File → Export → Flattened PDF* still makes a marked-up copy without changing the project.
+
+### Speed and graphics
+
+* Pages already seen show at once: rendered pages are kept (in graphics memory) and the next and previous sheets are
+  rendered ahead while you work, so paging through a set no longer waits for each page. Thumbnails use the same
+  renders. Rendering ahead gives way the moment the sheet on screen needs drawing.
+* Large sets show the first drawing sooner: page sizes are read in parallel, and on sets over 12 pages the sheet
+  numbers are read from the title blocks after the drawing is up.
+* PDFs are drawn on graphics-card canvases where the browser allows it.
+* *Settings → Speed & Graphics*: in the desktop app, **hardware acceleration** On (default), On even for graphics
+  drivers Chromium does not trust, or Off for display problems (restart to apply), with what the graphics card is used
+  for; whether to render ahead; how many rendered pages to keep (about 80, 190 or 440 MB); reading labels after
+  opening.
 
 ### Formula columns
 
@@ -273,12 +337,16 @@ Report units (LF/in/m, SF/SY/m², CY/CF/m³) and decimals are set in the **Measu
 | `V` / hold `Space` / middle-drag | Select / pan |
 | Wheel, `Ctrl+0`, `Ctrl+9`, `Ctrl+=`/`-`, `Z` | Zoom at cursor, fit page, fit width, zoom in/out, zoom rectangle |
 | `PgUp` / `PgDn` | Previous / next sheet |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab`, `Ctrl+F4` | Next / previous document tab, close tab |
+| `Ctrl+O`, `Ctrl+S` | Open PDF in a new tab, save project |
 | `Shift+Alt+K L M A P V C G` | Calibrate, Length, Polylength, Area, Perimeter, Volume, Count, Angle |
 | `T Q C R E L A N G P H` | Text, Callout, Cloud, Rectangle, Ellipse, Line, Arrow, Polyline, Polygon, Pen, Highlight |
 | `Enter` / double-click / right-click | Finish a multi-point markup; `Backspace` removes the last point; `Esc` cancels |
 | `Ctrl+Z` `Ctrl+Y` `Ctrl+C` `Ctrl+V` `Ctrl+D` `Del` | Undo, redo, copy, paste, duplicate, delete |
 | Arrow keys (`Shift` ×10) | Nudge selection (pixels or a drawing length – *Settings → Drawing & Editing*) |
 | `Ctrl+,` | Settings & Preferences |
+
+These are the defaults: every command's keys can be changed in *Settings → Keyboard*.
 
 Status-bar toggles: **CONTENT** (snap to PDF geometry), **MARKUP** (snap to markup vertices), **ORTHO**, **REUSE** (keep the
 tool active), **LABELS** (measurement labels on the drawing).
@@ -289,15 +357,16 @@ tool active), **LABELS** (measurement labels on the drawing).
 * The open project autosaves to IndexedDB and is restored on reload.
 * *File → Save Project As…* writes a single `.takeoff.json` containing the PDFs and all takeoff data; open it with
   *File → Open Project…* or drag it onto the window.
-* The Tool Chest (including size-tool sizes and hidden tools), list layout, workspace layout and preferences are stored
-  per user and shared across projects.
+* The Tool Chest (including size-tool sizes and hidden tools), list layout, workspace layout, keyboard shortcuts and
+  preferences are stored per user and shared across projects. Opening a project opens each of its documents as a tab
+  in the first pane.
 
 ## Development
 
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff project (needs `npm run dev` running)
@@ -330,8 +399,12 @@ src/
     align.ts         overlay maths: similarity fits, text/RANSAC and image alignment, change finding
     compare.ts       overlay rendering helpers: tint matrices, auto-align and changes on rendered sheets
     pdf.ts           pdf.js loading, rendering, title-block text, snap index, line work for automatic takeoff
-    export.ts        CSV, printable report, flattened PDF
-  store/           Zustand store (undo/redo history), project I/O, autosave, commands
+    renderCache.ts   kept page renders, rendering ahead, background renders that give way to the screen
+    keymap.ts        commands and their default keys, key chords, custom bindings and clashes
+    text.ts          title-block text: sheet numbers, captions, labels from a box
+    export.ts        CSV, printable report, flattened PDF (also used to flatten markups into the project)
+  store/           Zustand store (undo/redo history, panes and document tabs), project I/O, autosave, commands
+                   (menu and keyboard commands), flatten (markups into new versions of the PDFs)
   components/      viewer (canvas + SVG markup layer), panels, markups list, summary, dialogs,
                    dock/ (dockable/floating panels; Panes.tsx: split panes and detached pane windows)
 electron/          Windows desktop shell (main process + preload)
@@ -371,8 +444,10 @@ GitHub release when a `v*` tag is pushed.
 
 * Scanned (raster) PDFs have no text layer: title-block reading and content snapping need vector PDFs; enter labels by
   hand and rely on markup snapping for scans.
-* Markups are stored in the project, not written back into the PDF as native annotations; use the flattened PDF export
-  to share marked-up drawings.
+* Markups are stored in the project, not written back into the PDF as native annotations; flatten them into the
+  drawing, or use the flattened PDF export to share marked-up drawings.
+* In a browser, `Ctrl+Tab`, `Ctrl+F4` and some other keys belong to the browser; use `Ctrl+Shift+]` / `[` or set your
+  own keys. The desktop app gets them all.
 * Automatic takeoff needs vector PDFs whose member labels are text placed beside the member, parallel to it. Labels
   connected by a leader line, or one *TYP.* label meant for several members, give one member each; scans have no line
   work or text to read.

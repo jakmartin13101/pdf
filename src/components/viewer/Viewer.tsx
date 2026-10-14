@@ -14,6 +14,8 @@ import { useOwnerWindow } from '../ownerWindow';
 import { detailMenuItems } from '../detailMenu';
 import { AlignMarkers, ChangeBoxes, LayerA, LayerB, TintDefs } from './OverlayLayers';
 import { AutoTakeoffLayer } from './AutoTakeoffLayer';
+import { useShortcuts } from '../useShortcuts';
+import { cmdLabelsFromBox } from '../../store/commands';
 import { applySim, fitSimilarity, invertSim, type Similarity } from '../../core/align';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -134,6 +136,7 @@ export function Viewer({ paneId }: { paneId: string }) {
   const selection = useStore((s) => s.selection);
   const tool = useStore((s) => s.tool);
   const prefs = useStore(useShallow((s) => s.prefs));
+  const sc = useShortcuts();
   const viewRequest = useStore((s) => s.viewRequest);
   const flash = useStore((s) => s.flash);
   const editingTextId = useStore((s) => s.editingTextId);
@@ -867,6 +870,7 @@ export function Viewer({ paneId }: { paneId: string }) {
       items.push({ label: 'Properties', onClick: () => st.showPanel('properties') });
       items.push({ label: 'Add to Tool Chest…', onClick: () => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: id }) });
       const forDetails = getState().selection.includes(id) ? getState().selection : [id];
+      items.push({ label: forDetails.length > 1 ? `Add Detail to ${forDetails.length} Markups…` : 'Add Detail…', onClick: () => st.setDialog({ kind: 'addDetail', markupIds: forDetails }) });
       items.push({ label: forDetails.length > 1 ? `Standard Details (${forDetails.length} selected)` : 'Standard Details', children: detailMenuItems(forDetails) });
       items.push({ label: 'Set as Default for Tool', onClick: () => st.setTypeDefault(m.type, { style: m.style, subject: m.subject }) });
       items.push({ sep: true });
@@ -882,18 +886,21 @@ export function Viewer({ paneId }: { paneId: string }) {
       items.push({ label: 'Bring to Front', onClick: () => bringTo(sel, 'front') });
       items.push({ label: 'Send to Back', onClick: () => bringTo(sel, 'back') });
       items.push({ sep: true });
-      items.push({ label: 'Copy', shortcut: 'Ctrl+C', onClick: () => st.copySelection() });
-      items.push({ label: 'Duplicate', shortcut: 'Ctrl+D', onClick: () => st.duplicateSelection() });
-      items.push({ label: 'Delete', shortcut: 'Del', danger: true, onClick: () => st.deleteMarkups(sel) });
+      items.push({ label: 'Copy', shortcut: sc('edit.copy'), onClick: () => st.copySelection() });
+      items.push({ label: 'Duplicate', shortcut: sc('edit.duplicate'), onClick: () => st.duplicateSelection() });
+      items.push({ label: sel.length > 1 ? `Flatten ${sel.length} Markups…` : 'Flatten…', shortcut: sc('edit.flatten'), onClick: () => st.setDialog({ kind: 'flatten', markupIds: sel }) });
+      items.push({ label: 'Delete', shortcut: sc('edit.delete'), danger: true, onClick: () => st.deleteMarkups(sel) });
     } else {
-      items.push({ label: 'Paste', shortcut: 'Ctrl+V', onClick: () => st.paste(at) });
-      items.push({ label: 'Select All on Sheet', shortcut: 'Ctrl+A', onClick: () => st.setSelection(pageMarkups.map((m) => m.id)) });
+      items.push({ label: 'Paste', shortcut: sc('edit.paste'), onClick: () => st.paste(at) });
+      items.push({ label: 'Select All on Sheet', shortcut: sc('edit.selectAll'), onClick: () => st.setSelection(pageMarkups.map((m) => m.id)) });
       items.push({ sep: true });
       items.push({ label: 'Calibrate Scale…', onClick: () => st.setTool({ kind: 'calibrate' }) });
       items.push({ label: 'Set Scale…', onClick: () => st.setDialog({ kind: 'scale', sheetId: sheet.id }) });
       items.push({ label: 'Add Viewport', onClick: () => st.setTool({ kind: 'viewport' }) });
+      items.push({ label: 'Page Labels from a Box…', shortcut: sc('doc.labelsFromBox'), onClick: () => cmdLabelsFromBox() });
+      items.push({ label: 'Flatten Markups…', shortcut: sc('edit.flatten'), onClick: () => st.setDialog({ kind: 'flatten' }) });
       items.push({ sep: true });
-      items.push({ label: 'Fit Page', shortcut: 'Ctrl+0', onClick: () => st.requestView({ kind: 'fit' } as ViewRequest) });
+      items.push({ label: 'Fit Page', shortcut: sc('view.fit'), onClick: () => st.requestView({ kind: 'fit' } as ViewRequest) });
       items.push({ label: 'Fit Width', onClick: () => st.requestView({ kind: 'fitWidth' } as ViewRequest) });
     }
     setMenu({ x: e.clientX, y: e.clientY, items });
@@ -924,6 +931,7 @@ export function Viewer({ paneId }: { paneId: string }) {
         return;
       }
       if (k === 'Escape') {
+        e.preventDefault();
         if (draftRef.current) setDraft(null);
         else if (st.tool.kind !== 'select') st.setTool({ kind: 'select' });
         else st.setSelection([]);
@@ -931,6 +939,7 @@ export function Viewer({ paneId }: { paneId: string }) {
         return;
       }
       if (k === 'Enter' && draftRef.current) {
+        e.preventDefault();
         finishDraft();
         return;
       }
@@ -938,66 +947,6 @@ export function Viewer({ paneId }: { paneId: string }) {
         const d = draftRef.current;
         setDraft(d.length > 1 ? d.slice(0, -1) : null);
         e.preventDefault();
-        return;
-      }
-      if ((k === 'Delete' || k === 'Backspace') && st.selection.length) {
-        st.deleteMarkups(st.selection);
-        e.preventDefault();
-        return;
-      }
-      if (ctrl && (k === 'z' || k === 'Z')) {
-        e.preventDefault();
-        if (e.shiftKey) st.redo();
-        else st.undo();
-        return;
-      }
-      if (ctrl && (k === 'y' || k === 'Y')) {
-        e.preventDefault();
-        st.redo();
-        return;
-      }
-      if (ctrl && k === 'c') {
-        st.copySelection();
-        return;
-      }
-      if (ctrl && k === 'v') {
-        e.preventDefault();
-        st.paste();
-        return;
-      }
-      if (ctrl && k === 'd') {
-        e.preventDefault();
-        st.duplicateSelection();
-        return;
-      }
-      if (ctrl && k === 'a') {
-        e.preventDefault();
-        st.setSelection(pageMarkups.map((m) => m.id));
-        return;
-      }
-      if (ctrl && (k === '0' || k === '9')) {
-        e.preventDefault();
-        st.requestView({ kind: k === '0' ? 'fit' : 'fitWidth' } as ViewRequest);
-        return;
-      }
-      if (ctrl && (k === '=' || k === '+')) {
-        e.preventDefault();
-        st.requestView({ kind: 'zoomBy', factor: 1.25 } as ViewRequest);
-        return;
-      }
-      if (ctrl && k === '-') {
-        e.preventDefault();
-        st.requestView({ kind: 'zoomBy', factor: 0.8 } as ViewRequest);
-        return;
-      }
-      if (k === 'PageDown' || (ctrl && k === 'ArrowRight')) {
-        e.preventDefault();
-        st.gotoSheetOffset(1);
-        return;
-      }
-      if (k === 'PageUp' || (ctrl && k === 'ArrowLeft')) {
-        e.preventDefault();
-        st.gotoSheetOffset(-1);
         return;
       }
       if (!ctrl && st.selection.length && k.startsWith('Arrow')) {
@@ -1016,12 +965,7 @@ export function Viewer({ paneId }: { paneId: string }) {
         e.preventDefault();
         return;
       }
-      if (ctrl) return;
-      const toolKey = keyToTool(e);
-      if (toolKey) {
-        e.preventDefault();
-        st.setTool(toolKey);
-      }
+      // Everything else (tools, undo, zoom…) is a command with a shortcut: see handleAppShortcut.
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === ' ') {
@@ -1029,10 +973,11 @@ export function Viewer({ paneId }: { paneId: string }) {
         containerRef.current?.classList.remove('space-pan');
       }
     };
-    win.addEventListener('keydown', onKey);
+    // Capture: the drawing's own keys (drafting, Space, arrows) come before the shortcut commands.
+    win.addEventListener('keydown', onKey, true);
     win.addEventListener('keyup', onKeyUp);
     return () => {
-      win.removeEventListener('keydown', onKey);
+      win.removeEventListener('keydown', onKey, true);
       win.removeEventListener('keyup', onKeyUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1370,31 +1315,3 @@ function pickMarkupAt(clientX: number, clientY: number, selection: string[], doc
   return pool.find((id) => selection.includes(id)) ?? pool[0];
 }
 
-function keyToTool(e: KeyboardEvent): ToolMode | null {
-  const k = e.key.toLowerCase();
-  if (e.shiftKey && e.altKey) {
-    const code = e.code.replace('Key', '').toLowerCase();
-    const map: Record<string, MarkupType> = { l: 'length', m: 'polylength', a: 'area', p: 'perimeter', v: 'volume', c: 'count', g: 'angle' };
-    if (map[code]) return { kind: 'markup', type: map[code] };
-    if (code === 'k') return { kind: 'calibrate' };
-    return null;
-  }
-  if (e.altKey || e.shiftKey) return null;
-  const map: Record<string, MarkupType> = {
-    t: 'text',
-    q: 'callout',
-    c: 'cloud',
-    r: 'rectangle',
-    e: 'ellipse',
-    l: 'line',
-    a: 'arrow',
-    n: 'polyline',
-    g: 'polygon',
-    p: 'pen',
-    h: 'highlight',
-  };
-  if (k === 'v') return { kind: 'select' };
-  if (k === 'z') return { kind: 'zoomrect' };
-  if (map[k]) return { kind: 'markup', type: map[k] };
-  return null;
-}

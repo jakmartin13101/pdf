@@ -430,9 +430,11 @@ export function MarkupsList() {
             : [{ label: '(no tools)', disabled: true }],
         },
         { label: 'Add to Tool Chest…', onClick: () => s.setDialog({ kind: 'toolEdit', setId: s.toolChest[0]?.id ?? '', fromMarkupId: r.markup.id }) },
+        { label: ids.length > 1 ? `Add Detail to ${ids.length} Markups…` : 'Add Detail…', onClick: () => s.setDialog({ kind: 'addDetail', markupIds: ids }) },
         { label: ids.length > 1 ? `Standard Details (${ids.length} selected)` : 'Standard Details', children: detailMenuItems(ids) },
         { sep: true },
         { label: 'Copy', onClick: () => s.copySelection() },
+        { label: ids.length > 1 ? `Flatten ${ids.length} Markups…` : 'Flatten…', onClick: () => s.setDialog({ kind: 'flatten', markupIds: ids }) },
         { label: `Delete ${ids.length > 1 ? `${ids.length} Markups` : ''}`, danger: true, onClick: () => s.deleteMarkups(ids) },
       ],
     });

@@ -18,7 +18,13 @@ export interface DesktopBridge {
   takeOpenFiles(): Promise<{ name: string; data: Uint8Array }[]>;
   /** Files sent from a second launch while the app is already open. Returns an unsubscribe function. */
   onOpenFiles(callback: (files: { name: string; data: Uint8Array }[]) => void): () => void;
+  /** Graphics card use: the mode running now, the one saved for the next start, and Chromium's feature status. */
+  graphics?(): Promise<{ mode: GpuMode; saved: GpuMode; status: Record<string, string>; gpu: { vendorId: number; deviceId: number; driver: string } | null }>;
+  setGraphics?(mode: GpuMode): Promise<boolean>;
+  relaunch?(): Promise<void>;
 }
+
+export type GpuMode = 'auto' | 'off' | 'force';
 
 export const desktop: DesktopBridge | undefined = typeof window !== 'undefined' ? (window as unknown as { buildsuite?: DesktopBridge }).buildsuite : undefined;
 

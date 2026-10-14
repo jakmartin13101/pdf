@@ -70,7 +70,7 @@ export function CompareDialog({ sheetId }: { sheetId?: string }) {
     >
       <div className="hint">
         Sheet B is drawn over sheet A, each in its own colour. Line work on both sheets shows dark; what changed shows in A's or B's colour. Add the revised drawings to the
-        set first (File → Add PDF), then pick the two versions here.
+        set first (File → Open PDF), then pick the two versions here.
       </div>
       <div className="field">
         <label>

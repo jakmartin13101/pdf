@@ -61,7 +61,9 @@ test('a detached pane can go back to the main window, and closing its window clo
   await again.waitForSelector('.pane canvas');
   await again.close();
   await expect(page.getByTestId('pane')).toHaveCount(1);
-  await expect(page.getByTestId('pane-head')).toHaveCount(0);
+  // Back to a single pane: the header is just the document tabs again.
+  await expect(page.locator('.pane-num')).toHaveCount(0);
+  await expect(page.getByTestId('pane-close')).toHaveCount(0);
 });
 
 test('without pop-ups a detached pane floats inside the window and can be moved and resized', async ({ page }) => {
@@ -79,9 +81,10 @@ test('without pop-ups a detached pane floats inside the window and can be moved 
 
   const before = (await float.boundingBox())!;
   const head = float.getByTestId('pane-head');
-  // Drag by the empty part of the header (left of the attach/close buttons).
+  // Drag by the empty part of the header (right of the document tabs).
   const hb = (await head.boundingBox())!;
-  const grab = { x: hb.x + hb.width - 80, y: hb.y + hb.height / 2 };
+  const add = (await head.getByTestId('doc-tab-add').boundingBox())!;
+  const grab = { x: add.x + add.width + 30, y: hb.y + hb.height / 2 };
   await page.mouse.move(grab.x, grab.y);
   await page.mouse.down();
   await page.mouse.move(grab.x - 80, grab.y + 60, { steps: 6 });

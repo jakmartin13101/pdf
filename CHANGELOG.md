@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.5.0 – 2026-10-14
+
+### Document tabs
+- Every PDF in the project has a tab across the top of its pane. *File → Open PDF…* (`Ctrl+O`), the Open button and
+  dropping PDFs on a pane open each file in a new tab of the active pane (and add it to the sheet set); *File → New
+  Project from PDF…* starts a new project instead (what *Open PDF* did before).
+- Tabs remember their sheet. `Ctrl+Tab` / `Ctrl+Shift+Tab` (and `Ctrl+Shift+]` / `[`) switch tabs, `Ctrl+F4`, × or a
+  middle click closes one – the document stays in the project and opens again from **+** or the Sheets panel.
+- Drag a tab onto another pane's tabs or drawing to move it there (`Ctrl` to keep it in both), along the strip to
+  reorder, or into a detached window. Right-click a tab (or *Window → Document Tab*) for *Move to Pane*, *Also Show
+  in Pane*, *Move to New Pane* and *Move to New Window*. A pane whose last tab moves away closes.
+- A sheet dragged from the Sheets panel onto a pane shows there. The pane's sheet picker lists the sheets of the
+  document on show first.
+
+### Add Detail from the right-click menu
+- With one or more markups selected, right-click → **Add Detail to N Markups…** opens a window listing the standard
+  details already made: tick one to add it to all of them, untick to take it off (a dash shows it is on some), with a
+  preview of the material that results. **New Detail for These N…** makes a new detail for them. Also in Properties.
+
+### Custom keyboard shortcuts
+- *Settings → Keyboard* lists every command with its keys: add a shortcut by pressing it, remove one, put a command
+  back to its default or reset all. Clashes with another command are shown with the choice to move the key. Search by
+  command or key. Menus, toolbar tooltips and *Help → Keyboard Shortcuts* show your keys; detached windows use them too.
+
+### Flatten markups
+- *Edit → Flatten Markups…* (and on the right-click menus) draws the selected markups, the sheet's or all of them into
+  the PDF itself, with or without measurement labels. They leave the list, or stay as takeoff data on a hidden, locked
+  *Flattened* layer. One undo step brings everything back.
+
+### Page labels from a box
+- Draw a box around the sheet number, title or both on one page (*Document → Page Labels from a Box…* or right-click
+  the drawing); the same spot is read on all pages or only the ticked ones (*All*, *None*, *This File*, *Unlabelled*).
+  The dialog shows the text found in the box on each page; what the box holds is guessed and can be changed.
+- Captions are dropped more carefully: a title such as *COVER SHEET* keeps its last word.
+
+### Faster opening and rendering
+- Rendered pages are kept (as GPU-backed bitmaps) and the next and previous sheets are rendered ahead while idle, so
+  paging back and forth is near instant; thumbnails share these renders. Background rendering gives way as soon as
+  the sheet on screen needs drawing.
+- Page sizes are read in parallel, and large sets (over 12 pages) show the drawing before reading sheet numbers.
+- PDFs draw on hardware-accelerated canvases. New *Settings → Speed & Graphics*: hardware acceleration On / On for
+  untrusted drivers / Off in the desktop app (with the graphics features in use), rendering ahead, how many rendered
+  pages to keep, and when to read labels.
+
 ## 1.4.1 – 2026-10-12
 
 ### Automatic takeoff: members on continuous lines

@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { MenuList, type MenuItem } from './ContextMenu';
 import { getState, useStore, PANEL_IDS, PANEL_TITLES, type LayoutState, type PanelId } from '../store/store';
 import { dockMenuItems } from './dock/PanelHeader';
+import { useShortcuts } from './useShortcuts';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from '../brand';
-import { cmdAddPdf, cmdCloseProject, cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject, view } from '../store/commands';
-import { csvBlob, exportFlattenedPdf, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
+import { cmdAddPdf, cmdCloseProject, cmdLabelsFromBox, cmdNewProject, cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, cmdSaveProject, exportPdf, view } from '../store/commands';
+import { tabMenuItems } from './dock/Panes';
+import { csvBlob, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
 import { buildTakeoffRows } from '../core/details';
-import { fileBytes, safeName } from '../store/project';
+import { safeName } from '../store/project';
 import { offerFile } from '../store/files';
 import { MEASURE_TYPES, MARKUP_TYPES, TYPE_INFO } from '../core/markupTypes';
 
@@ -15,20 +17,7 @@ function panelOpen(layout: LayoutState, id: PanelId) {
   return p.dock === 'float' ? p.open : layout.active[p.dock] === id;
 }
 
-export async function exportPdf() {
-  const st = getState();
-  st.setBusy('Exporting flattened PDF…');
-  try {
-    const bytes = await exportFlattenedPdf(st.doc, fileBytes);
-    st.setBusy(null);
-    await offerFile(new Blob([bytes], { type: 'application/pdf' }), `${safeName(st.projectName)}_markups.pdf`, 'Marked-up PDF');
-  } catch (e) {
-    console.error(e);
-    st.toast(`Export failed: ${(e as Error).message}`, 'error');
-  } finally {
-    st.setBusy(null);
-  }
-}
+export { exportPdf };
 
 export function exportMarkupsCsv() {
   const st = getState();
@@ -64,6 +53,7 @@ export function MenuBar() {
   const panes = useStore((s) => s.panes);
   const activePaneId = useStore((s) => s.activePaneId);
   const prefs = useStore((s) => s.prefs);
+  const sc = useShortcuts();
 
   useEffect(() => {
     if (!open) return;
@@ -76,15 +66,26 @@ export function MenuBar() {
   }, [open]);
 
   const st = getState;
+  // Window menu: the active pane's document tabs.
+  const docTabItems = (): MenuItem[] => {
+    const pane = panes.find((p) => p.id === activePaneId);
+    const fileId = st().doc.sheets.find((x) => x.id === pane?.sheetId)?.fileId;
+    const many = (pane?.tabs.length ?? 0) > 1;
+    return [
+      { label: 'Next Document Tab', shortcut: sc('tab.next'), disabled: !loaded || !many, onClick: () => st().cycleTab(1) },
+      { label: 'Previous Document Tab', shortcut: sc('tab.prev'), disabled: !loaded || !many, onClick: () => st().cycleTab(-1) },
+      { label: 'Document Tab', disabled: !loaded || !pane || !fileId, children: pane && fileId ? tabMenuItems(pane.id, fileId, sc) : [] },
+    ];
+  };
   const menus: Record<string, MenuItem[]> = {
     File: [
-      { label: 'Open PDF…', shortcut: 'Ctrl+O', onClick: cmdOpenPdf },
-      { label: 'Add PDF to Set…', onClick: cmdAddPdf, disabled: !loaded },
+      { label: loaded ? 'Open PDF in a New Tab…' : 'Open PDF…', shortcut: sc('file.openPdf'), onClick: cmdOpenPdf },
+      { label: 'New Project from PDF…', shortcut: sc('file.newProject'), onClick: cmdNewProject },
       { label: 'Open Sample Drawing Set', onClick: cmdOpenSample },
       { label: 'Open Example Takeoff', onClick: cmdOpenExample },
       { sep: true },
       { label: 'Open Project…', onClick: cmdOpenProject },
-      { label: 'Save Project As…', shortcut: 'Ctrl+S', onClick: cmdSaveProject, disabled: !loaded },
+      { label: 'Save Project As…', shortcut: sc('file.save'), onClick: cmdSaveProject, disabled: !loaded },
       { sep: true },
       {
         label: 'Export',
@@ -100,17 +101,17 @@ export function MenuBar() {
       { label: 'Close Project', onClick: cmdCloseProject, disabled: !loaded },
     ],
     Edit: [
-      { label: 'Undo', shortcut: 'Ctrl+Z', onClick: () => st().undo(), disabled: !canUndo },
-      { label: 'Redo', shortcut: 'Ctrl+Y', onClick: () => st().redo(), disabled: !canRedo },
+      { label: 'Undo', shortcut: sc('edit.undo'), onClick: () => st().undo(), disabled: !canUndo },
+      { label: 'Redo', shortcut: sc('edit.redo'), onClick: () => st().redo(), disabled: !canRedo },
       { sep: true },
-      { label: 'Copy', shortcut: 'Ctrl+C', onClick: () => st().copySelection(), disabled: !hasSel },
-      { label: 'Paste', shortcut: 'Ctrl+V', onClick: () => st().paste(), disabled: !loaded },
-      { label: 'Duplicate', shortcut: 'Ctrl+D', onClick: () => st().duplicateSelection(), disabled: !hasSel },
-      { label: 'Delete', shortcut: 'Del', onClick: () => st().deleteMarkups(st().selection), disabled: !hasSel },
+      { label: 'Copy', shortcut: sc('edit.copy'), onClick: () => st().copySelection(), disabled: !hasSel },
+      { label: 'Paste', shortcut: sc('edit.paste'), onClick: () => st().paste(), disabled: !loaded },
+      { label: 'Duplicate', shortcut: sc('edit.duplicate'), onClick: () => st().duplicateSelection(), disabled: !hasSel },
+      { label: 'Delete', shortcut: sc('edit.delete'), onClick: () => st().deleteMarkups(st().selection), disabled: !hasSel },
       { sep: true },
       {
         label: 'Select All on Sheet',
-        shortcut: 'Ctrl+A',
+        shortcut: sc('edit.selectAll'),
         onClick: () => {
           const s = st();
           s.setSelection(s.doc.markups.filter((m) => m.sheetId === s.currentSheetId).map((m) => m.id));
@@ -119,14 +120,16 @@ export function MenuBar() {
       },
       { label: 'Deselect', shortcut: 'Esc', onClick: () => st().setSelection([]) },
       { sep: true },
-      { label: 'Settings & Preferences…', shortcut: 'Ctrl+,', onClick: () => st().setDialog({ kind: 'settings' }) },
+      { label: 'Flatten Markups…', shortcut: sc('edit.flatten'), onClick: () => st().setDialog({ kind: 'flatten' }), disabled: !loaded || !st().doc.markups.length },
+      { sep: true },
+      { label: 'Settings & Preferences…', shortcut: sc('app.settings'), onClick: () => st().setDialog({ kind: 'settings' }) },
     ],
     View: [
-      { label: 'Fit Page', shortcut: 'Ctrl+0', onClick: () => view('fit'), disabled: !loaded },
-      { label: 'Fit Width', shortcut: 'Ctrl+9', onClick: () => view('fitWidth'), disabled: !loaded },
+      { label: 'Fit Page', shortcut: sc('view.fit'), onClick: () => view('fit'), disabled: !loaded },
+      { label: 'Fit Width', shortcut: sc('view.fitWidth'), onClick: () => view('fitWidth'), disabled: !loaded },
       { label: 'Actual Size', onClick: () => view('actual'), disabled: !loaded },
-      { label: 'Zoom In', shortcut: 'Ctrl+=', onClick: () => view('zoomBy', 1.25), disabled: !loaded },
-      { label: 'Zoom Out', shortcut: 'Ctrl+-', onClick: () => view('zoomBy', 0.8), disabled: !loaded },
+      { label: 'Zoom In', shortcut: sc('view.zoomIn'), onClick: () => view('zoomBy', 1.25), disabled: !loaded },
+      { label: 'Zoom Out', shortcut: sc('view.zoomOut'), onClick: () => view('zoomBy', 0.8), disabled: !loaded },
       { sep: true },
       ...PANEL_IDS.map<MenuItem>((id) => ({ label: PANEL_TITLES[id], checked: panelOpen(layout, id), onClick: () => st().togglePanel(id) })),
       { sep: true },
@@ -141,21 +144,22 @@ export function MenuBar() {
       },
     ],
     Document: [
-      { label: 'Page Labels…', onClick: () => st().setDialog({ kind: 'pageLabels' }), disabled: !loaded },
+      { label: 'Page Labels…', shortcut: sc('doc.pageLabels'), onClick: () => st().setDialog({ kind: 'pageLabels' }), disabled: !loaded },
+      { label: 'Page Labels from a Box…', shortcut: sc('doc.labelsFromBox'), onClick: cmdLabelsFromBox, disabled: !loaded },
       { label: 'Compare / Overlay Sheets…', onClick: () => st().setDialog({ kind: 'compare' }), disabled: !loaded || st().doc.sheets.length < 2 },
-      { label: 'Next Sheet', shortcut: 'PgDn', onClick: () => st().gotoSheetOffset(1), disabled: !loaded },
-      { label: 'Previous Sheet', shortcut: 'PgUp', onClick: () => st().gotoSheetOffset(-1), disabled: !loaded },
+      { label: 'Next Sheet', shortcut: sc('sheet.next'), onClick: () => st().gotoSheetOffset(1), disabled: !loaded },
+      { label: 'Previous Sheet', shortcut: sc('sheet.prev'), onClick: () => st().gotoSheetOffset(-1), disabled: !loaded },
       { sep: true },
       { label: 'Add PDF to Set…', onClick: cmdAddPdf, disabled: !loaded },
     ],
     Measure: [
-      { label: 'Calibrate…', shortcut: 'Shift+Alt+K', onClick: () => st().setTool({ kind: 'calibrate' }), disabled: !loaded },
+      { label: 'Calibrate…', shortcut: sc('tool.calibrate'), onClick: () => st().setTool({ kind: 'calibrate' }), disabled: !loaded },
       { label: 'Set Scale…', onClick: () => st().currentSheetId && st().setDialog({ kind: 'scale', sheetId: st().currentSheetId! }), disabled: !loaded },
       { label: 'Add Viewport', onClick: () => st().setTool({ kind: 'viewport' }), disabled: !loaded },
       { sep: true },
       ...MEASURE_TYPES.map<MenuItem>((t) => ({
         label: TYPE_INFO[t].label,
-        shortcut: TYPE_INFO[t].shortcut,
+        shortcut: sc(`tool.${t}`),
         onClick: () => st().setTool({ kind: 'markup', type: t }),
         disabled: !loaded,
       })),
@@ -166,11 +170,11 @@ export function MenuBar() {
       {
         label: 'Markup',
         disabled: !loaded,
-        children: MARKUP_TYPES.map((t) => ({ label: TYPE_INFO[t].label, shortcut: TYPE_INFO[t].shortcut, onClick: () => st().setTool({ kind: 'markup', type: t }) })),
+        children: MARKUP_TYPES.map((t) => ({ label: TYPE_INFO[t].label, shortcut: sc(`tool.${t}`), onClick: () => st().setTool({ kind: 'markup', type: t }) })),
       },
-      { label: 'Select', shortcut: 'V', onClick: () => st().setTool({ kind: 'select' }) },
+      { label: 'Select', shortcut: sc('tool.select'), onClick: () => st().setTool({ kind: 'select' }) },
       { label: 'Pan', shortcut: 'Space', onClick: () => st().setTool({ kind: 'pan' }) },
-      { label: 'Zoom Rectangle', shortcut: 'Z', onClick: () => st().setTool({ kind: 'zoomrect' }) },
+      { label: 'Zoom Rectangle', shortcut: sc('tool.zoomrect'), onClick: () => st().setTool({ kind: 'zoomrect' }) },
       { sep: true },
       { label: 'Manage Columns…', onClick: () => st().setDialog({ kind: 'columns' }) },
       { label: 'Standard Details…', onClick: () => st().setDialog({ kind: 'details' }) },
@@ -179,7 +183,7 @@ export function MenuBar() {
       { label: 'New Steel Shape / Size Tool…', onClick: () => st().setDialog({ kind: 'shapeTool' }) },
     ],
     Settings: [
-      { label: 'Settings & Preferences…', shortcut: 'Ctrl+,', onClick: () => st().setDialog({ kind: 'settings', tab: 'general' }) },
+      { label: 'Settings & Preferences…', shortcut: sc('app.settings'), onClick: () => st().setDialog({ kind: 'settings', tab: 'general' }) },
       { label: 'Units & Totals…', onClick: () => st().setDialog({ kind: 'settings', tab: 'units' }) },
       { label: 'Drawing & Editing…', onClick: () => st().setDialog({ kind: 'settings', tab: 'editing' }) },
       { label: 'Auto Takeoff Line Styles…', onClick: () => st().setDialog({ kind: 'settings', tab: 'auto' }) },
@@ -203,6 +207,8 @@ export function MenuBar() {
       { label: 'Reset Workspace Layout', onClick: () => st().resetLayout() },
     ],
     Window: [
+      ...docTabItems(),
+      { sep: true },
       { label: 'Single View', checked: paneLayout === 'single', disabled: !loaded, onClick: () => st().setPaneLayout('single') },
       { label: 'Split Vertical', checked: paneLayout === 'vertical', disabled: !loaded, onClick: () => st().setPaneLayout('vertical') },
       { label: 'Split Horizontal', checked: paneLayout === 'horizontal', disabled: !loaded, onClick: () => st().setPaneLayout('horizontal') },

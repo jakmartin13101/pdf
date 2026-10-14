@@ -466,6 +466,38 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
   }
 }
 
+/** Labels drawn with a measurement on the page (sheet scale or viewport scale). */
+function labelLinesFor(doc: DocState, m: Markup): string[] {
+  if (!TYPE_INFO[m.type].measure) return [];
+  const sheet = doc.sheets.find((s) => s.id === m.sheetId);
+  const sc = scaleForMarkup(m, sheet);
+  return drawingLabelLines(m, computeMeasure(m, sc), sc, doc.settings);
+}
+
+/**
+ * Flatten markups into a PDF: draws them into the page content of a copy of `bytes` and returns the
+ * new PDF. `pages` gives, per page, the markups and how page points map to PDF coordinates.
+ */
+export async function flattenIntoPdf(
+  bytes: Uint8Array,
+  doc: DocState,
+  pages: { pageIndex: number; markups: Markup[]; toPdf: (p: Pt) => Pt }[],
+  opts: { labels?: boolean } = {},
+): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const fonts: FontSet = {
+    Helvetica: [await pdf.embedFont(StandardFonts.Helvetica), await pdf.embedFont(StandardFonts.HelveticaBold)],
+    Times: [await pdf.embedFont(StandardFonts.TimesRoman), await pdf.embedFont(StandardFonts.TimesRomanBold)],
+    Courier: [await pdf.embedFont(StandardFonts.Courier), await pdf.embedFont(StandardFonts.CourierBold)],
+  };
+  for (const pg of pages) {
+    const page = pdf.getPage(pg.pageIndex);
+    const painter = makePainter(page, pg.toPdf, fonts);
+    for (const m of pg.markups) paintMarkup(painter, m, opts.labels === false ? [] : labelLinesFor(doc, m));
+  }
+  return pdf.save();
+}
+
 export async function exportFlattenedPdf(doc: DocState, fileBytes: Map<string, Uint8Array>, opts: { includeHidden?: boolean } = {}): Promise<Uint8Array> {
   const out = await PDFDocument.create();
   const fonts: FontSet = {

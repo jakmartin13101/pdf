@@ -146,3 +146,33 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await page.locator('.submenu .menu-item', { hasText: 'Back to Rules Only' }).click();
   await expect(rows).toHaveCount(6);
 });
+
+test('right-click → Add Detail opens a window to add existing details to the selected markups', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('open-example').click();
+  const rows = page.getByTestId('markup-row');
+  await page.getByTestId('list-search').fill('HSS8x4x1/4');
+  await expect(rows).toHaveCount(2);
+  await rows.nth(0).click();
+  await rows.nth(1).click({ modifiers: ['Control'] });
+  await rows.nth(1).click({ button: 'right' });
+  await page.locator('.menu-item', { hasText: 'Add Detail to 2 Markups…' }).click();
+  await expect(page.getByTestId('add-detail-item')).toHaveCount(4);
+  await expect(page.getByTestId('add-detail-preview').locator('tbody tr')).toHaveText(['No material from standard details on the selection.']);
+  // Tick the column base detail for both tubes: the preview shows what it adds (plate and anchor rods).
+  const item = page.getByTestId('add-detail-item').filter({ hasText: 'HSS column base' });
+  await item.locator('input').check();
+  await expect(item).toContainText('will add');
+  await expect(page.getByTestId('add-detail-preview').locator('tbody tr')).toHaveCount(2);
+  await page.getByTestId('add-detail-apply').click();
+  await expect(rows).toHaveCount(6); // each tube now has its two material rows
+  await expect(rows.nth(1).locator('[data-col=type]')).toHaveText(/Standard Detail/);
+  // Opening it again shows the detail on both; "New Detail for These 2…" goes to the editor.
+  await rows.nth(0).click();
+  await rows.nth(3).click({ modifiers: ['Control'] });
+  await rows.nth(3).click({ button: 'right' });
+  await page.locator('.menu-item', { hasText: 'Add Detail to 2 Markups…' }).click();
+  await expect(page.getByTestId('add-detail-item').filter({ hasText: 'HSS column base' })).toContainText('on all');
+  await page.getByTestId('add-detail-new').click();
+  await expect(page.getByTestId('detail-selected')).toHaveText('2 markups selected – all have this detail');
+});

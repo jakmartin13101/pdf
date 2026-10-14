@@ -3,9 +3,10 @@ import { detectSheetLabel, pageInfos, registerPdf, unregisterAll } from '../core
 import { uid } from '../core/ids';
 import { base64ToBytes, bytesToBase64, idbDel, idbGet, idbKeys, idbSet } from '../core/persistence';
 import { offerFile } from './files';
-import { emptyDoc, getState, useStore } from './store';
+import { emptyDoc, getState, newPane, useStore } from './store';
 import { DEFAULT_SETTINGS } from '../core/units';
 import { titleCase } from '../core/text';
+import { whenIdle } from '../core/renderCache';
 
 /** In-memory PDF bytes by file id (needed for export and project save). */
 export const fileBytes = new Map<string, Uint8Array>();
@@ -28,7 +29,10 @@ function baseName(name: string) {
   return name.replace(/\.[^.]+$/, '');
 }
 
-async function importPdf(name: string, bytes: Uint8Array, startIndex: number): Promise<{ file: SourceFile; sheets: Sheet[] }> {
+/** Sets with more pages than this are shown first and their title blocks read afterwards. */
+const READ_LABELS_FIRST_MAX = 12;
+
+async function importPdf(name: string, bytes: Uint8Array, startIndex: number, readLabels: boolean): Promise<{ file: SourceFile; sheets: Sheet[] }> {
   const fileId = uid('f');
   const pdf = await registerPdf(fileId, bytes);
   fileBytes.set(fileId, bytes);
@@ -52,19 +56,43 @@ async function importPdf(name: string, bytes: Uint8Array, startIndex: number): P
     scale: null,
     viewports: [],
   }));
-  // Read sheet numbers/titles from title blocks when every page has one.
-  try {
-    const detected = await Promise.all(sheets.map((s) => detectSheetLabel(fileId, s.pageIndex, s.width, s.height)));
-    if (detected.length && detected.every((d) => d && d.number)) {
-      detected.forEach((d, i) => {
-        sheets[i].number = d!.number;
-        if (d!.title) sheets[i].title = titleCase(d!.title);
-      });
+  // Read sheet numbers/titles from title blocks when every page has one (large sets: afterwards).
+  if (readLabels || sheets.length <= READ_LABELS_FIRST_MAX) {
+    try {
+      const detected = await Promise.all(sheets.map((s) => detectSheetLabel(fileId, s.pageIndex, s.width, s.height)));
+      if (detected.length && detected.every((d) => d && d.number)) {
+        detected.forEach((d, i) => {
+          sheets[i].number = d!.number;
+          if (d!.title) sheets[i].title = titleCase(d!.title);
+        });
+      }
+    } catch {
+      /* heuristic only */
     }
-  } catch {
-    /* heuristic only */
   }
   return { file: { id: fileId, name, pageCount: infos.length }, sheets };
+}
+
+/** Read sheet numbers and titles from the title blocks of a large set once its first page is showing. */
+async function readLabelsLater(fileId: string) {
+  const sheets = getState().doc.sheets.filter((s) => s.fileId === fileId);
+  if (sheets.length <= READ_LABELS_FIRST_MAX) return;
+  const before = Object.fromEntries(sheets.map((s) => [s.id, { number: s.number, title: s.title }]));
+  const detected: ({ number: string; title: string } | null)[] = [];
+  try {
+    for (const s of sheets) {
+      await whenIdle();
+      detected.push(await detectSheetLabel(fileId, s.pageIndex, s.width, s.height));
+    }
+  } catch {
+    return;
+  }
+  if (!detected.every((d) => d?.number)) return;
+  getState().applyReadLabels(
+    Object.fromEntries(sheets.map((s, i) => [s.id, { number: detected[i]!.number, title: detected[i]!.title ? titleCase(detected[i]!.title) : s.title }])),
+    before,
+  );
+  getState().toast(`Read ${sheets.length} sheet numbers from the title blocks`, 'success');
 }
 
 export async function openPdfs(files: { name: string; bytes: Uint8Array }[], mode: 'new' | 'append') {
@@ -80,8 +108,11 @@ export async function openPdfs(files: { name: string; bytes: Uint8Array }[], mod
     let sheets = [...base.sheets];
     const newFiles: SourceFile[] = [...base.files];
     let firstNew: string | null = null;
+    const readFirst = !st.prefs.perf.backgroundLabels;
+    const later: string[] = [];
     for (const f of files) {
-      const r = await importPdf(f.name, f.bytes, sheets.length);
+      const r = await importPdf(f.name, f.bytes, sheets.length, readFirst);
+      if (!readFirst) later.push(r.file.id);
       newFiles.push(r.file);
       sheets = [...sheets, ...r.sheets];
       firstNew ??= r.sheets[0]?.id ?? null;
@@ -92,6 +123,7 @@ export async function openPdfs(files: { name: string; bytes: Uint8Array }[], mod
     if (firstNew) getState().setCurrentSheet(firstNew);
     st.requestView({ kind: 'fit' });
     st.toast(`Loaded ${sheets.length - base.sheets.length} sheet${sheets.length - base.sheets.length === 1 ? '' : 's'}`, 'success');
+    for (const id of later) void readLabelsLater(id);
   } catch (e) {
     console.error(e);
     st.toast(`Could not open PDF: ${(e as Error).message}`, 'error');
@@ -210,7 +242,7 @@ export async function closeProject() {
     currentSheetId: null,
     selection: [],
     projectName: 'Untitled Project',
-    panes: [{ id: 'pane-1', sheetId: null }],
+    panes: [newPane('pane-1')],
     paneLayout: 'single',
     activePaneId: 'pane-1',
   });

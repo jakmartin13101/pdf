@@ -6,7 +6,7 @@ async function openWithRevision(page: Page) {
   await openSample(page);
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.locator('.menu-btn', { hasText: 'File' }).click().then(() => page.getByText('Add PDF to Set…').first().click()),
+    page.locator('.menu-btn', { hasText: 'File' }).click().then(() => page.getByText('Open PDF in a New Tab…').first().click()),
   ]);
   await chooser.setFiles('public/samples/Sample-S1.02-Addendum-2.pdf');
   await expect(page.getByTestId('sheet-thumb')).toHaveCount(8);

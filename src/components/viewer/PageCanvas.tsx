@@ -1,7 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RenderTask } from 'pdfjs-dist';
 import type { Rect, Sheet } from '../../types';
 import { renderPage } from '../../core/pdf';
+import { cachedRender, keepRender, mainRenderDone, mainRenderStarted, prefetch, renderAhead } from '../../core/renderCache';
+import { getState, useStore } from '../../store/store';
+
+/** The sheets before and after this one (in set order), to render ahead. */
+function neighbours(sheet: Sheet) {
+  const list = getState().doc.sheets;
+  const i = list.findIndex((s) => s.id === sheet.id);
+  return [list[i + 1], list[i - 1]].filter(Boolean).map((s) => ({ fileId: s.fileId, pageIndex: s.pageIndex }));
+}
 import { useOwnerWindow } from '../ownerWindow';
 
 interface Props {
@@ -27,30 +36,70 @@ export function PageCanvas({ sheet, zoom, visible }: Props) {
   // The pane's own window: a detached pane can sit on a monitor with a different pixel ratio.
   const dpr = Math.min(useOwnerWindow().devicePixelRatio || 1, 2);
   const maxBase = Math.sqrt(MAX_BASE_PIXELS / (sheet.width * sheet.height));
+  const prefetchOn = useStore((s) => s.prefs.perf.prefetch);
+  // The sheet on show now: work started for another sheet must not draw.
+  const shown = useRef(sheet.id);
+  shown.current = sheet.id;
   const wantBase = Math.min(maxBase, Math.max(0.25, zoom * dpr));
 
-  // Reset when the sheet changes.
-  useEffect(() => {
-    setBaseScale(0);
+  // When the sheet changes: show a kept render at once (if there is one), else start empty.
+  useLayoutEffect(() => {
     setDetail(null);
-  }, [sheet.id]);
+    const kept = cachedRender(sheet.fileId, sheet.pageIndex, wantBase);
+    const canvas = baseRef.current;
+    if (kept && canvas) {
+      canvas.width = kept.bmp.width;
+      canvas.height = kept.bmp.height;
+      canvas.getContext('2d')!.drawImage(kept.bmp, 0, 0);
+      setBaseScale(kept.scale);
+    } else setBaseScale(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet.id, sheet.fileId]);
 
   // Base layer: re-render when the desired resolution drifts by more than ~20%.
   useEffect(() => {
     if (baseScale && Math.abs(wantBase - baseScale) / baseScale < 0.2 && !(wantBase >= maxBase && baseScale < maxBase)) return;
+    let started = false;
     const t = setTimeout(
       () => {
         const canvas = baseRef.current;
         if (!canvas) return;
         baseTask.current?.cancel();
         const scale = wantBase;
-        renderPage(sheet.fileId, sheet.pageIndex, canvas, scale, undefined, (task) => (baseTask.current = task))
-          .then(() => setBaseScale(scale))
-          .catch(() => {});
+        started = true;
+        mainRenderStarted(sheet.fileId, sheet.pageIndex);
+        // A render of this sheet already running ahead: use it rather than render twice.
+        const ahead = renderAhead(sheet.fileId, sheet.pageIndex, scale);
+        const forSheet = sheet.id;
+        const job = ahead
+          ? ahead.then((off) => {
+              if (shown.current !== forSheet) return null;
+              if (!off) return renderPage(sheet.fileId, sheet.pageIndex, canvas, scale, undefined, (task) => (baseTask.current = task));
+              canvas.width = off.width;
+              canvas.height = off.height;
+              canvas.getContext('2d')!.drawImage(off, 0, 0);
+              return off;
+            })
+          : renderPage(sheet.fileId, sheet.pageIndex, canvas, scale, undefined, (task) => (baseTask.current = task)).then((off) => {
+              void keepRender(sheet.fileId, sheet.pageIndex, scale, off);
+              return off;
+            });
+        job
+          .then((off) => {
+            if (!off || shown.current !== forSheet || baseRef.current !== canvas) return;
+            setBaseScale(scale);
+            if (prefetchOn) prefetch(neighbours(sheet), scale);
+          })
+          .catch(() => {})
+          .finally(() => {
+            if (started) mainRenderDone();
+            started = false;
+          });
       },
       baseScale ? 180 : 0,
     );
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet.fileId, sheet.pageIndex, sheet.id, wantBase, baseScale, maxBase]);
 
   // Detail layer for zoom levels beyond the base resolution.

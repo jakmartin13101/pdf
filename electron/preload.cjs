@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld('buildsuite', {
   saveFile: (name, data) => ipcRenderer.invoke('buildsuite:save-file', name, data),
   openReport: (html) => ipcRenderer.invoke('buildsuite:open-report', html),
   takeOpenFiles: () => ipcRenderer.invoke('buildsuite:take-open-files'),
+  graphics: () => ipcRenderer.invoke('buildsuite:graphics'),
+  setGraphics: (mode) => ipcRenderer.invoke('buildsuite:set-graphics', mode),
+  relaunch: () => ipcRenderer.invoke('buildsuite:relaunch'),
   onOpenFiles: (callback) => {
     const listener = (_event, files) => callback(files);
     ipcRenderer.on('buildsuite:open-files', listener);
