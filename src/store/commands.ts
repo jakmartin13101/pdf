@@ -194,6 +194,8 @@ export function runCommand(id: string) {
       return st.cycleTab(1);
     case 'tab.prev':
       return st.cycleTab(-1);
+    case 'report.combine':
+      return st.setDialog({ kind: 'combine' });
     case 'tab.close': {
       const t = activeTab();
       if (t) cmdCloseTab(t.paneId, t.docId);

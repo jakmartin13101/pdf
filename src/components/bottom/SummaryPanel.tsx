@@ -1,7 +1,7 @@
 import { useContext, useMemo, useState } from 'react';
 import { PanelContext, PanelHeader } from '../dock/PanelHeader';
 import type { CustomColumn, DocState } from '../../types';
-import { Download, PackagePlus, Printer, Sigma } from 'lucide-react';
+import { Download, PackagePlus, Printer, Scissors, Sigma } from 'lucide-react';
 import { getState, useStore } from '../../store/store';
 import { allColumns, customColId } from '../../core/columns';
 import { buildSummary, primaryQuantity, summableCustomColumns } from '../../core/summary';
@@ -109,6 +109,9 @@ export function SummaryPanel() {
         </button>
         <button className="btn sm" onClick={() => printSummary(validGroup)}>
           <Printer size={13} /> Report
+        </button>
+        <button className="btn sm" onClick={() => getState().setDialog({ kind: 'combine' })} title="Stock lengths to order, with the pieces nested on them" data-testid="summary-combine">
+          <Scissors size={13} /> Combine
         </button>
       </div>
       <table className="grid">

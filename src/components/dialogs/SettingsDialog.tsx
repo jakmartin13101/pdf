@@ -7,6 +7,9 @@ import type { AutoStyleRule, LineStyle, ProjectSettings } from '../../types';
 import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
 import { cmdConvertSubjects, cmdExportListStyle, cmdImportListStyle, cmdSaveDefaultListStyle } from '../../store/commands';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject } from '../../core/subjects';
+import { defaultCombineSettings, type CombineSettings } from '../../core/combine';
+import { lenText } from '../../core/combineReport';
+import { LengthSetting } from './CombineDialog';
 import { allColumns } from '../../core/columns';
 import { desktop, type GpuMode } from '../../brand';
 import { AUTO_MATCH, autoStyleFor, defaultAutoStyles, isAutoMarkup, newAutoStyle, withRule } from '../../core/autoStyles';
@@ -22,6 +25,7 @@ const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'editing', label: 'Drawing & Editing', hint: 'Snapping and adjusting' },
   { id: 'keys', label: 'Keyboard', hint: 'Shortcuts for commands' },
   { id: 'subjects', label: 'Subjects', hint: 'Shapes markups can have' },
+  { id: 'combine', label: 'Combine', hint: 'Stock lengths to order' },
   { id: 'list', label: 'Markups List', hint: 'Default columns for new files' },
   { id: 'auto', label: 'Auto Takeoff', hint: 'Line styles by subject' },
   { id: 'speed', label: 'Speed & Graphics', hint: 'Graphics card, rendering' },
@@ -598,6 +602,114 @@ function Speed() {
   );
 }
 
+/** Lengths that can be ordered, as chips with × and a box to add one (bare numbers are feet). */
+function StockLengths({ lengths, onChange, metric, testId }: { lengths: number[]; onChange: (l: number[]) => void; metric: boolean; testId: string }) {
+  const [add, setAdd] = useState('');
+  const doAdd = () => {
+    const n = parseLength(add, metric ? 'm' : 'ft');
+    if (n == null || n <= 0) {
+      if (add.trim()) getState().toast(`“${add}” is not a length`, 'error');
+      return;
+    }
+    onChange([...new Set([...lengths, Math.round(n * 1000) / 1000])].sort((a, b) => a - b));
+    setAdd('');
+  };
+  return (
+    <div className="cmb-lengths" data-testid={testId}>
+      {lengths.map((l) => (
+        <span key={l} className="set-chip cmb-chip" data-testid="stock-length">
+          {lenText(l, metric)}
+          <button className="icon-btn" title="Remove this length" onClick={() => onChange(lengths.filter((x) => x !== l))} data-testid="stock-length-remove">
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      <input
+        className="cmb-add"
+        value={add}
+        placeholder={metric ? '+ e.g. 12' : "+ e.g. 30'"}
+        onChange={(e) => setAdd(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && doAdd()}
+        onBlur={doAdd}
+        data-testid="stock-length-add"
+      />
+    </div>
+  );
+}
+
+/** Combine report settings: the machine allowance, the kerf and the lengths each shape can be ordered in. */
+function CombineStock() {
+  const c = useStore((s) => s.prefs.combine);
+  const metric = useStore((s) => s.doc.settings.lengthUnit === 'm');
+  const [shape, setShape] = useState('');
+  const st = getState();
+  const set = (patch: Partial<CombineSettings>) => st.setPrefs({ combine: { ...c, ...patch } });
+  const setLengths = (i: number, lengths: number[]) => set({ stock: c.stock.map((x, j) => (j === i ? { ...x, lengths } : x)) });
+  const adding = shape.trim();
+  const clash = !!adding && c.stock.some((x) => x.shape.toUpperCase() === adding.toUpperCase());
+  const addShape = () => {
+    if (!adding || clash) return;
+    set({ stock: [...c.stock, { shape: adding, lengths: [...c.other] }] });
+    setShape('');
+  };
+  return (
+    <>
+      <div className="hint">
+        The Combine Report (Tools → Combine Report) nests the pieces of each size on the lengths you can order. Each bar keeps an allowance for the machine; each cut
+        loses the kerf. Bare numbers are feet for stock lengths and inches for the allowance and kerf.
+      </div>
+      <div className="field-row" style={{ justifyContent: 'flex-start', gap: 16 }}>
+        <label className="inline">
+          Machine allowance per bar
+          <LengthSetting value={c.allowance} unit="in" metric={metric} onChange={(v) => set({ allowance: v })} testId="set-combine-allowance" />
+        </label>
+        <label className="inline">
+          Kerf per cut
+          <LengthSetting value={c.kerf} unit="in" metric={metric} onChange={(v) => set({ kerf: v })} testId="set-combine-kerf" />
+        </label>
+      </div>
+      <h4 className="set-h">Stock lengths by shape</h4>
+      <div className="cmb-stock-table" data-testid="stock-table">
+        {c.stock.map((x, i) => (
+          <div key={x.shape} className="cmb-stock-row" data-testid="stock-shape" data-shape={x.shape}>
+            <b>{x.shape}</b>
+            <StockLengths lengths={x.lengths} metric={metric} onChange={(l) => setLengths(i, l)} testId="stock-lengths" />
+            <button className="icon-btn" title={`Remove ${x.shape}`} onClick={() => set({ stock: c.stock.filter((_, j) => j !== i) })} data-testid="stock-shape-remove">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ))}
+        <div className="cmb-stock-row" data-testid="stock-other">
+          <b title="Shapes not in the list">Other</b>
+          <StockLengths lengths={c.other} metric={metric} onChange={(other) => set({ other })} testId="stock-other-lengths" />
+          <span />
+        </div>
+      </div>
+      <div className="field-row" style={{ justifyContent: 'flex-start' }}>
+        <input
+          className="narrow"
+          style={{ width: 120 }}
+          value={shape}
+          placeholder="Shape, e.g. RB"
+          onChange={(e) => setShape(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addShape()}
+          data-testid="stock-shape-input"
+        />
+        <button className="btn sm narrow primary" disabled={!adding || clash} onClick={addShape} data-testid="stock-shape-add">
+          <Plus size={12} /> Add Shape
+        </button>
+        <button className="btn sm narrow" onClick={() => st.setPrefs({ combine: defaultCombineSettings() })} data-testid="stock-reset">
+          <RotateCcw size={12} /> Reset to Defaults
+        </button>
+        {clash && <span className="hint">Already in the list.</span>}
+      </div>
+      <div className="hint">
+        Sizes whose shape is not in the list (joists, rebar, plate…) use the lengths under Other; with none there, they are listed in the report but not planned.
+      </div>
+    </>
+  );
+}
+
 /** The subjects markups can have: shapes, added and removed by the user. */
 function Subjects() {
   const subjects = useStore((s) => s.prefs.subjects);
@@ -788,6 +900,7 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
           {tab === 'editing' && <Editing />}
           {tab === 'keys' && <Keyboard />}
           {tab === 'subjects' && <Subjects />}
+          {tab === 'combine' && <CombineStock />}
           {tab === 'list' && <ListDefaults />}
           {tab === 'auto' && <AutoTakeoff />}
           {tab === 'speed' && <Speed />}

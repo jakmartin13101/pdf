@@ -32,6 +32,7 @@ import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
+import { defaultCombineSettings, type CombineSettings } from '../core/combine';
 
 export type ToolMode =
   | { kind: 'select' }
@@ -78,7 +79,8 @@ export type DialogState =
   | { kind: 'about' }
   | { kind: 'confirm'; title: string; message: string; onConfirm: () => void }
   /** Documents about to close with unsaved changes: save them, close without saving, or cancel. */
-  | { kind: 'unsaved'; docIds: string[]; then: () => void };
+  | { kind: 'unsaved'; docIds: string[]; then: () => void }
+  | { kind: 'combine' };
 
 export type ViewRequest = (
   | { kind: 'fit' | 'fitWidth' | 'actual'; nonce: number }
@@ -224,6 +226,8 @@ export interface Prefs {
   listStyle: MarkupListStyle | null;
   /** The subjects markups can have: shapes such as W, HSS, L, BP, C (Settings → Subjects). */
   subjects: string[];
+  /** Combine report: machine allowance, saw kerf and the stock lengths per shape (Settings → Combine). */
+  combine: CombineSettings;
 }
 
 export interface PerfPrefs {
@@ -247,7 +251,7 @@ export interface AutoOptions {
   useprinted: boolean;
 }
 
-export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'subjects' | 'list' | 'auto' | 'speed' | 'workspace';
+export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'subjects' | 'combine' | 'list' | 'auto' | 'speed' | 'workspace';
 
 interface TypeDefault {
   style: MarkupStyle;
@@ -656,6 +660,7 @@ const defaultPrefs = (): Prefs => ({
   perf: { hwa: true, cache: 'normal', prefetch: true, backgroundLabels: true },
   listStyle: null,
   subjects: [...DEFAULT_SUBJECTS],
+  combine: defaultCombineSettings(),
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -673,6 +678,7 @@ function loadPrefs(): Prefs {
     perf: { ...d.perf, ...saved.perf },
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
     subjects: Array.isArray(saved.subjects) ? cleanSubjects(saved.subjects.map(String)) : d.subjects,
+    combine: { ...d.combine, ...saved.combine, stock: Array.isArray(saved.combine?.stock) ? saved.combine!.stock : d.combine.stock, other: Array.isArray(saved.combine?.other) ? saved.combine!.other : d.combine.other },
   };
 }
 

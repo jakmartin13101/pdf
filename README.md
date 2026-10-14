@@ -7,11 +7,11 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.7.0**: a markup's **subject is its shape** (W, HSS, L, BP, C, BO…), picked from a list each user can
-> add to and take from (*Settings → Subjects*), with the size as Member Size – and **labels and text have their own
-> colour**, also in the automatic takeoff line styles (1.6.0: every PDF is its own document with its takeoff saved
-> inside it, Markups List layouts with a default; 1.5.0: document tabs, Add Detail, custom shortcuts, flatten, page labels
-> from a box, faster rendering) – see the [changelog](CHANGELOG.md).
+> **Version 1.8.0**: the **Combine Report** – what stock lengths to order for every size (W8x10, HSS6x6x3/8…),
+> with the pieces nested on the lengths you can buy for each shape (*Settings → Combine*) and an adjustable machine
+> allowance per bar, plus a cutting plan for every bar (1.7.0: subjects are shapes from your own list, labels and text
+> have their own colour; 1.6.0: every PDF is its own document with its takeoff saved inside it, Markups List layouts
+> with a default) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -87,6 +87,7 @@ A five-minute tour with the sample set:
 | **Overlay / compare** | *Document → Compare / Overlay Sheets*: two sheets in their own colours, auto-aligned (text or image) or aligned by points / by hand, with change detection and revision clouds. See [Overlay / compare](#overlay--compare-sheets). |
 | **Standard details** | *Tools → Standard Details*: IF a column (drop-down) equals a value (drop-down of the takeoff's values) → ADD material by subject, size and length, @ spacing OC, × quantity or full length – or add a detail by hand to any selected markups. See [Standard details](#standard-details). |
 | **Automatic takeoff** | *Auto* button (*Tools → Automatic Takeoff*): finds the member-size labels on a plan (W24x55, HSS8x4x1/4, Pipe 4 Std…), measures the line each one labels at the sheet's scale and creates labelled length measurements, drawn by line style rules (*Settings → Auto Takeoff Line Styles*). See [Automatic takeoff](#automatic-takeoff-beams-and-tubing). |
+| **Combine report** | *Tools → Combine Report* (or *Combine* in the Takeoff Summary): the stock lengths to order for each size, nesting the cut pieces on the lengths you can order per shape with a machine allowance per bar. See [Combine report](#combine-report). |
 | **Subjects** | A markup's subject is its shape (W, HSS, L, BP, C, BO…) from a list you keep in *Settings → Subjects*. See [Subjects](#subjects-shapes). |
 | **Settings & preferences** | *Settings* menu (`Ctrl+,`): general preferences, the project's units and totals, snapping and fine adjustment, **keyboard shortcuts**, **subjects**, auto takeoff line styles, **speed & graphics**, workspace. See [Settings](#settings--preferences). |
 | **Documents** | Every PDF is its own document: its takeoff is saved inside it, with its own undo and Markups List layout; each has a tab, and tabs drag between panes and windows. See [Documents and tabs](#documents-and-tabs). |
@@ -217,6 +218,8 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
   more. A key already used by another command is flagged, with the choice to move it. Search by command or by key.
   The menus, tooltips and *Help → Keyboard Shortcuts* show your keys.
 * **Subjects** – the shapes markups can have as subject (see [Subjects](#subjects-shapes)).
+* **Combine** – the stock lengths you can order for each shape, the machine allowance and the kerf (see
+  [Combine report](#combine-report)).
 * **Auto Takeoff** – line styles by subject (above) and the defaults for finding members.
 * **Speed & Graphics** – see [Speed and graphics](#speed-and-graphics).
 * **Workspace** – lock the layout, toolbar position, reset the layout.
@@ -246,6 +249,38 @@ Markups List, *Properties* and the Tool Chest tool editor) rather than typed.
 * Files from before have subjects such as `W24x55` or `HSS Column`; the Markups List shows subjects not in the list in
   italics. *Settings → Subjects → Change Sizes to Shapes* turns them into shapes (W24x55 → W, the size going into Member
   Size when that is empty); *… and Clear the Rest* also clears the ones that name no shape. One undo step.
+
+### Combine report
+
+*Tools → Combine Report…* (also *File → Export → Combine Report*, and the **Combine** button of the Takeoff Summary)
+works out the material to order. It reads the size of every length measurement (its Member Size, else its label) and
+its length, and nests the pieces of each size on the stock lengths you can order for its shape, using as little
+material as it can:
+
+* 3 × W8x10 at 5'-0" fit on **one 20' beam** (15' + the 1' machine allowance = 16').
+* W8x10 at 15'-0" and 2 at 18'-0" need **one 40' and one 20'** when W comes in 20' and 40' (18' + 18' + 1' on the
+  40', 15' + 1' on the 20'). With every 5' length from 20' to 60' to choose from, it orders one 55' instead (52' of
+  pieces + 1'), which is less material. Two plans that use the same length go to the one with fewer bars.
+
+![Combine report: the stock to order for each size, with the cutting plan of W18x35](docs/screenshot-combine.png)
+
+* **Machine allowance per bar** – the length every bar keeps for the machine (usually about 1'-0"), and the **kerf**
+  lost at each cut (1/8" to start with). Change them in the report or in *Settings → Combine*; bare numbers are inches.
+* **Stock lengths per shape** – *Settings → Combine* lists the lengths you can order for each shape (W: 20' to 60'
+  every 5'; HSS: 20', 24', 40', 48'; L, C, MC, WT, S: 20', 40'; HP: 40' to 60'; PIPE: 21', 42'). Add a length (`32`,
+  `32'`, `9.75 m`) or click × to take one off; **add or remove shapes** like everywhere else; *Reset* puts the defaults
+  back. Sizes whose shape is not in the list (joists, rebar, plate…) use the lengths under *Other*; with none there,
+  they are listed in the report but not planned.
+* Each row shows the pieces, their total cut length, **what to order** (`1 × 40'-0" + 1 × 20'-0"`), the length ordered,
+  the drop and the weight ordered (from the steel tables). Click a row for its **cutting plan**: every bar drawn to
+  scale with its pieces, the machine allowance and the drop; *Select These Markups* finds them on the drawing.
+* Quantities count: a markup with Qty 3 is three pieces. Material added by **standard details** (clip angles,
+  posts…) is included (untick *Standard detail material* to leave it out). *Current Sheet* plans one sheet only.
+* A piece longer than the longest stock length is **spliced**: it takes as many bars of the longest length as it
+  needs, the rest going on the shortest length that holds it; the report flags it.
+* Exports: **CSV** (the order list and the cutting plan) and **Print / PDF** (a printable page with the bars drawn).
+
+<img src="docs/screenshot-combine-stock.png" width="640" alt="Settings: stock lengths to order for each shape">
 
 ### Labels and text colour
 
@@ -427,7 +462,7 @@ tool active), **LABELS** (measurement labels on the drawing).
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff (sample set + addendum; needs `npm run dev` running)
@@ -467,6 +502,8 @@ src/
     embed.ts         the takeoff saved inside its PDF (an embedded file), and read back
     listStyle.ts     Markups List styles: the file format, built-in style
     subjects.ts      subjects as shapes: the default list, the shape of a size, older subjects
+    combine.ts       combine report: pieces by size, nesting them on the stock lengths to order
+    combineReport.ts combine report output: order text, CSV, printable page
   store/           Zustand store (open documents, each with its undo history; panes and tabs), project.ts
                    (opening, saving into the PDF, closing, autosave), commands
                    (menu and keyboard commands), flatten (markups into new versions of the PDFs)

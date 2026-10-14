@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.8.0 – 2026-10-14
+
+### Combine report
+- *Tools → Combine Report…* (also *File → Export → Combine Report*, and *Combine* in the Takeoff Summary): the stock
+  lengths to order for every size. It reads the size (Member Size, else the label) and the length of each length
+  measurement and nests the pieces of each size on the lengths you can order for its shape, using as little material
+  as it can (the best plan exactly for up to 12 pieces of a size, a close one above that); of plans that use the same
+  length, the one with fewer bars. 3 × W8x10 at 5' fit on one 20'; 15' + 2 × 18' need one 40' and one 20' when W comes
+  in 20' and 40'.
+- **Machine allowance** per bar (1'-0" to start with) and **kerf** per cut (1/8"), set in the report or in
+  *Settings → Combine*.
+- *Settings → Combine*: the stock lengths for each shape (W, HSS, L, C, MC, WT, S, HP, PIPE to start with) – add or
+  remove lengths, add or remove shapes, reset to the defaults; *Other* for sizes whose shape is not listed (none to
+  start with: those sizes are listed, not planned).
+- Each size shows its pieces, cut length, what to order (`1 × 40'-0" + 1 × 20'-0"`), length ordered, drop and weight;
+  click it for the cutting plan, every bar drawn to scale with its pieces, the allowance and the drop. Qty counts as
+  pieces; standard detail material is included (or not); all sheets or the current one. Pieces longer than the longest
+  stock are spliced over several bars and flagged.
+- Export as CSV (order list and cutting plan) or a printable page (Print / Save as PDF).
+
 ## 1.7.0 – 2026-10-14
 
 ### Subjects are shapes

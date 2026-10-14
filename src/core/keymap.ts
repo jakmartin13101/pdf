@@ -65,6 +65,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'tab.next', label: 'Next Document Tab', group: 'View', keys: ['Ctrl+Tab', 'Ctrl+Shift+]'] },
   { id: 'tab.prev', label: 'Previous Document Tab', group: 'View', keys: ['Ctrl+Shift+Tab', 'Ctrl+Shift+['] },
   { id: 'tab.close', label: 'Close Document Tab', group: 'View', keys: ['Ctrl+F4'] },
+  { id: 'report.combine', label: 'Combine Report…', group: 'Takeoff', keys: [] },
   { id: 'tab.newPane', label: 'Move Document Tab to a New Pane', group: 'View', keys: [] },
 
   { id: 'tool.select', label: 'Select', group: 'Tools', keys: ['V'] },

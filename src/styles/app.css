@@ -3770,3 +3770,122 @@ button.linkish {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* combine report */
+.cmb-opts {
+  gap: 12px;
+}
+.cmb-scroll {
+  max-height: 52vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.cmb-table td,
+.cmb-table th {
+  white-space: nowrap;
+}
+.cmb-table .num {
+  text-align: right;
+}
+.cmb-table tr.row {
+  cursor: pointer;
+}
+.cmb-pieces {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmb-plan-row td {
+  background: var(--bg-panel-2, var(--bg-hover));
+}
+.cmb-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  align-items: flex-start;
+}
+.cmb-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.cmb-stock {
+  width: 64px;
+  flex: none;
+}
+.cmb-track {
+  flex: 1;
+  display: flex;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  overflow: hidden;
+  background: repeating-linear-gradient(45deg, transparent, transparent 4px, var(--bg-hover) 4px, var(--bg-hover) 8px);
+}
+.cmb-piece {
+  flex: none;
+  background: var(--accent-soft);
+  border-right: 1px solid var(--accent);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text);
+}
+.cmb-piece.detail {
+  background: rgba(60, 207, 122, 0.22);
+}
+.cmb-machine {
+  flex: none;
+  background: rgba(245, 177, 61, 0.55);
+}
+.cmb-drop {
+  width: 110px;
+  flex: none;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.warn-text {
+  color: var(--warn);
+}
+.cmb-stock-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.cmb-stock-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+}
+.cmb-stock-row:first-child {
+  border-top: 0;
+}
+.cmb-lengths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.cmb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 2px;
+}
+.cmb-chip .icon-btn {
+  min-width: 16px;
+  height: 16px;
+}
+.cmb-add {
+  width: 90px;
+  padding: 1px 6px;
+}
