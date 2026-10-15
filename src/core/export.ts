@@ -4,6 +4,7 @@ import { allColumns, columnUnit, sheetDisplayName, type Row } from './columns';
 import { buildSummary, columnName, primaryQuantity, summableCustomColumns } from './summary';
 import { centroid, dist, labelPoint } from './geometry';
 import { computeMeasure, drawingLabelLines, scaleForMarkup } from './measure';
+import type { DetailMark } from './detailMarks';
 import { TYPE_INFO, textColor } from './markupTypes';
 import { calloutAnchor, calloutBox, dashArray, markupRect, polylineLabelAnchor, stampFontSize, uprightAngle, wrapText } from './shapes';
 import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, fmtNumber } from './units';
@@ -466,8 +467,37 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
   }
 }
 
+/** Standard detail material drawn beside its markup (see core/detailMarks.ts). */
+function paintDetailMark(p: Painter, mk: DetailMark) {
+  const s = mk.style;
+  const r = mk.symbolSize;
+  for (const path of mk.paths) p.path(path.pts, { closed: path.closed, stroke: s.color, width: s.lineWidth, dash: dashArray(s), opacity: s.opacity });
+  for (const q of mk.symbols) {
+    for (const poly of symbolPolys(s.symbol, q, r)) {
+      p.path(poly.pts, {
+        closed: poly.closed,
+        stroke: s.color,
+        width: poly.closed ? Math.max(0.6, r * 0.16) : Math.max(1.2, r * 0.3),
+        fill: poly.closed ? s.fillColor ?? s.color : undefined,
+        fillOpacity: s.fillOpacity,
+        opacity: s.opacity,
+      });
+    }
+  }
+  if (mk.text) {
+    const t = mk.text;
+    // `at` is the middle of the text's height; the painter wants its baseline.
+    const k = t.size * 0.35;
+    const at = { x: t.at.x - Math.sin(t.angle) * k, y: t.at.y + Math.cos(t.angle) * k };
+    p.text(t.text, at, { size: t.size, color: textColor(s), angle: t.angle, bold: true, family: s.fontFamily, align: t.anchor === 'middle' ? 'center' : 'left', halo: true, opacity: s.opacity });
+  }
+}
+
+/** Standard detail material for some markups of a page (`labels`: the markups' labels are drawn too). */
+export type MarksFor = (markups: Markup[], labels: boolean) => DetailMark[];
+
 /** Labels drawn with a measurement on the page (sheet scale or viewport scale). */
-function labelLinesFor(doc: DocState, m: Markup): string[] {
+export function markupLabelLines(doc: DocState, m: Markup): string[] {
   if (!TYPE_INFO[m.type].measure) return [];
   const sheet = doc.sheets.find((s) => s.id === m.sheetId);
   const sc = scaleForMarkup(m, sheet);
@@ -482,7 +512,7 @@ export async function flattenIntoPdf(
   bytes: Uint8Array,
   doc: DocState,
   pages: { pageIndex: number; markups: Markup[]; toPdf: (p: Pt) => Pt }[],
-  opts: { labels?: boolean } = {},
+  opts: { labels?: boolean; marks?: MarksFor } = {},
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const fonts: FontSet = {
@@ -493,12 +523,17 @@ export async function flattenIntoPdf(
   for (const pg of pages) {
     const page = pdf.getPage(pg.pageIndex);
     const painter = makePainter(page, pg.toPdf, fonts);
-    for (const m of pg.markups) paintMarkup(painter, m, opts.labels === false ? [] : labelLinesFor(doc, m));
+    for (const m of pg.markups) paintMarkup(painter, m, opts.labels === false ? [] : markupLabelLines(doc, m));
+    for (const mk of opts.marks?.(pg.markups, opts.labels !== false) ?? []) paintDetailMark(painter, mk);
   }
   return pdf.save();
 }
 
-export async function exportFlattenedPdf(doc: DocState, fileBytes: Map<string, Uint8Array>, opts: { includeHidden?: boolean } = {}): Promise<Uint8Array> {
+export async function exportFlattenedPdf(
+  doc: DocState,
+  fileBytes: Map<string, Uint8Array>,
+  opts: { includeHidden?: boolean; marks?: MarksFor } = {},
+): Promise<Uint8Array> {
   const out = await PDFDocument.create();
   const fonts: FontSet = {
     Helvetica: [await out.embedFont(StandardFonts.Helvetica), await out.embedFont(StandardFonts.HelveticaBold)],
@@ -523,17 +558,9 @@ export async function exportFlattenedPdf(doc: DocState, fileBytes: Map<string, U
       return { x, y };
     };
     const painter = makePainter(page, toPdf, fonts);
-    for (const m of doc.markups) {
-      if (m.sheetId !== sheet.id) continue;
-      if (!opts.includeHidden && hidden.has(m.layer)) continue;
-      const lines = TYPE_INFO[m.type].measure
-        ? (() => {
-            const sc = scaleForMarkup(m, sheet);
-            return drawingLabelLines(m, computeMeasure(m, sc), sc, doc.settings);
-          })()
-        : [];
-      paintMarkup(painter, m, lines);
-    }
+    const drawn = doc.markups.filter((m) => m.sheetId === sheet.id && (opts.includeHidden || !hidden.has(m.layer)));
+    for (const m of drawn) paintMarkup(painter, m, markupLabelLines(doc, m));
+    for (const mk of opts.marks?.(drawn, true) ?? []) paintDetailMark(painter, mk);
   }
   out.setTitle('Takeoff markups');
   out.setCreator('BuildSuite Takeoff Studio');

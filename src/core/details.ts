@@ -123,6 +123,8 @@ export function parseDetailLength(text: string): number | null {
 }
 
 const ftIn = (inches: number) => formatLength(inches, 'ft-in', 16);
+/** A number of pieces: whole numbers without decimals. */
+const fmtCount = (n: number) => fmtNumber(n, n % 1 ? 2 : 0);
 
 export interface ItemQuantity {
   /** Number of pieces. */
@@ -137,7 +139,7 @@ export interface ItemQuantity {
 }
 
 /** Multiplier from the markup's Qty column (identical members drawn once), if it has one. */
-function qtyColumnId(doc: DocState): string | null {
+export function qtyColumnId(doc: DocState): string | null {
   const c = doc.columns.find((x) => (x.kind === 'number' || x.kind === 'formula') && ['qty', 'quantity'].includes(normName(x.name)));
   return c ? customColId(c) : null;
 }
@@ -166,7 +168,7 @@ export function itemQuantity(item: DetailItem, r: Row, qtyCol: string | null): I
     const runs = item.value.trim() === '' ? 1 : toNum(item.value);
     if (!run) return { pieces: 0, pieceLength: 0, totalLength: 0, basis: 'full length', warning: 'Full length needs a length, polylength, perimeter or area markup' };
     const pieces = runs * mult;
-    return { pieces, pieceLength: run, totalLength: pieces * run, basis: runs === 1 ? 'full length' : `full length × ${fmtNumber(runs, 2)}` };
+    return { pieces, pieceLength: run, totalLength: pieces * run, basis: runs === 1 ? 'full length' : `full length × ${fmtCount(runs)}` };
   }
   const n = item.value.trim() === '' ? 1 : toNum(item.value);
   const pieces = n * perItem * mult;
@@ -174,7 +176,7 @@ export function itemQuantity(item: DetailItem, r: Row, qtyCol: string | null): I
     pieces,
     pieceLength: typed,
     totalLength: pieces * typed,
-    basis: `× ${fmtNumber(n, 2)}${m.type === 'count' ? ' per item' : ''}`,
+    basis: `× ${fmtCount(n)}${m.type === 'count' ? ' per item' : ''}`,
   };
 }
 

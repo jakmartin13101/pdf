@@ -137,6 +137,7 @@ export function MenuBar() {
       ...PANEL_IDS.map<MenuItem>((id) => ({ label: PANEL_TITLES[id], checked: panelOpen(layout, id), onClick: () => st().togglePanel(id) })),
       { sep: true },
       { label: 'Measurement Labels on Drawing', checked: prefs.showLabels, onClick: () => st().setPrefs({ showLabels: !prefs.showLabels }) },
+      { label: 'Standard Detail Material on Drawing', checked: prefs.detailMarks.show, onClick: () => st().setPrefs({ detailMarks: { ...prefs.detailMarks, show: !prefs.detailMarks.show } }) },
       {
         label: 'Theme',
         children: (['system', 'light', 'dark'] as const).map((t) => ({
@@ -196,6 +197,7 @@ export function MenuBar() {
       { label: 'Ortho', checked: prefs.ortho, onClick: () => st().setPrefs({ ortho: !prefs.ortho }) },
       { label: 'Keep Tool Active (Reuse)', checked: prefs.reuse, onClick: () => st().setPrefs({ reuse: !prefs.reuse }) },
       { label: 'Measurement Labels on Drawing', checked: prefs.showLabels, onClick: () => st().setPrefs({ showLabels: !prefs.showLabels }) },
+      { label: 'Standard Detail Material on Drawing', checked: prefs.detailMarks.show, onClick: () => st().setPrefs({ detailMarks: { ...prefs.detailMarks, show: !prefs.detailMarks.show } }) },
       {
         label: 'Theme',
         children: (['system', 'light', 'dark'] as const).map((t) => ({

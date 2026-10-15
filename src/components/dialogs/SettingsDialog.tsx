@@ -14,7 +14,7 @@ import { allColumns } from '../../core/columns';
 import { desktop, type GpuMode } from '../../brand';
 import { AUTO_MATCH, autoStyleFor, defaultAutoStyles, isAutoMarkup, newAutoStyle, withRule } from '../../core/autoStyles';
 import { MEMBER_FAMILIES } from '../../core/autoTakeoff';
-import { formatLength, parseLength } from '../../core/units';
+import { fmtNumber, formatLength, parseLength } from '../../core/units';
 import { CommitInput } from '../fields';
 import { LineSample, StepSelect } from '../EndAdjuster';
 import { Modal } from './Modal';
@@ -195,6 +195,35 @@ function Editing() {
       </div>
       <div className="hint">
         The step for the − / + buttons that lengthen or shorten a measurement's ends (Properties → <i>Adjust Ends</i>, and members in the Auto Takeoff panel).
+      </div>
+
+      <h4 className="set-h">Standard detail material</h4>
+      <Check checked={prefs.detailMarks.show} onChange={(v) => st.setPrefs({ detailMarks: { ...prefs.detailMarks, show: v } })} testId="set-detail-marks">
+        Draw the material standard details add next to their markups
+      </Check>
+      <Check checked={prefs.detailMarks.labels} onChange={(v) => st.setPrefs({ detailMarks: { ...prefs.detailMarks, labels: v } })} testId="set-detail-mark-labels">
+        Write its size and number of pieces
+      </Check>
+      <div className="field">
+        <label>Space from the markup</label>
+        <select
+          value={prefs.detailMarks.gap}
+          onChange={(e) => st.setPrefs({ detailMarks: { ...prefs.detailMarks, gap: Number(e.target.value) } })}
+          data-testid="set-detail-mark-gap"
+        >
+          {[...new Set([2, 4, 8, 14, prefs.detailMarks.gap])]
+            .sort((a, b) => a - b)
+            .map((g) => (
+              <option key={g} value={g}>
+                {g === 2 ? 'Tight' : g === 4 ? 'Small' : g === 8 ? 'Medium' : g === 14 ? 'Wide' : `${g} pt`} ({fmtNumber(g / 72, 3)}" on the sheet)
+              </option>
+            ))}
+        </select>
+      </div>
+      <div className="hint">
+        Full-length material is a line beside the markup, the same length and direction; pieces at a spacing are marks along it; counted pieces are a
+        count mark by the markup's label. Each in the look of its shape (Auto Takeoff line styles, else its Tool Chest tool). Clicking one picks its
+        markup.
       </div>
     </>
   );

@@ -7,11 +7,11 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.8.0**: the **Combine Report** – what stock lengths to order for every size (W8x10, HSS6x6x3/8…),
-> with the pieces nested on the lengths you can buy for each shape (*Settings → Combine*) and an adjustable machine
-> allowance per bar, plus a cutting plan for every bar (1.7.0: subjects are shapes from your own list, labels and text
-> have their own colour; 1.6.0: every PDF is its own document with its takeoff saved inside it, Markups List layouts
-> with a default) – see the [changelog](CHANGELOG.md).
+> **Version 1.9.0**: the material **standard details add is drawn on the drawing**, beside its markup in the look of
+> its shape – full-length material as a matching line, pieces at a spacing as marks along it, counted pieces as a
+> count mark by the markup's label (1.8.0: the Combine Report of stock lengths to order; 1.7.0: subjects are shapes
+> from your own list, labels and text have their own colour; 1.6.0: every PDF is its own document with its takeoff
+> saved inside it) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -157,6 +157,29 @@ IF [Subject] = "PIPE" AND [Category] = "Misc Metals"  → ADD Post  HSS1-1/2x1-1
 
 ![Material added by standard details in the Markups List](docs/screenshot-detail-rows.png)
 
+#### Detail material on the drawing
+
+Whatever a standard detail adds – by its rule or by hand – is also **drawn next to its markup**, a little to the side so
+the markup, its label and the material all stay readable:
+
+* **Full length** material is a **line the same length and in the same direction** as the markup (a polylength's line
+  follows every bend), on the side away from the markup's label; around an area it runs just inside the outline. The
+  size is written along it.
+* **@ spacing** pieces are a **mark for every piece**, where it falls along the member (posts at 4'-0" OC, studs,
+  dowels), with "13 × 3/4" stud @ 2'-0"".
+* **× quantity** pieces are a **count mark next to the markup's label** with the number of pieces ("4 × L4x4x3/8");
+  several are stacked by the label. On a count markup the mark goes by its count label.
+* Each is drawn in the **look of its shape**: the line style rule for that shape (*Settings → Auto Takeoff Line Styles*:
+  L orange dotted, HSS blue dashed…), else the Tool Chest tool for its size (a count tool's symbol for marks), else a
+  colour per size. Text uses the rule's text colour.
+* The material moves with its markup and goes away when the detail is taken off; it is not a markup of its own, so it
+  is still counted once. Hover it to see the detail and the quantity; click it to select its markup.
+* *Settings → Drawing & Editing → Standard detail material*: draw it or not (also *View* and *Settings* menus →
+  *Standard Detail Material on Drawing*), write its size and number of pieces or not, and the space from the markup.
+  Flattened PDFs (*Edit → Flatten Markups*, *File → Export → Flattened PDF*) draw it too.
+
+![Detail material drawn beside two beams: the full-length angle as a dotted line, studs at 2'-0" OC, and "4 × L4x4x3/8" by each beam's label](docs/screenshot-detail-marks.png)
+
 ### Automatic takeoff (beams and tubing)
 
 Open the **Auto** panel (toolbar, or *Tools → Automatic Takeoff (Beams & Tubing)…*) on a framing plan and click
@@ -212,7 +235,8 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
 * **Units & Totals** – the document's units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area
   labels; saved with the document.
 * **Drawing & Editing** – snapping to the drawing and to markups, ortho; what the arrow keys move a selection by (screen
-  pixels, or a drawing length such as 1" at each markup's own scale – Shift ×10); the step for adjusting ends.
+  pixels, or a drawing length such as 1" at each markup's own scale – Shift ×10); the step for adjusting ends; standard
+  detail material on the drawing (see [Detail material on the drawing](#detail-material-on-the-drawing)).
 * **Keyboard** – every command with its keys: click **+** and press the keys to add a shortcut, × to remove one,
   *Default* to put a command back, *Reset All*. Single keys (like `L`) work on the drawing; add Ctrl, Shift or Alt for
   more. A key already used by another command is flagged, with the choice to move it. Search by command or by key.
@@ -395,7 +419,8 @@ itself – the selected markups, those on this sheet, or all – with or without
 including hidden layers. The drawing then carries them like any other line work (other programs see them, and page
 labels and snapping read them). Flattened markups leave the Markups List, or choose **Keep them as takeoff data**: they
 stay in the list and totals on a hidden, locked *Flattened* layer so nothing is drawn twice. Undo puts everything back.
-*File → Export → Flattened PDF* still makes a marked-up copy without changing the document.
+*File → Export → Flattened PDF* still makes a marked-up copy without changing the document. Standard detail material
+shown on the drawing is drawn with its markups.
 
 ### Speed and graphics
 
@@ -462,7 +487,7 @@ tool active), **LABELS** (measurement labels on the drawing).
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine, detail material on the drawing)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff (sample set + addendum; needs `npm run dev` running)
@@ -504,6 +529,7 @@ src/
     subjects.ts      subjects as shapes: the default list, the shape of a size, older subjects
     combine.ts       combine report: pieces by size, nesting them on the stock lengths to order
     combineReport.ts combine report output: order text, CSV, printable page
+    detailMarks.ts   standard detail material on the drawing: offset lines, marks along a member, count marks by labels
   store/           Zustand store (open documents, each with its undo history; panes and tabs), project.ts
                    (opening, saving into the PDF, closing, autosave), commands
                    (menu and keyboard commands), flatten (markups into new versions of the PDFs)

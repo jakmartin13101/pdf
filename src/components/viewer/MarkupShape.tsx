@@ -1,5 +1,6 @@
 import { memo, type CSSProperties } from 'react';
 import type { FontFamily, Markup, Pt } from '../../types';
+import type { DetailMark } from '../../core/detailMarks';
 import { cloudPath, labelPoint, pointsToPath } from '../../core/geometry';
 import { textColor } from '../../core/markupTypes';
 import {
@@ -353,6 +354,57 @@ export const MarkupShape = memo(function MarkupShape({ m, label, showLabels, dra
   return (
     <g data-mid={draft ? undefined : m.id} className={`mk mk-${m.type}${m.locked ? ' locked' : ''}`} opacity={m.style.opacity}>
       {body(m, label, showLabels, draft)}
+    </g>
+  );
+});
+
+/**
+ * Material a standard detail adds, drawn beside its markup. Clicking it picks the markup (the
+ * material belongs to it); `data-dmark` tells the hover tip which material it is.
+ */
+export const DetailMarkShape = memo(function DetailMarkShape({ mark }: { mark: DetailMark }) {
+  const s = mark.style;
+  const pseudo = { style: s } as Markup;
+  const open = OPEN_SYMBOLS.has(s.symbol);
+  const r = mark.symbolSize;
+  return (
+    <g data-mid={mark.parentId} data-dmark={mark.key} className={`mk mk-detail mk-detail-${mark.kind}`} opacity={s.opacity} data-testid="detail-mark">
+      {mark.paths.map((p, i) => {
+        const d = pointsToPath(p.pts, p.closed);
+        return (
+          <g key={i}>
+            <Hit d={d} />
+            <path d={d} style={strokeStyle(pseudo)} />
+          </g>
+        );
+      })}
+      {mark.symbols.length > 0 && (
+        <path
+          d={mark.symbols.map((p) => symbolPath(s.symbol, p, r)).join('')}
+          className="mk-count"
+          style={{
+            stroke: s.color,
+            strokeWidth: `max(${open ? Math.max(1.2, r * 0.3) : Math.max(0.6, r * 0.16)}px, var(--px))`,
+            fill: open ? 'none' : s.fillColor ?? s.color,
+            fillOpacity: open ? undefined : s.fillOpacity,
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          }}
+        />
+      )}
+      {mark.text && (
+        <Halo
+          family={cssFontFamily(s.fontFamily)}
+          weight={600}
+          x={mark.text.at.x}
+          y={mark.text.at.y}
+          lines={[mark.text.text]}
+          size={mark.text.size}
+          color={textColor(s)}
+          angle={mark.text.angle}
+          anchor={mark.text.anchor}
+        />
+      )}
     </g>
   );
 });

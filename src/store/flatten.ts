@@ -1,7 +1,8 @@
 // Flatten markups: draw them into the drawing itself. Each affected PDF gets a new version (a new file
 // id with the markups in its page content), so Undo goes back to the original drawing.
-import type { Markup, SourceFile } from '../types';
-import { flattenIntoPdf } from '../core/export';
+import type { DocState, Markup, SourceFile } from '../types';
+import { flattenIntoPdf, markupLabelLines, type MarksFor } from '../core/export';
+import { detailMarks } from '../core/detailMarks';
 import { getPage, registerPdf } from '../core/pdf';
 import { uid } from '../core/ids';
 import { idbSet } from '../core/persistence';
@@ -15,6 +16,16 @@ export interface FlattenOptions {
   keep: boolean;
   /** Draw measurement labels with the measurements. */
   labels: boolean;
+}
+
+/** The standard detail material drawn with markups in a flattened PDF, as on the screen (if shown there). */
+export function marksForPdf(doc: DocState): MarksFor {
+  const { prefs, toolChest } = getState();
+  const dm = prefs.detailMarks;
+  return (markups, labels) =>
+    dm.show
+      ? detailMarks(doc, markups, { chest: toolChest, look: prefs, gap: dm.gap, labels: labels && dm.labels, parentLabel: (m) => (labels ? markupLabelLines(doc, m) : []) })
+      : [];
 }
 
 /** Flatten these markups into their sheets' PDFs, as one undo step. Returns how many were flattened. */
@@ -48,7 +59,7 @@ export async function flattenMarkups(ids: string[], opts: FlattenOptions): Promi
           return { pageIndex, markups, toPdf: (q: { x: number; y: number }) => ({ x: vp.convertToPdfPoint(q.x, q.y)[0], y: vp.convertToPdfPoint(q.x, q.y)[1] }) };
         }),
       );
-      const out = await flattenIntoPdf(bytes, doc, plan, { labels: opts.labels });
+      const out = await flattenIntoPdf(bytes, doc, plan, { labels: opts.labels, marks: marksForPdf(doc) });
       const file = doc.files.find((f) => f.id === fileId)!;
       const next: SourceFile = { ...file, id: uid('f') };
       await registerPdf(next.id, out);

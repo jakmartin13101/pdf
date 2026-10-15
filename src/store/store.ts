@@ -32,6 +32,7 @@ import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
+import { defaultDetailMarkPrefs, type DetailMarkPrefs } from '../core/detailMarks';
 import { defaultCombineSettings, type CombineSettings } from '../core/combine';
 
 export type ToolMode =
@@ -228,6 +229,8 @@ export interface Prefs {
   subjects: string[];
   /** Combine report: machine allowance, saw kerf and the stock lengths per shape (Settings → Combine). */
   combine: CombineSettings;
+  /** Standard detail material drawn next to its markups (Settings → Drawing & Editing). */
+  detailMarks: DetailMarkPrefs;
 }
 
 export interface PerfPrefs {
@@ -661,6 +664,7 @@ const defaultPrefs = (): Prefs => ({
   listStyle: null,
   subjects: [...DEFAULT_SUBJECTS],
   combine: defaultCombineSettings(),
+  detailMarks: defaultDetailMarkPrefs(),
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -678,6 +682,7 @@ function loadPrefs(): Prefs {
     perf: { ...d.perf, ...saved.perf },
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
     subjects: Array.isArray(saved.subjects) ? cleanSubjects(saved.subjects.map(String)) : d.subjects,
+    detailMarks: { ...d.detailMarks, ...saved.detailMarks },
     combine: { ...d.combine, ...saved.combine, stock: Array.isArray(saved.combine?.stock) ? saved.combine!.stock : d.combine.stock, other: Array.isArray(saved.combine?.other) ? saved.combine!.other : d.combine.other },
   };
 }

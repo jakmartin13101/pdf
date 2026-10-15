@@ -7,6 +7,7 @@ import { normName } from '../core/formula';
 import { closeDocument, fileBytes, openExampleTakeoff, openFiles, openProjectFile, openSample, safeName, saveDocument } from './project';
 import { offerFile } from './files';
 import { exportFlattenedPdf } from '../core/export';
+import { marksForPdf } from './flatten';
 import { COMMAND_BY_ID, chordFromEvent, commandForChord, resolveBindings } from '../core/keymap';
 import { TYPE_INFO } from '../core/markupTypes';
 import { desktop } from '../brand';
@@ -255,7 +256,7 @@ export async function exportPdf() {
   const st = getState();
   st.setBusy('Exporting flattened PDF…');
   try {
-    const bytes = await exportFlattenedPdf(st.doc, fileBytes);
+    const bytes = await exportFlattenedPdf(st.doc, fileBytes, { marks: marksForPdf(st.doc) });
     st.setBusy(null);
     await offerFile(new Blob([bytes], { type: 'application/pdf' }), `${safeName(st.projectName)}_markups.pdf`, 'Marked-up PDF');
   } catch (e) {

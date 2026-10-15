@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0 – 2026-10-15
+
+### Standard detail material on the drawing
+- The material a standard detail adds (by its rule or by hand) is drawn next to its markup, a little to the side so
+  both stay readable, and moves with it:
+  - **full length** – a line the same length and direction as the markup, on the side away from its label (inside
+    the outline of an area), with the size along it;
+  - **@ spacing** – a mark for every piece where it falls along the member, with the number, size and spacing;
+  - **× quantity** – a count mark with the number of pieces next to the markup's label (stacked when there are
+    several; by the count label on a count markup).
+- Drawn in the look of the material's shape: the Auto Takeoff line style rule for the shape, else the Tool Chest tool
+  for the size (its symbol for marks), else a colour per size.
+- Hover shows the detail and the quantity; clicking selects the markup. Not a markup of its own: the material is
+  still counted once, in the Markups List, Summary and exports.
+- *Settings → Drawing & Editing → Standard detail material*: show or hide it (also *View / Settings → Standard Detail
+  Material on Drawing*), its size and count text, and the space from the markup. Flattened PDFs draw it too.
+
+### Fixes
+- The quantity of standard detail material reads "× 4" instead of "× 4.00".
+
 ## 1.8.0 – 2026-10-14
 
 ### Combine report

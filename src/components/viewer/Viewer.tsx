@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Markup, MarkupType, Pt, Rect, Sheet } from '../../types';
 import { findSheet, getState, paneDoc, useStore, type ToolMode, type ViewRequest } from '../../store/store';
-import { MarkupShape } from './MarkupShape';
+import { DetailMarkShape, MarkupShape } from './MarkupShape';
+import { detailMarks, type DetailMark } from '../../core/detailMarks';
 import { PageCanvas } from './PageCanvas';
 import { defaultStyle as defaultStyleFor, TYPE_INFO, textColor } from '../../core/markupTypes';
 import { computeMeasure, drawingLabelLines, measurementText, scaleAt, scaleForMarkup } from '../../core/measure';
@@ -107,6 +108,17 @@ const MarkupsLayer = memo(function MarkupsLayer({ markups, labels, showLabels }:
   );
 });
 
+const DetailMarksLayer = memo(function DetailMarksLayer({ marks }: { marks: DetailMark[] }) {
+  if (!marks.length) return null;
+  return (
+    <g className="detail-marks">
+      {marks.map((d) => (
+        <DetailMarkShape key={d.key} mark={d} />
+      ))}
+    </g>
+  );
+});
+
 function ViewportsLayer({ sheet, zoom }: { sheet: Sheet; zoom: number }) {
   if (!sheet.viewports.length) return null;
   return (
@@ -134,6 +146,8 @@ export function Viewer({ paneId }: { paneId: string }) {
   const allMarkups = useStore((s) => paneDoc(s, paneId).markups);
   const layers = useStore((s) => paneDoc(s, paneId).layers);
   const settings = useStore((s) => paneDoc(s, paneId).settings);
+  const doc = useStore((s) => paneDoc(s, paneId));
+  const toolChest = useStore((s) => s.toolChest);
   const selection = useStore((s) => s.selection);
   const tool = useStore((s) => s.tool);
   const prefs = useStore(useShallow((s) => s.prefs));
@@ -174,6 +188,7 @@ export function Viewer({ paneId }: { paneId: string }) {
   const [marquee, setMarquee] = useState<{ r: Rect; crossing: boolean } | null>(null);
   const [freehand, setFreehand] = useState<Pt[] | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [hoverMark, setHoverMark] = useState<string | null>(null);
   const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const [panning, setPanning] = useState(false);
@@ -200,6 +215,19 @@ export function Viewer({ paneId }: { paneId: string }) {
     }
     return map;
   }, [pageMarkups, sheet, settings]);
+
+  // Material added by standard details, drawn beside its markups.
+  const marks = useMemo(() => {
+    const dm = prefs.detailMarks;
+    if (!dm.show || !doc.standardDetails?.length || !pageMarkups.length) return [];
+    return detailMarks(doc, pageMarkups, {
+      chest: toolChest,
+      look: prefs,
+      gap: dm.gap,
+      labels: dm.labels && prefs.showLabels,
+      parentLabel: (m) => (prefs.showLabels ? labels.get(m.id)?.split('\n').filter(Boolean) ?? [] : []),
+    });
+  }, [doc, pageMarkups, labels, toolChest, prefs]);
 
   // ---- sizing
   useLayoutEffect(() => {
@@ -683,6 +711,8 @@ export function Viewer({ paneId }: { paneId: string }) {
     if (tool.kind === 'select') {
       const id = (e.target as Element).closest?.('[data-mid]')?.getAttribute('data-mid') ?? null;
       if (id !== hoverId) setHoverId(id);
+      const mk = (e.target as Element).closest?.('[data-dmark]')?.getAttribute('data-dmark') ?? null;
+      if (mk !== hoverMark) setHoverMark(mk);
       if (hover) setHover(null);
       return;
     }
@@ -1053,11 +1083,13 @@ export function Viewer({ paneId }: { paneId: string }) {
 
   const hoverTip = useMemo(() => {
     if (!hoverId || tool.kind !== 'select' || dragRef.current) return null;
+    const mark = hoverMark ? marks.find((x) => x.key === hoverMark) : undefined;
+    if (mark) return { title: mark.title, sub: mark.sub };
     const m = pageMarkups.find((x) => x.id === hoverId);
     if (!m) return null;
     const lab = labels.get(m.id);
     return { title: m.subject, sub: lab ? lab.split('\n').filter((l) => l !== m.label).join('  ·  ') : m.text?.slice(0, 60) ?? '' };
-  }, [hoverId, pageMarkups, labels, tool.kind]);
+  }, [hoverId, hoverMark, marks, pageMarkups, labels, tool.kind]);
 
   const flashMarkup = flash && sheet ? pageMarkups.find((m) => m.id === flash.id) : undefined;
   const editing = editingTextId ? pageMarkups.find((m) => m.id === editingTextId) : undefined;
@@ -1119,6 +1151,8 @@ export function Viewer({ paneId }: { paneId: string }) {
         >
           <ViewportsLayer sheet={sheet} zoom={z} />
           <MarkupsLayer markups={pageMarkups} labels={labels} showLabels={prefs.showLabels} />
+          {/* Over the markups: an area's fill would wash out the material drawn inside it. */}
+          <DetailMarksLayer marks={marks} />
           {autoTakeoff && autoHere.length > 0 && <AutoTakeoffLayer members={autoHere} state={autoTakeoff} zoom={z} clickable={tool.kind === 'select'} sheet={sheet} />}
           {draftMarkup && (
             <g className="draft">
