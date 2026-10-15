@@ -25,6 +25,7 @@ const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'general', label: 'General', hint: 'You, theme and tools' },
   { id: 'units', label: 'Units & Totals', hint: 'This project' },
   { id: 'editing', label: 'Drawing & Editing', hint: 'Snapping and adjusting' },
+  { id: 'lengths', label: 'Length Measurements', hint: 'Maximum length by shape' },
   { id: 'keys', label: 'Keyboard', hint: 'Shortcuts for commands' },
   { id: 'subjects', label: 'Subjects', hint: 'Shapes markups can have' },
   { id: 'details', label: 'Detail Marks', hint: 'Detail material by shape' },
@@ -715,6 +716,110 @@ function CombineStock() {
 }
 
 /** The subjects markups can have: shapes, added and removed by the user. */
+/** A maximum length: ft-in (bare numbers are feet), blank for none. */
+function MaxInput({ value, onChange, testId }: { value: number; onChange: (inches: number) => void; testId?: string }) {
+  return (
+    <CommitInput
+      value={value > 0 ? formatLength(value, 'ft-in', 16) : ''}
+      placeholder="No maximum"
+      onCommit={(v) => {
+        if (!v.trim()) return onChange(0);
+        const n = parseLength(v, 'ft');
+        if (n == null || n <= 0) getState().toast(`“${v}” is not a length`, 'error');
+        else onChange(n);
+      }}
+      style={{ width: 120 }}
+      className="narrow"
+      data-testid={testId}
+    />
+  );
+}
+
+/** Settings → Length Measurements: the longest piece of each shape; longer measurements are broken up. */
+function MaxLengths() {
+  const ml = useStore((s) => s.prefs.maxLengths);
+  const subjects = useStore((s) => s.prefs.subjects);
+  const loaded = useStore((s) => s.loaded);
+  const st = getState();
+  const set = (p: Partial<typeof ml>) => st.setPrefs({ maxLengths: { ...ml, ...p } });
+  const setShape = (shape: string, inches: number) => {
+    const byShape = Object.fromEntries(Object.entries(ml.byShape).filter(([k]) => k.toLowerCase() !== shape.toLowerCase()));
+    if (inches > 0) byShape[shape] = inches;
+    set({ byShape });
+  };
+  const own = (shape: string) => Object.entries(ml.byShape).find(([k]) => k.toLowerCase() === shape.toLowerCase())?.[1] ?? 0;
+  // The subjects, then shapes with a maximum that are no longer subjects (so they can be cleared).
+  const shapes = [...subjects, ...Object.keys(ml.byShape).filter((k) => !subjects.some((x) => x.toLowerCase() === k.toLowerCase()))];
+  const [all, setAll] = useState('');
+  return (
+    <>
+      <div className="hint">
+        The longest piece you take off for each shape. A length or polylength measurement longer than its shape's maximum is taken off as pieces along the same
+        line, each a markup of its own on the drawing and in the Markups List: with W at 40'-0", a 63'-0" line becomes a 40'-0" W and a 23'-0" W. A markup's
+        shape is its subject, else the shape of its Member Size. Bare numbers are feet.
+      </div>
+      <Check checked={ml.enabled} onChange={(v) => set({ enabled: v })} testId="set-max-enabled">
+        Break measurements longer than their shape's maximum length into pieces
+      </Check>
+      <Check checked={ml.autoTakeoff} onChange={(v) => set({ autoTakeoff: v })} testId="set-max-auto">
+        Also members found by the automatic takeoff
+      </Check>
+      <table className="grid set-max-table" data-testid="max-table">
+        <thead>
+          <tr>
+            <th>Shape</th>
+            <th>Maximum length</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shapes.map((sh) => (
+            <tr key={sh} data-testid="max-row" data-shape={sh}>
+              <td>
+                <b>{sh}</b>
+                {!subjects.some((x) => x.toLowerCase() === sh.toLowerCase()) && <span className="hint"> (not a subject)</span>}
+              </td>
+              <td>
+                <MaxInput value={own(sh)} onChange={(v) => setShape(sh, v)} testId="max-input" />
+              </td>
+            </tr>
+          ))}
+          <tr data-testid="max-row" data-shape="*">
+            <td>
+              <b>Other shapes</b> <span className="hint">and no shape</span>
+            </td>
+            <td>
+              <MaxInput value={ml.other} onChange={(v) => set({ other: v })} testId="max-other" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div className="field-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+        <input className="narrow" style={{ width: 100 }} value={all} placeholder="e.g. 40'" onChange={(e) => setAll(e.target.value)} data-testid="max-all-input" />
+        <button
+          className="btn sm narrow"
+          disabled={!all.trim()}
+          onClick={() => {
+            const n = parseLength(all, 'ft');
+            if (n == null || n <= 0) return st.toast(`“${all}” is not a length`, 'error');
+            set({ byShape: Object.fromEntries(shapes.map((sh) => [sh, n])) });
+            setAll('');
+          }}
+          data-testid="max-all"
+        >
+          Set Every Shape
+        </button>
+        <button className="btn sm narrow" disabled={!Object.keys(ml.byShape).length && !ml.other} onClick={() => set({ byShape: {}, other: 0 })} data-testid="max-clear">
+          <RotateCcw size={12} /> Clear All
+        </button>
+      </div>
+      <div className="hint">
+        New measurements are broken as you draw them. For measurements already taken off: select them, right-click → <i>Split at Maximum Length</i> (also
+        <i> Edit → Split at Maximum Length</i>){loaded ? '' : ' once a file is open'}.
+      </div>
+    </>
+  );
+}
+
 const SYMBOL_NAMES: Record<CountSymbol, string> = {
   circle: 'Circle',
   square: 'Square',
@@ -1150,6 +1255,7 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
           {tab === 'units' && <Units />}
           {tab === 'editing' && <Editing />}
           {tab === 'keys' && <Keyboard />}
+          {tab === 'lengths' && <MaxLengths />}
           {tab === 'subjects' && <Subjects />}
           {tab === 'details' && <DetailMarksSettings />}
           {tab === 'combine' && <CombineStock />}

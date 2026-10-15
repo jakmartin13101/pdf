@@ -4,7 +4,7 @@ import { getState, isDirty, listStyleOf, useStore, PANEL_IDS, PANEL_TITLES, type
 import { dockMenuItems } from './dock/PanelHeader';
 import { useShortcuts } from './useShortcuts';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from '../brand';
-import { cmdCloseAll, cmdCloseDocument, cmdLabelsFromBox, cmdOpenExample, cmdOpenPdf, cmdOpenSample, cmdSave, cmdSaveAll, cmdSaveAs, exportPdf, view } from '../store/commands';
+import { cmdCloseAll, cmdCloseDocument, cmdLabelsFromBox, cmdSplitAtMax, cmdOpenExample, cmdOpenPdf, cmdOpenSample, cmdSave, cmdSaveAll, cmdSaveAs, exportPdf, view } from '../store/commands';
 import { tabMenuItems } from './dock/Panes';
 import { csvBlob, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
 import { buildTakeoffRows } from '../core/details';
@@ -122,6 +122,7 @@ export function MenuBar() {
       { label: 'Deselect', shortcut: 'Esc', onClick: () => st().setSelection([]) },
       { sep: true },
       { label: 'Flatten Markups…', shortcut: sc('edit.flatten'), onClick: () => st().setDialog({ kind: 'flatten' }), disabled: !loaded || !st().doc.markups.length },
+      { label: 'Split at Maximum Length', onClick: () => cmdSplitAtMax(), disabled: !loaded || !st().selection.length },
       { sep: true },
       { label: 'Settings & Preferences…', shortcut: sc('app.settings'), onClick: () => st().setDialog({ kind: 'settings' }) },
     ],
@@ -187,6 +188,7 @@ export function MenuBar() {
       { label: 'Settings & Preferences…', shortcut: sc('app.settings'), onClick: () => st().setDialog({ kind: 'settings', tab: 'general' }) },
       { label: 'Units & Totals…', onClick: () => st().setDialog({ kind: 'settings', tab: 'units' }) },
       { label: 'Drawing & Editing…', onClick: () => st().setDialog({ kind: 'settings', tab: 'editing' }) },
+      { label: 'Length Measurements…', onClick: () => st().setDialog({ kind: 'settings', tab: 'lengths' }) },
       { label: 'Detail Marks…', onClick: () => st().setDialog({ kind: 'settings', tab: 'details' }) },
       { label: 'Auto Takeoff Line Styles…', onClick: () => st().setDialog({ kind: 'settings', tab: 'auto' }) },
       { label: 'Workspace…', onClick: () => st().setDialog({ kind: 'settings', tab: 'workspace' }) },

@@ -7,11 +7,10 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.10.0**: **detail marks set shape by shape** (*Settings → Detail Marks*: count mark symbol, size,
-> colour and label; line style, width, colour and label), **docks split into up to four sections** (the Sheets and
-> the Tool Chest on the left at once, the Markups List beside the Summary), and **program windows you can move** that
-> no longer dim the drawing (1.9.0: standard detail material drawn on the drawing; 1.8.0: the Combine Report; 1.7.0:
-> subjects are shapes from your own list) – see the [changelog](CHANGELOG.md).
+> **Version 1.11.0**: **maximum lengths by shape** (*Settings → Length Measurements*): a length longer than its
+> shape's maximum is taken off as pieces along the same line – with W at 40'-0", a 63'-0" line becomes a 40'-0" and a
+> 23'-0" markup (1.10.0: detail marks by shape, docks split into sections, movable windows; 1.9.0: standard detail
+> material drawn on the drawing; 1.8.0: the Combine Report) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -108,6 +107,29 @@ A five-minute tour with the sample set:
 * Any tool can be made a size tool from its properties (*Size / label tool*), and fonts are available on every tool.
 
 <img src="docs/screenshot-size-tool.png" width="520" alt="New Steel Shape / Size Tool dialog">
+
+### Maximum lengths
+
+*Settings → Length Measurements* (also *Settings → Length Measurements…*) sets the **longest piece of each shape** –
+the length members come in, e.g. W and HSS at 40'-0", L at 20'-0". A length or polylength measurement longer than its
+shape's maximum is **taken off as pieces along the same line**: with W at 40'-0", pulling a 63'-0" W24x55 makes **two
+markups**, 40'-0" and 23'-0", end to end on the line you drew – two rows in the Markups List, each with the size,
+subject and takeoff data of the tool. Full pieces come first from where you started, the rest last (an 85'-0" line:
+40 + 40 + 5).
+
+<img src="docs/screenshot-max-length.png" width="640" alt="Settings: maximum length for each shape">
+
+* The list has every shape in your subjects (*Settings → Subjects*), and **Other shapes** for markups whose shape has
+  no maximum of its own or that have no shape. Blank means no maximum. Lengths are ft-in; bare numbers are feet.
+  *Set Every Shape* fills them all at once; *Clear All* empties them.
+* A markup's shape is its subject, else the shape of its Member Size (W24x55 → W) or label.
+* Polylengths are cut where the distance along them reaches the maximum, so a piece can go round a corner.
+* *Also members found by the automatic takeoff* breaks those the same way when you create them.
+* Measurements already taken off: select them, right-click → **Split at Maximum Length** (on the drawing or in the
+  Markups List), or *Edit → Split at Maximum Length*. One undo puts a broken measurement back together.
+* Untick *Break measurements longer than their shape's maximum length into pieces* to switch it off.
+
+![A 63'-0" W24x55 line taken off as a 40'-0" and a 23'-0" markup](docs/screenshot-max-length-split.png)
 
 ### Count editing
 
@@ -242,6 +264,7 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
   keep tools active, show hidden Tool Chest tools.
 * **Units & Totals** – the document's units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area
   labels; saved with the document.
+* **Length Measurements** – the maximum length of each shape (see [Maximum lengths](#maximum-lengths)).
 * **Drawing & Editing** – snapping to the drawing and to markups, ortho; what the arrow keys move a selection by (screen
   pixels, or a drawing length such as 1" at each markup's own scale – Shift ×10); the step for adjusting ends; standard
   detail material on the drawing (see [Detail material on the drawing](#detail-material-on-the-drawing)).
@@ -516,7 +539,7 @@ tool active), **LABELS** (measurement labels on the drawing).
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine, detail material on the drawing and its presets, dock sections)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine, detail material on the drawing and its presets, dock sections, maximum lengths)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff (sample set + addendum; needs `npm run dev` running)
@@ -559,6 +582,7 @@ src/
     combine.ts       combine report: pieces by size, nesting them on the stock lengths to order
     combineReport.ts combine report output: order text, CSV, printable page
     detailMarks.ts   standard detail material on the drawing: offset lines, marks along a member, count marks by labels
+    maxLength.ts     maximum lengths by shape: cutting a measurement into pieces along its line
   store/           Zustand store (open documents, each with its undo history; panes and tabs), dockLayout.ts
                    (docks split into sections), project.ts
                    (opening, saving into the PDF, closing, autosave), commands

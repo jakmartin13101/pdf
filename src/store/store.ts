@@ -33,6 +33,7 @@ import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
 import { PANEL_IDS, dockPanelIn, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, type DockTarget } from './dockLayout';
+import { defaultMaxLengths, splitMarkupAtMax, type MaxLengthPrefs } from '../core/maxLength';
 import { defaultDetailMarkPrefs, defaultDetailStyles, type DetailMarkPrefs, type DetailShapeStyle } from '../core/detailMarks';
 import { defaultCombineSettings, type CombineSettings } from '../core/combine';
 
@@ -242,6 +243,8 @@ export interface Prefs {
   detailMarks: DetailMarkPrefs;
   /** The look of each shape's detail material (Settings → Detail Marks). */
   detailStyles: DetailShapeStyle[];
+  /** Maximum lengths by shape: longer measurements are taken off as pieces (Settings → Length Measurements). */
+  maxLengths: MaxLengthPrefs;
 }
 
 export interface PerfPrefs {
@@ -265,7 +268,7 @@ export interface AutoOptions {
   useprinted: boolean;
 }
 
-export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'subjects' | 'details' | 'combine' | 'list' | 'auto' | 'speed' | 'workspace';
+export type SettingsTab = 'general' | 'units' | 'editing' | 'lengths' | 'keys' | 'subjects' | 'details' | 'combine' | 'list' | 'auto' | 'speed' | 'workspace';
 
 interface TypeDefault {
   style: MarkupStyle;
@@ -375,6 +378,13 @@ export interface AppState {
 
   // markups
   createMarkup: (type: MarkupType, sheetId: string, points: Pt[], extra?: Partial<Markup>) => Markup;
+  /**
+   * A new measurement, taken off as pieces when it is longer than its shape's maximum length
+   * (Settings → Length Measurements). Returns the pieces (one when it is not too long).
+   */
+  createMeasured: (type: MarkupType, sheetId: string, points: Pt[], extra?: Partial<Markup>) => Markup[];
+  /** Break these markups into pieces of their shapes' maximum length. Returns how many were broken. */
+  splitAtMaxLength: (ids: string[]) => number;
   /** Several new markups in one undo step. */
   addMarkups: (items: { type: MarkupType; sheetId: string; points: Pt[]; extra?: Partial<Markup> }[]) => Markup[];
   addPointsToMarkup: (id: string, pts: Pt[]) => void;
@@ -682,6 +692,7 @@ const defaultPrefs = (): Prefs => ({
   combine: defaultCombineSettings(),
   detailMarks: defaultDetailMarkPrefs(),
   detailStyles: defaultDetailStyles(),
+  maxLengths: defaultMaxLengths(),
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -700,6 +711,7 @@ function loadPrefs(): Prefs {
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
     subjects: Array.isArray(saved.subjects) ? cleanSubjects(saved.subjects.map(String)) : d.subjects,
     detailMarks: { ...d.detailMarks, ...saved.detailMarks },
+    maxLengths: { ...d.maxLengths, ...saved.maxLengths, byShape: { ...saved.maxLengths?.byShape } },
     detailStyles: Array.isArray(saved.detailStyles) && saved.detailStyles.length ? saved.detailStyles : d.detailStyles,
     combine: { ...d.combine, ...saved.combine, stock: Array.isArray(saved.combine?.stock) ? saved.combine!.stock : d.combine.stock, other: Array.isArray(saved.combine?.other) ? saved.combine!.other : d.combine.other },
   };
@@ -720,6 +732,17 @@ export const useStore = create<AppState>()((set, get, api) => {
     const next = fn(doc);
     if (next === doc) return;
     set({ doc: next, past: [...past.slice(-(HISTORY_LIMIT - 1)), doc], future: [] });
+  };
+
+  /**
+   * A markup as the pieces it is taken off as: broken at its shape's maximum length (Settings → Length
+   * Measurements) when it is longer, else itself. `sheet` overrides the markup's sheet (a scale being set).
+   */
+  const splitNew = (m: Markup, sheet?: Sheet): Markup[] => {
+    const { prefs, doc } = get();
+    if (!prefs.maxLengths.enabled) return [m];
+    const sizeCol = doc.columns.find((c) => normName(c.name) === 'membersize')?.id;
+    return splitMarkupAtMax(m, sheet ?? doc.sheets.find((x) => x.id === m.sheetId), prefs.maxLengths, prefs.subjects, () => uid('m'), sizeCol);
   };
 
   /** A new markup with the current tool's (or the type's default) properties; not yet added. */
@@ -1122,6 +1145,25 @@ export const useStore = create<AppState>()((set, get, api) => {
       commit((d) => ({ ...d, markups: [...d.markups, m] }));
       return m;
     },
+    createMeasured: (type, sheetId, points, extra = {}) => {
+      const pieces = splitNew(buildMarkup(type, sheetId, points, extra));
+      commit((d) => ({ ...d, markups: [...d.markups, ...pieces] }));
+      return pieces;
+    },
+    splitAtMaxLength: (ids) => {
+      const want = new Set(ids);
+      let broken = 0;
+      const next: Markup[] = [];
+      for (const m of get().doc.markups) {
+        const pieces = want.has(m.id) ? splitNew(m) : [m];
+        if (pieces.length > 1) {
+          broken++;
+          next.push(...pieces.map((p) => ({ ...p, modified: Date.now() })));
+        } else next.push(m);
+      }
+      if (broken) commit((d) => ({ ...d, markups: next }));
+      return broken;
+    },
     addMarkups: (items) => {
       const list = items.map((it) => buildMarkup(it.type, it.sheetId, it.points, it.extra ?? {}));
       if (list.length) commit((d) => ({ ...d, markups: [...d.markups, ...list] }));
@@ -1286,7 +1328,14 @@ export const useStore = create<AppState>()((set, get, api) => {
     },
     setAutoTakeoff: (autoTakeoff) => set({ autoTakeoff }),
     applyAutoTakeoff: (items, scales) => {
-      const list = items.map((it) => buildMarkup('length', it.sheetId, it.points, it.extra));
+      const made = items.map((it) => buildMarkup('length', it.sheetId, it.points, it.extra));
+      // Members longer than their shape's maximum length come in as pieces (at the scale being set).
+      const list = get().prefs.maxLengths.autoTakeoff
+        ? made.flatMap((m) => {
+            const sh = get().doc.sheets.find((x) => x.id === m.sheetId);
+            return splitNew(m, sh && !sh.scale && scales[sh.id] ? { ...sh, scale: scales[sh.id] } : sh);
+          })
+        : made;
       commit((d) => ({
         ...d,
         sheets: d.sheets.map((x) => (scales[x.id] && !x.scale ? { ...x, scale: scales[x.id] } : x)),

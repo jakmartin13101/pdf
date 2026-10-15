@@ -1,4 +1,6 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { SPLITTABLE } from '../../core/maxLength';
+import { cmdSplitAtMax } from '../../store/commands';
 import { PanelContext, PanelHeader } from '../dock/PanelHeader';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Columns3, Download, Filter, LayoutTemplate, PackagePlus, Search, Table2, Trash2, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -449,6 +451,7 @@ export function MarkupsList() {
               },
             ]
           : []),
+        ...(SPLITTABLE.has(r.markup.type) ? [{ label: 'Split at Maximum Length', onClick: () => cmdSplitAtMax(ids) }] : []),
         {
           label: `Select All “${r.markup.subject}”`,
           onClick: () => s.setSelection(s.doc.markups.filter((m) => m.subject === r.markup.subject).map((m) => m.id)),

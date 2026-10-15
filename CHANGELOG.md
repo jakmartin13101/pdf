@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.11.0 – 2026-10-15
+
+### Maximum lengths by shape
+- *Settings → Length Measurements* (new; also *Settings → Length Measurements…*): the longest piece of each shape
+  (every subject, plus *Other shapes*), blank for none; *Set Every Shape*, *Clear All*.
+- A length or polylength measurement longer than its shape's maximum is taken off as pieces along the same line, each
+  its own markup on the drawing and in the Markups List: with W at 40'-0", a 63'-0" line becomes 40'-0" + 23'-0".
+  Full pieces first from the start of the line; polylengths are cut along their length.
+- The shape is the markup's subject, else the shape of its Member Size or label. Members found by the automatic
+  takeoff are broken too (can be switched off).
+- *Split at Maximum Length* (right-click on the drawing or in the Markups List, *Edit* menu) breaks measurements
+  already taken off; one undo puts them back.
+
 ## 1.10.0 – 2026-10-15
 
 ### Detail marks by shape

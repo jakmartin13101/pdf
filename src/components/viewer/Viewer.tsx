@@ -16,7 +16,8 @@ import { detailMenuItems } from '../detailMenu';
 import { AlignMarkers, ChangeBoxes, LayerA, LayerB, TintDefs } from './OverlayLayers';
 import { AutoTakeoffLayer } from './AutoTakeoffLayer';
 import { useShortcuts } from '../useShortcuts';
-import { cmdLabelsFromBox } from '../../store/commands';
+import { cmdLabelsFromBox, cmdSplitAtMax } from '../../store/commands';
+import { SPLITTABLE } from '../../core/maxLength';
 import { applySim, fitSimilarity, invertSim, type Similarity } from '../../core/align';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -449,9 +450,19 @@ export function Viewer({ paneId }: { paneId: string }) {
       setDraft(null);
       return;
     }
-    const m = st.createMarkup(type, sheet.id, normalizeRectPoints(type, pts));
+    // Lengths longer than their shape's maximum come in as pieces along the same line.
+    const pieces = SPLITTABLE.has(type) ? st.createMeasured(type, sheet.id, pts) : [st.createMarkup(type, sheet.id, normalizeRectPoints(type, pts))];
+    const m = pieces[0];
     setDraft(null);
     setRectPreview(null);
+    if (pieces.length > 1) {
+      const sc = scaleForMarkup(m, sheet);
+      const lens = pieces.map((p) => formatLength(computeMeasure(p, sc).length ?? 0, sc.unit, sc.precision));
+      st.toast(`Over the maximum length: taken off as ${pieces.length} pieces (${lens.join(' + ')})`, 'info');
+      st.setSelection(pieces.map((p) => p.id));
+      if (!st.prefs.reuse) st.setTool({ kind: 'select' });
+      return;
+    }
     if (type === 'text' || type === 'callout') {
       st.setSelection([m.id]);
       st.setTool({ kind: 'select' });
@@ -898,6 +909,8 @@ export function Viewer({ paneId }: { paneId: string }) {
           ],
         });
       }
+      if (sel.some((x) => SPLITTABLE.has(st.doc.markups.find((y) => y.id === x)?.type ?? 'line')))
+        items.push({ label: 'Split at Maximum Length', onClick: () => cmdSplitAtMax(sel) });
       items.push({ label: 'Properties', onClick: () => st.showPanel('properties') });
       items.push({ label: 'Add to Tool Chest…', onClick: () => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: id }) });
       const forDetails = getState().selection.includes(id) ? getState().selection : [id];

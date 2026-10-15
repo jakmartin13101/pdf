@@ -382,3 +382,19 @@ export function cmdConvertSubjects(clearOthers = false): number {
   st.toast(changed ? `Changed the subject of ${changed} markup${changed === 1 ? '' : 's'}` : 'All subjects are already shapes from the list', changed ? 'success' : 'info');
   return changed;
 }
+
+/** Break the selected (or given) length measurements at their shapes' maximum length. */
+export function cmdSplitAtMax(ids: string[] = getState().selection) {
+  const st = getState();
+  if (!st.prefs.maxLengths.enabled) {
+    st.toast('Maximum lengths are off (Settings → Length Measurements)', 'info');
+    return;
+  }
+  const n = st.splitAtMaxLength(ids);
+  st.toast(
+    n
+      ? `${n} measurement${n === 1 ? '' : 's'} broken at the maximum length`
+      : 'Nothing is longer than its maximum length (set them in Settings → Length Measurements)',
+    n ? 'success' : 'info',
+  );
+}
