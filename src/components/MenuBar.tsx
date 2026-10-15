@@ -11,11 +11,9 @@ import { buildTakeoffRows } from '../core/details';
 import { safeName } from '../store/project';
 import { offerFile } from '../store/files';
 import { MEASURE_TYPES, MARKUP_TYPES, TYPE_INFO } from '../core/markupTypes';
+import { isPanelOpen } from '../store/dockLayout';
 
-function panelOpen(layout: LayoutState, id: PanelId) {
-  const p = layout.panels[id];
-  return p.dock === 'float' ? p.open : layout.active[p.dock] === id;
-}
+const panelOpen = (layout: LayoutState, id: PanelId) => isPanelOpen(layout, id);
 
 export { exportPdf };
 
@@ -189,6 +187,7 @@ export function MenuBar() {
       { label: 'Settings & Preferences…', shortcut: sc('app.settings'), onClick: () => st().setDialog({ kind: 'settings', tab: 'general' }) },
       { label: 'Units & Totals…', onClick: () => st().setDialog({ kind: 'settings', tab: 'units' }) },
       { label: 'Drawing & Editing…', onClick: () => st().setDialog({ kind: 'settings', tab: 'editing' }) },
+      { label: 'Detail Marks…', onClick: () => st().setDialog({ kind: 'settings', tab: 'details' }) },
       { label: 'Auto Takeoff Line Styles…', onClick: () => st().setDialog({ kind: 'settings', tab: 'auto' }) },
       { label: 'Workspace…', onClick: () => st().setDialog({ kind: 'settings', tab: 'workspace' }) },
       { sep: true },

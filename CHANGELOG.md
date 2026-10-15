@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.10.0 – 2026-10-15
+
+### Detail marks by shape
+- *Settings → Detail Marks* (new; also *Settings → Detail Marks…*): how standard detail material is drawn, set for
+  each shape (W, HSS, L, C, MC, WT, S, HP, PL, BP, BO, PIPE to start with, and **Other shapes**):
+  - count marks (× quantity, @ spacing): show, symbol, size, colour, label on/off;
+  - lines (full length): show, solid/dashed/dotted, width, colour, label on/off.
+- Add and remove shapes, reset to the defaults; a sample of each look in the list. Text size and the space from the
+  markup at the top (moved here from Drawing & Editing). Used on the drawing and in flattened PDFs.
+- A material's shape comes from its size (L4x4x3/8 → L), else its subject. Detail marks no longer follow the Auto
+  Takeoff line styles or the Tool Chest.
+
+### Docks split into sections
+- Each dock (left, right, top, bottom) splits into up to four sections (three splits), each a group of tabs with its
+  own open panel: the Sheets and the Tool Chest on the left at the same time, the Markups List beside the Takeoff
+  Summary.
+- Drag a panel onto the end of a section to split a new section there (the place is highlighted), or onto a section
+  to join its tabs; or *Split Below / Split Right (New Section)* and *Move to Section* in a panel's layout menu.
+- Drag the splitters between sections to size them, and the dock's edge for its width or height. Sections collapse on
+  their own; empty ones close up. Saved layouts from before open as one section per dock.
+
+### Program windows
+- Every window can be moved by its title bar (double-click to centre it again) and opens where it was left for the
+  rest of the session.
+- Windows no longer dim the program, and the drawing and panels behind them stay usable.
+- The Settings window is wider.
+
 ## 1.9.0 – 2026-10-15
 
 ### Standard detail material on the drawing

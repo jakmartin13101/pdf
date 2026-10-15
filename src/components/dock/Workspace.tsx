@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { Files, GitCompareArrows, Layers, Ruler, SlidersHorizontal, Sigma, Table2, Wand2, Wrench, X } from 'lucide-react';
 import { getState, useStore, PANEL_IDS, PANEL_TITLES, type DockSide, type PanelId } from '../../store/store';
 import { PanelContext, DockMenuButton } from './PanelHeader';
 import { beginDockDrag, consumeDragClick } from './dragging';
+import { dockPanels, sectionCount, sectionPanels } from '../../store/dockLayout';
 import { SheetsPanel } from '../panels/SheetsPanel';
 import { ToolChestPanel } from '../panels/ToolChestPanel';
 import { PropertiesPanel } from '../panels/PropertiesPanel';
@@ -90,36 +91,93 @@ export function Splitter({ dir, onDrag, onEnd }: { dir: 'v' | 'h'; onDrag: (delt
   );
 }
 
-/** Left/right dock: a vertical tab strip plus the open panel. */
+/**
+ * A dock's sections, one after another (down a side dock, across a top/bottom dock), with splitters
+ * between them: dragging one shares the space between its two neighbours. `fixed` sections (collapsed
+ * ones in a top/bottom dock) keep their own size.
+ */
+function SectionStack({ side, dir, sections }: { side: DockSide; dir: 'column' | 'row'; sections: { index: number; node: ReactNode; fixed?: boolean }[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const split = useStore((s) => s.layout.split[side]);
+  const resize = (a: number, b: number, d: number) => {
+    const el = ref.current;
+    if (!el) return;
+    const st = getState();
+    const sizes = [...st.layout.split[side]];
+    const total = Math.max(1, dir === 'column' ? el.clientHeight : el.clientWidth);
+    const W = sections.filter((x) => !x.fixed).reduce((t, x) => t + (sizes[x.index] ?? 1), 0);
+    const dw = (d * W) / total;
+    const min = (70 * W) / total; // keep every section at least ~70 px
+    const wa = (sizes[a] ?? 1) + dw;
+    const wb = (sizes[b] ?? 1) - dw;
+    if (wa < min || wb < min) return;
+    sizes[a] = wa;
+    sizes[b] = wb;
+    st.setSectionSizes(side, sizes);
+  };
+  return (
+    <div ref={ref} className={`dock-sections ${dir}`}>
+      {sections.map((x, i) => {
+        const prev = sections[i - 1];
+        return (
+          <Fragment key={x.index}>
+            {prev &&
+              (!prev.fixed && !x.fixed ? (
+                <Splitter dir={dir === 'column' ? 'h' : 'v'} onDrag={(d) => resize(prev.index, x.index, d)} />
+              ) : (
+                <div className="dock-divider" />
+              ))}
+            <div
+              className={`dock-section${x.fixed ? ' fixed' : ''}`}
+              style={{ flex: x.fixed ? '0 0 auto' : `${split[x.index] ?? 1} 1 0` }}
+              data-dock-section={`${side}:${x.index}`}
+              data-testid="dock-section"
+            >
+              {x.node}
+            </div>
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Left/right dock: a vertical tab strip (a group of tabs per section) plus the sections' open panels. */
 export function SideDock({ side }: { side: 'left' | 'right' }) {
   const layout = useStore((s) => s.layout);
-  const panels = PANEL_IDS.filter((id) => layout.panels[id].dock === side);
-  const active = layout.active[side];
   const st = getState;
+  const panels = dockPanels(layout, side);
+  if (!panels.length) return null;
+  const n = sectionCount(layout, side);
+  const groups = Array.from({ length: n }, (_, s) => sectionPanels(layout, side, s));
+  const open = groups.map((_, s) => ({ s, id: layout.active[side][s] })).filter((x): x is { s: number; id: PanelId } => !!x.id);
   const strip = (
     <div className={`side-tabs ${side}`} data-testid={`dock-${side}`}>
-      {panels.map((id) => (
-        <button
-          key={id}
-          className={`side-tab${active === id ? ' active' : ''}`}
-          title={`${PANEL_TITLES[id]} – click to show or hide, drag to move`}
-          onClick={() => !consumeDragClick() && st().togglePanel(id)}
-          onPointerDown={(e) => beginDockDrag(e, id, { w: layout.size[side], h: 420 }, undefined, { fromTab: true })}
-          data-testid={`tab-${PANEL_TITLES[id].toLowerCase().replace(/\s+/g, '-')}`}
-        >
-          {PANEL_ICONS[id]({ size: 17 })}
-        </button>
+      {groups.map((g, s) => (
+        <div key={s} className="side-tab-group" data-dock-section={`${side}:${s}`} data-testid="side-tab-group">
+          {g.map((id) => (
+            <button
+              key={id}
+              className={`side-tab${layout.active[side][s] === id ? ' active' : ''}`}
+              title={`${PANEL_TITLES[id]} – click to show or hide, drag to move${n > 1 ? ` (section ${s + 1} of ${n})` : ''}`}
+              onClick={() => !consumeDragClick() && st().togglePanel(id)}
+              onPointerDown={(e) => beginDockDrag(e, id, { w: layout.size[side], h: 420 }, undefined, { fromTab: true })}
+              data-testid={`tab-${PANEL_TITLES[id].toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              {PANEL_ICONS[id]({ size: 17 })}
+            </button>
+          ))}
+        </div>
       ))}
     </div>
   );
-  if (!panels.length) return null;
-  const content = active && panels.includes(active) && (
+  const content = open.length > 0 && (
     <>
-      {side === 'right' && <Splitter dir="v" onDrag={(d) => st().setDockSize('right', Math.max(220, Math.min(640, st().layout.size.right - d)))} />}
+      {side === 'right' && <Splitter dir="v" onDrag={(d) => st().setDockSize('right', Math.max(220, Math.min(760, st().layout.size.right - d)))} />}
       <div className={`side-panel ${side}`} style={{ width: layout.size[side] }}>
-        <PanelHost id={active} dock={side} />
+        <SectionStack side={side} dir="column" sections={open.map((x) => ({ index: x.s, node: <PanelHost id={x.id} dock={side} /> }))} />
       </div>
-      {side === 'left' && <Splitter dir="v" onDrag={(d) => st().setDockSize('left', Math.max(170, Math.min(640, st().layout.size.left + d)))} />}
+      {side === 'left' && <Splitter dir="v" onDrag={(d) => st().setDockSize('left', Math.max(170, Math.min(760, st().layout.size.left + d)))} />}
     </>
   );
   return side === 'left' ? (
@@ -135,37 +193,49 @@ export function SideDock({ side }: { side: 'left' | 'right' }) {
   );
 }
 
-/** Top/bottom dock: a tab bar plus the open panel. */
+/** Top/bottom dock: its sections side by side, each a tab bar plus its open panel. */
 export function EdgeDock({ side }: { side: 'top' | 'bottom' }) {
   const layout = useStore((s) => s.layout);
-  const panels = PANEL_IDS.filter((id) => layout.panels[id].dock === side);
-  const active = layout.active[side];
   const st = getState;
+  const panels = dockPanels(layout, side);
   if (!panels.length) return null;
-  const open = !!active && panels.includes(active);
+  const n = sectionCount(layout, side);
+  const anyOpen = layout.active[side].some(Boolean);
   const resize = (d: number) =>
     st().setDockSize(side, Math.max(120, Math.min(window.innerHeight - 220, st().layout.size[side] + (side === 'bottom' ? -d : d))));
+  const sections = Array.from({ length: n }, (_, s) => {
+    const active = layout.active[side][s];
+    return {
+      index: s,
+      fixed: !active,
+      node: (
+        <>
+          <div className="bottom-tabs">
+            {sectionPanels(layout, side, s).map((id) => (
+              <button
+                key={id}
+                className={`bottom-tab${active === id ? ' active' : ''}`}
+                onClick={() => !consumeDragClick() && st().togglePanel(id)}
+                onPointerDown={(e) => beginDockDrag(e, id, { w: 760, h: layout.size[side] }, undefined, { fromTab: true })}
+                title={`${PANEL_TITLES[id]} – click to show or hide, drag to move`}
+                data-testid={`tab-${id}`}
+              >
+                {PANEL_ICONS[id]({ size: 14 })} {PANEL_TITLES[id]}
+              </button>
+            ))}
+            <div style={{ flex: 1 }} />
+            {active && <DockMenuButton id={active} />}
+          </div>
+          {active && <PanelHost id={active} dock={side} />}
+        </>
+      ),
+    };
+  });
   return (
-    <div className={`edge-dock ${side}`} style={{ height: open ? layout.size[side] : undefined }} data-testid={`dock-${side}`}>
-      {side === 'bottom' && open && <Splitter dir="h" onDrag={resize} />}
-      <div className="bottom-tabs">
-        {panels.map((id) => (
-          <button
-            key={id}
-            className={`bottom-tab${active === id ? ' active' : ''}`}
-            onClick={() => !consumeDragClick() && st().togglePanel(id)}
-            onPointerDown={(e) => beginDockDrag(e, id, { w: 760, h: layout.size[side] }, undefined, { fromTab: true })}
-            title={`${PANEL_TITLES[id]} – click to show or hide, drag to move`}
-            data-testid={`tab-${id}`}
-          >
-            {PANEL_ICONS[id]({ size: 14 })} {PANEL_TITLES[id]}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        {open && <DockMenuButton id={active!} />}
-      </div>
-      {open && <PanelHost id={active!} dock={side} />}
-      {side === 'top' && open && <Splitter dir="h" onDrag={resize} />}
+    <div className={`edge-dock ${side}`} style={{ height: anyOpen ? layout.size[side] : undefined }} data-testid={`dock-${side}`}>
+      {side === 'bottom' && anyOpen && <Splitter dir="h" onDrag={resize} />}
+      <SectionStack side={side} dir="row" sections={sections} />
+      {side === 'top' && anyOpen && <Splitter dir="h" onDrag={resize} />}
     </div>
   );
 }
@@ -252,16 +322,22 @@ export function DropOverlay() {
     }
   };
   const title = drag.id === 'toolbar' ? 'Toolbar' : PANEL_TITLES[drag.id];
+  const hint = drag.hint;
   return (
     <div className="drop-overlay">
       {zones.map((z) => (
-        <div key={z} className={`drop-zone${drag.zone === z ? ' hot' : ''}`} style={zoneRect(z)}>
+        <div key={z} className={`drop-zone${drag.zone === z && !hint ? ' hot' : ''}`} style={zoneRect(z)}>
           Dock {z}
         </div>
       ))}
+      {hint && (
+        <div className="drop-section" style={{ left: hint.left, top: hint.top, width: hint.width, height: hint.height }} data-testid="drop-section">
+          {hint.label}
+        </div>
+      )}
       <div className={`drop-ghost${drag.zone === 'float' ? ' floating' : ''}`} style={{ left: drag.x - drag.dx, top: drag.y - drag.dy, width: Math.min(drag.w, 420), height: Math.min(drag.h, 300) }}>
         {title}
-        <small>{drag.zone === 'float' ? 'Release to float here' : `Release to dock ${drag.zone}`}</small>
+        <small>{drag.zone === 'float' ? 'Release to float here' : hint ? hint.label : `Release to dock ${drag.zone}`}</small>
       </div>
     </div>
   );

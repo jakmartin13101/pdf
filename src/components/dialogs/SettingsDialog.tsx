@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2, X } from 'lucide-react';
 import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolveBindings } from '../../core/keymap';
-import type { AutoStyleRule, LineStyle, ProjectSettings } from '../../types';
+import type { AutoStyleRule, CountSymbol, LineStyle, ProjectSettings } from '../../types';
+import { COUNT_SYMBOLS, OTHER_SHAPES, defaultDetailStyles, lookStyle, newDetailStyle, type DetailShapeStyle } from '../../core/detailMarks';
+import { dashArray, symbolPath } from '../../core/shapes';
 import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
 import { cmdConvertSubjects, cmdExportListStyle, cmdImportListStyle, cmdSaveDefaultListStyle } from '../../store/commands';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject } from '../../core/subjects';
@@ -25,6 +27,7 @@ const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'editing', label: 'Drawing & Editing', hint: 'Snapping and adjusting' },
   { id: 'keys', label: 'Keyboard', hint: 'Shortcuts for commands' },
   { id: 'subjects', label: 'Subjects', hint: 'Shapes markups can have' },
+  { id: 'details', label: 'Detail Marks', hint: 'Detail material by shape' },
   { id: 'combine', label: 'Combine', hint: 'Stock lengths to order' },
   { id: 'list', label: 'Markups List', hint: 'Default columns for new files' },
   { id: 'auto', label: 'Auto Takeoff', hint: 'Line styles by subject' },
@@ -197,34 +200,6 @@ function Editing() {
         The step for the − / + buttons that lengthen or shorten a measurement's ends (Properties → <i>Adjust Ends</i>, and members in the Auto Takeoff panel).
       </div>
 
-      <h4 className="set-h">Standard detail material</h4>
-      <Check checked={prefs.detailMarks.show} onChange={(v) => st.setPrefs({ detailMarks: { ...prefs.detailMarks, show: v } })} testId="set-detail-marks">
-        Draw the material standard details add next to their markups
-      </Check>
-      <Check checked={prefs.detailMarks.labels} onChange={(v) => st.setPrefs({ detailMarks: { ...prefs.detailMarks, labels: v } })} testId="set-detail-mark-labels">
-        Write its size and number of pieces
-      </Check>
-      <div className="field">
-        <label>Space from the markup</label>
-        <select
-          value={prefs.detailMarks.gap}
-          onChange={(e) => st.setPrefs({ detailMarks: { ...prefs.detailMarks, gap: Number(e.target.value) } })}
-          data-testid="set-detail-mark-gap"
-        >
-          {[...new Set([2, 4, 8, 14, prefs.detailMarks.gap])]
-            .sort((a, b) => a - b)
-            .map((g) => (
-              <option key={g} value={g}>
-                {g === 2 ? 'Tight' : g === 4 ? 'Small' : g === 8 ? 'Medium' : g === 14 ? 'Wide' : `${g} pt`} ({fmtNumber(g / 72, 3)}" on the sheet)
-              </option>
-            ))}
-        </select>
-      </div>
-      <div className="hint">
-        Full-length material is a line beside the markup, the same length and direction; pieces at a spacing are marks along it; counted pieces are a
-        count mark by the markup's label. Each in the look of its shape (Auto Takeoff line styles, else its Tool Chest tool). Clicking one picks its
-        markup.
-      </div>
     </>
   );
 }
@@ -740,6 +715,253 @@ function CombineStock() {
 }
 
 /** The subjects markups can have: shapes, added and removed by the user. */
+const SYMBOL_NAMES: Record<CountSymbol, string> = {
+  circle: 'Circle',
+  square: 'Square',
+  triangle: 'Triangle',
+  diamond: 'Diamond',
+  star: 'Star',
+  check: 'Check',
+  cross: 'Cross',
+};
+
+/** A small picture of a shape's detail marks: its line and its count mark. */
+function DetailLookSample({ look }: { look: DetailShapeStyle }) {
+  const line = lookStyle(look.line);
+  const r = Math.min(8, Math.max(2, look.count.size));
+  const open = look.count.symbol === 'check' || look.count.symbol === 'cross';
+  return (
+    <svg width={92} height={24} viewBox="0 0 92 24" className="dm-sample" aria-hidden>
+      {look.line.show && (
+        <line
+          x1={4}
+          y1={16}
+          x2={54}
+          y2={16}
+          stroke={look.line.color}
+          strokeWidth={Math.min(8, look.line.width)}
+          strokeDasharray={dashArray(line)?.map((n) => Math.min(n, 12)).join(' ')}
+          strokeLinecap="round"
+        />
+      )}
+      {look.count.show && (
+        <path
+          d={symbolPath(look.count.symbol, { x: 74, y: 12 }, r)}
+          fill={open ? 'none' : look.count.color}
+          fillOpacity={0.8}
+          stroke={look.count.color}
+          strokeWidth={open ? Math.max(1.2, r * 0.3) : 1}
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+/** Settings → Detail Marks: how the material standard details add is drawn, shape by shape. */
+function DetailMarksSettings() {
+  const dm = useStore((s) => s.prefs.detailMarks);
+  const styles = useStore((s) => s.prefs.detailStyles);
+  const subjects = useStore((s) => s.prefs.subjects);
+  const [add, setAdd] = useState('');
+  const st = getState();
+  const setDm = (p: Partial<typeof dm>) => st.setPrefs({ detailMarks: { ...dm, ...p } });
+  const set = (list: DetailShapeStyle[]) => st.setPrefs({ detailStyles: list });
+  const patch = (id: string, kind: 'count' | 'line', p: Partial<DetailShapeStyle['count']> | Partial<DetailShapeStyle['line']>) =>
+    set(styles.map((x) => (x.id === id ? { ...x, [kind]: { ...x[kind], ...p } } : x)));
+  // Shapes first in the order added, "other shapes" last.
+  const rows = [...styles.filter((x) => x.shape !== OTHER_SHAPES), ...styles.filter((x) => x.shape === OTHER_SHAPES)];
+  const adding = add.trim();
+  const clash = !!adding && styles.some((x) => x.shape.toLowerCase() === adding.toLowerCase());
+  const doAdd = () => {
+    if (!adding || clash || adding === OTHER_SHAPES) return;
+    const other = styles.find((x) => x.shape === OTHER_SHAPES);
+    const n = newDetailStyle(adding);
+    set([...styles.filter((x) => x.shape !== OTHER_SHAPES), other ? { ...n, count: { ...other.count }, line: { ...other.line } } : n, ...(other ? [other] : [])]);
+    setAdd('');
+  };
+  const num = (v: string, min: number, max: number) => Math.min(max, Math.max(min, Number(v) || min));
+  return (
+    <>
+      <div className="hint">
+        The material a standard detail adds is drawn next to its markup: full-length material as a <b>line</b> the same length and direction as the markup, pieces at
+        a spacing as <b>count marks</b> along it, and counted pieces as a <b>count mark</b> with the number by the markup's label. Set how each shape's material is
+        drawn – a material's shape comes from its size (L4x4x3/8 is an L), else its subject.
+      </div>
+      <Check checked={dm.show} onChange={(v) => setDm({ show: v })} testId="set-detail-marks">
+        Draw standard detail material on the drawing
+      </Check>
+      <div className="field-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+        <label className="inline">
+          Space from the markup
+          <select value={dm.gap} onChange={(e) => setDm({ gap: Number(e.target.value) })} data-testid="set-detail-mark-gap">
+            {[...new Set([2, 4, 8, 14, dm.gap])]
+              .sort((a, b) => a - b)
+              .map((g) => (
+                <option key={g} value={g}>
+                  {g === 2 ? 'Tight' : g === 4 ? 'Small' : g === 8 ? 'Medium' : g === 14 ? 'Wide' : `${g} pt`} ({fmtNumber(g / 72, 3)}")
+                </option>
+              ))}
+          </select>
+        </label>
+        <label className="inline">
+          Text size
+          <select value={dm.textScale} onChange={(e) => setDm({ textScale: Number(e.target.value) })} data-testid="set-detail-mark-text">
+            {[...new Set([0.6, 0.75, 0.85, 1, 1.25, dm.textScale])]
+              .sort((a, b) => a - b)
+              .map((g) => (
+                <option key={g} value={g}>
+                  {Math.round(g * 100)}% of the markup's label
+                </option>
+              ))}
+          </select>
+        </label>
+      </div>
+      <div className="dm-scroll">
+        <table className="grid dm-table" data-testid="detail-style-table">
+          <thead>
+            <tr>
+              <th rowSpan={2}>Shape</th>
+              <th rowSpan={2}>Looks like</th>
+              <th colSpan={5} className="dm-group">
+                Count marks <span className="hint">× quantity, @ spacing</span>
+              </th>
+              <th colSpan={5} className="dm-group">
+                Lines <span className="hint">full length</span>
+              </th>
+              <th rowSpan={2} />
+            </tr>
+            <tr>
+              <th title="Draw counted material">Show</th>
+              <th>Symbol</th>
+              <th title="Symbol size in points (1/72&quot;)">Size</th>
+              <th>Colour</th>
+              <th title="Write the number of pieces and the size">Label</th>
+              <th title="Draw full-length material">Show</th>
+              <th>Line</th>
+              <th title="Line width in points (1/72&quot;)">Width</th>
+              <th>Colour</th>
+              <th title="Write the size along the line">Label</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((x) => {
+              const other = x.shape === OTHER_SHAPES;
+              return (
+                <tr key={x.id} data-testid="detail-style" data-shape={x.shape}>
+                  <td>
+                    <b>{other ? 'Other shapes' : x.shape}</b>
+                  </td>
+                  <td>
+                    <DetailLookSample look={x} />
+                  </td>
+                  <td className="c">
+                    <input type="checkbox" checked={x.count.show} onChange={(e) => patch(x.id, 'count', { show: e.target.checked })} data-testid="ds-count-show" />
+                  </td>
+                  <td>
+                    <select value={x.count.symbol} onChange={(e) => patch(x.id, 'count', { symbol: e.target.value as CountSymbol })} data-testid="ds-count-symbol">
+                      {COUNT_SYMBOLS.map((sy) => (
+                        <option key={sy} value={sy}>
+                          {SYMBOL_NAMES[sy]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      className="dm-num"
+                      min={1}
+                      max={30}
+                      step={0.5}
+                      value={x.count.size}
+                      onChange={(e) => patch(x.id, 'count', { size: num(e.target.value, 1, 30) })}
+                      data-testid="ds-count-size"
+                    />
+                  </td>
+                  <td>
+                    <input type="color" value={x.count.color} onChange={(e) => patch(x.id, 'count', { color: e.target.value })} data-testid="ds-count-color" />
+                  </td>
+                  <td className="c">
+                    <input type="checkbox" checked={x.count.label} onChange={(e) => patch(x.id, 'count', { label: e.target.checked })} data-testid="ds-count-label" />
+                  </td>
+                  <td className="c">
+                    <input type="checkbox" checked={x.line.show} onChange={(e) => patch(x.id, 'line', { show: e.target.checked })} data-testid="ds-line-show" />
+                  </td>
+                  <td>
+                    <select value={x.line.lineStyle} onChange={(e) => patch(x.id, 'line', { lineStyle: e.target.value as LineStyle })} data-testid="ds-line-style">
+                      {LINE_STYLES.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      className="dm-num"
+                      min={0.5}
+                      max={12}
+                      step={0.5}
+                      value={x.line.width}
+                      onChange={(e) => patch(x.id, 'line', { width: num(e.target.value, 0.5, 12) })}
+                      data-testid="ds-line-width"
+                    />
+                  </td>
+                  <td>
+                    <input type="color" value={x.line.color} onChange={(e) => patch(x.id, 'line', { color: e.target.value })} data-testid="ds-line-color" />
+                  </td>
+                  <td className="c">
+                    <input type="checkbox" checked={x.line.label} onChange={(e) => patch(x.id, 'line', { label: e.target.checked })} data-testid="ds-line-label" />
+                  </td>
+                  <td>
+                    {!other && (
+                      <button className="icon-btn" title={`Remove ${x.shape} (its material is drawn like other shapes)`} onClick={() => set(styles.filter((y) => y.id !== x.id))} data-testid="ds-remove">
+                        <X size={13} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="field-row" style={{ justifyContent: 'flex-start' }}>
+        <input
+          className="narrow"
+          style={{ width: 120 }}
+          value={add}
+          list="dm-subjects"
+          placeholder="Shape, e.g. RB"
+          onChange={(e) => setAdd(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && doAdd()}
+          data-testid="ds-add-input"
+        />
+        <datalist id="dm-subjects">
+          {subjects
+            .filter((sub) => !styles.some((x) => x.shape.toLowerCase() === sub.toLowerCase()))
+            .map((sub) => (
+              <option key={sub} value={sub} />
+            ))}
+        </datalist>
+        <button className="btn sm narrow primary" disabled={!adding || clash} onClick={doAdd} data-testid="ds-add">
+          <Plus size={12} /> Add Shape
+        </button>
+        <button className="btn sm narrow" onClick={() => set(defaultDetailStyles())} data-testid="ds-reset">
+          <RotateCcw size={12} /> Reset to Defaults
+        </button>
+        {clash && <span className="hint">Already in the list.</span>}
+      </div>
+      <div className="hint">
+        Sizes are in points (72 to the inch on the sheet). The text is written in each mark's colour. These are yours: they apply to every file, on the screen and
+        in flattened PDFs.
+      </div>
+    </>
+  );
+}
+
 function Subjects() {
   const subjects = useStore((s) => s.prefs.subjects);
   const markups = useStore((s) => s.doc.markups);
@@ -903,7 +1125,7 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
     <Modal
       title="Settings & Preferences"
       icon={<Settings size={16} />}
-      size="wide"
+      size="xwide"
       onClose={close}
       footer={
         <>
@@ -929,6 +1151,7 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
           {tab === 'editing' && <Editing />}
           {tab === 'keys' && <Keyboard />}
           {tab === 'subjects' && <Subjects />}
+          {tab === 'details' && <DetailMarksSettings />}
           {tab === 'combine' && <CombineStock />}
           {tab === 'list' && <ListDefaults />}
           {tab === 'auto' && <AutoTakeoff />}

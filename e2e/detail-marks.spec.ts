@@ -123,7 +123,43 @@ test('material added by a standard detail is drawn beside its markup', async ({ 
 
   await page.screenshot({ path: 'test-results/detail-marks.png' });
 
-  // Settings → Drawing & Editing: hide the material on the drawing.
+  // Settings → Detail Marks: each shape's look. L lines become wide, dashed and blue; L count marks a
+  // big star without the text.
+  await page.locator('.menu-btn', { hasText: 'Settings' }).click();
+  await page.locator('.menu-item', { hasText: 'Detail Marks…' }).click();
+  const L = page.locator('[data-testid=detail-style][data-shape="L"]');
+  await L.getByTestId('ds-line-style').selectOption('dashed');
+  await L.getByTestId('ds-line-width').fill('6');
+  await L.getByTestId('ds-line-color').evaluate((el: HTMLInputElement) => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    set.call(el, '#0055ff');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await L.getByTestId('ds-count-symbol').selectOption('star');
+  await L.getByTestId('ds-count-size').fill('10');
+  await L.getByTestId('ds-count-label').uncheck();
+  // The window can be moved out of the way, and doesn't dim the drawing.
+  const win = page.getByTestId('modal');
+  const head = win.locator('.modal-head');
+  const hb = (await head.boundingBox())!;
+  await page.mouse.move(hb.x + 60, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + 260, hb.y + 300, { steps: 8 });
+  await page.mouse.up();
+  const moved = (await head.boundingBox())!;
+  expect(moved.x - hb.x).toBeGreaterThan(150);
+  expect(moved.y - hb.y).toBeGreaterThan(250);
+  expect(await page.locator('.modal-back').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await win.getByRole('button', { name: 'Close' }).first().click();
+
+  const angle = marks.filter({ hasText: 'L3x3x1/4' }).first().locator('path:not(.mk-hit)').first();
+  await expect(angle).toHaveCSS('stroke', 'rgb(0, 85, 255)');
+  expect(await angle.evaluate((el) => getComputedStyle(el).strokeDasharray)).not.toBe('none');
+  await expect(marks.filter({ hasText: '4 × L4x4x3/8' })).toHaveCount(0);
+  const star = page.locator('[data-testid=detail-mark].mk-detail-count .mk-count').first();
+  expect(await star.getAttribute('d')).toMatch(/(L[^L]*){9}/); // a star: ten points
+
+  // Settings: hide the material on the drawing.
   await page.locator('.menu-btn', { hasText: 'Settings' }).click();
   await page.locator('.menu-item', { hasText: 'Standard Detail Material on Drawing' }).click();
   await expect(marks).toHaveCount(0);

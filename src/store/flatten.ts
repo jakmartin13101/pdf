@@ -20,11 +20,17 @@ export interface FlattenOptions {
 
 /** The standard detail material drawn with markups in a flattened PDF, as on the screen (if shown there). */
 export function marksForPdf(doc: DocState): MarksFor {
-  const { prefs, toolChest } = getState();
+  const { prefs } = getState();
   const dm = prefs.detailMarks;
   return (markups, labels) =>
     dm.show
-      ? detailMarks(doc, markups, { chest: toolChest, look: prefs, gap: dm.gap, labels: labels && dm.labels, parentLabel: (m) => (labels ? markupLabelLines(doc, m) : []) })
+      ? detailMarks(doc, markups, {
+          styles: prefs.detailStyles,
+          gap: dm.gap,
+          textScale: dm.textScale,
+          labels,
+          parentLabel: (m) => (labels ? markupLabelLines(doc, m) : []),
+        })
       : [];
 }
 

@@ -1,6 +1,5 @@
 // Standard detail material on the drawing. The material a detail adds to a markup is drawn next to it,
-// in the look of the material's shape (the line style rule for its shape, else the Tool Chest tool for
-// its size, else a colour per size), a little to the side so both stay readable:
+// a little to the side so both stay readable, in the look set for its shape (Settings → Detail Marks):
 //
 //   full length   – a line the same length and direction as the markup (inside an area's outline)
 //   @ spacing     – a mark for every piece, along that line
@@ -9,13 +8,11 @@
 // Marks are worked out from the details each time, so they follow their markup when it moves and go
 // away with the detail; they are not markups of their own (the material is counted once, as before).
 
-import type { ChestTool, CountSymbol, DocState, Markup, MarkupStyle, Pt, StandardDetail, ToolSet } from '../types';
+import type { CountSymbol, DocState, LineStyle, Markup, MarkupStyle, Pt, StandardDetail } from '../types';
 import { buildRows } from './columns';
 import { detailApplies, itemQuantity, itemSubject, parseDetailLength, qtyColumnId, runLength } from './details';
-import { autoStyleFor, withRule, type AutoLookPrefs } from './autoStyles';
-import { sizeColor } from './autoTakeoff';
-import { defaultStyle } from './markupTypes';
-import { DEFAULT_SUBJECTS, subjectForSize } from './subjects';
+import { BASE_STYLE } from './markupTypes';
+import { subjectForSize } from './subjects';
 import { bbox, centroid, dist, labelPoint, polygonArea, signedArea } from './geometry';
 import { polylineLabelAnchor, uprightAngle } from './shapes';
 import { normName, toNum } from './formula';
@@ -26,11 +23,11 @@ export interface DetailMarkPrefs {
   show: boolean;
   /** Space between a markup and its material, in page points (1/72"). */
   gap: number;
-  /** Write the size (and the number of pieces) by the material. */
-  labels: boolean;
+  /** Size of the material's text, relative to its markup's label text. */
+  textScale: number;
 }
 
-export const defaultDetailMarkPrefs = (): DetailMarkPrefs => ({ show: true, gap: 4, labels: true });
+export const defaultDetailMarkPrefs = (): DetailMarkPrefs => ({ show: true, gap: 4, textScale: 0.85 });
 
 export interface MarkText {
   text: string;
@@ -60,45 +57,103 @@ export interface DetailMark {
   sub: string;
 }
 
-// ---------------------------------------------------------------------------
-// The look of the material
+/** How counted material (× quantity, and pieces @ spacing) is drawn. */
+export interface CountLook {
+  show: boolean;
+  symbol: CountSymbol;
+  /** Symbol size (radius), page points. */
+  size: number;
+  color: string;
+  /** Write the number of pieces and the size. */
+  label: boolean;
+}
+
+/** How full-length material is drawn. */
+export interface LineLook {
+  show: boolean;
+  lineStyle: LineStyle;
+  /** Line width, page points. */
+  width: number;
+  color: string;
+  /** Write the size along the line. */
+  label: boolean;
+}
+
+/** The look of one shape's detail material (Settings → Detail Marks). */
+export interface DetailShapeStyle {
+  id: string;
+  /** The shape, e.g. "L" (L4x4x3/8 is an L); OTHER_SHAPES for every shape not listed. */
+  shape: string;
+  count: CountLook;
+  line: LineLook;
+}
+
+/** The entry for material whose shape has no entry of its own. */
+export const OTHER_SHAPES = '*';
+
+export const COUNT_SYMBOLS: CountSymbol[] = ['circle', 'square', 'triangle', 'diamond', 'star', 'check', 'cross'];
+export const LINE_STYLES: LineStyle[] = ['solid', 'dashed', 'dotted'];
+
+let seq = 0;
+export const detailStyleId = () => `ds${Date.now().toString(36)}${(seq++).toString(36)}`;
+
+export function newDetailStyle(shape: string, color = '#d1199a', symbol: CountSymbol = 'diamond', lineStyle: LineStyle = 'solid'): DetailShapeStyle {
+  return {
+    id: detailStyleId(),
+    shape,
+    count: { show: true, symbol, size: 4.5, color, label: true },
+    line: { show: true, lineStyle, width: 2.5, color, label: true },
+  };
+}
+
+/** Starting looks: the colours of the shapes' line styles elsewhere in the program. */
+export function defaultDetailStyles(): DetailShapeStyle[] {
+  return [
+    newDetailStyle('W', '#1aa34a', 'diamond'),
+    newDetailStyle('HSS', '#1f6feb', 'square', 'dashed'),
+    newDetailStyle('L', '#e76f51', 'triangle', 'dotted'),
+    newDetailStyle('C', '#6a4c93', 'diamond'),
+    newDetailStyle('MC', '#6a4c93', 'diamond'),
+    newDetailStyle('WT', '#2a9d8f', 'diamond'),
+    newDetailStyle('S', '#8d5a2b', 'diamond'),
+    newDetailStyle('HP', '#b5179e', 'diamond'),
+    newDetailStyle('PL', '#d97706', 'square'),
+    newDetailStyle('BP', '#c2410c', 'square'),
+    newDetailStyle('BO', '#0b8f8a', 'circle'),
+    newDetailStyle('PIPE', '#0b8f8a', 'circle', 'dashed'),
+    newDetailStyle(OTHER_SHAPES, '#d1199a', 'diamond'),
+  ];
+}
 
 const sameName = (a: string, b: string) => !!a.trim() && normName(a) === normName(b);
-const memberSize = (t: ChestTool) => String(Object.entries(t.custom).find(([k]) => normName(k) === 'membersize')?.[1] ?? '');
 
-/** The Tool Chest tool for a material: by its size, else by its subject; a count tool for marks. */
-export function materialTool(chest: ToolSet[], subject: string, size: string, kind: 'line' | 'count'): ChestTool | undefined {
-  const tools = chest.flatMap((s) => s.tools);
-  const bySize = size.trim() ? tools.filter((t) => sameName(memberSize(t), size) || (t.sizeTool && sameName(t.sizeTool.value, size)) || sameName(t.subject, size)) : [];
-  const pool = bySize.length ? bySize : tools.filter((t) => sameName(t.subject, subject) || sameName(t.name, subject));
-  const wanted = (t: ChestTool) => (kind === 'count' ? t.type === 'count' : t.type === 'length' || t.type === 'polylength');
-  return pool.find(wanted) ?? pool[0];
+/**
+ * The look for a material: the entry of its shape – from its size (L4x4x3/8 → L), else its subject –
+ * else the entry for other shapes.
+ */
+export function detailStyleFor(styles: DetailShapeStyle[], subject: string, size: string): DetailShapeStyle {
+  const shapes = styles.filter((s) => s.shape !== OTHER_SHAPES).map((s) => s.shape);
+  const shape = subjectForSize(size, shapes) ?? shapes.find((x) => sameName(x, subject)) ?? subjectForSize(subject, shapes);
+  return (
+    (shape !== undefined ? styles.find((s) => s.shape === shape) : undefined) ??
+    styles.find((s) => s.shape === OTHER_SHAPES) ??
+    newDetailStyle(OTHER_SHAPES)
+  );
 }
 
-/** The shape of a material: from its size (L4x4x3/8 → L), else its subject when that is a shape. */
-export function materialShape(subject: string, size: string, subjects: string[] = DEFAULT_SUBJECTS): string | undefined {
-  return subjectForSize(size, subjects) ?? subjects.find((s) => sameName(s, subject));
-}
-
-/** How a material is drawn: as a line, or as count marks. */
-export function materialLook(chest: ToolSet[], prefs: AutoLookPrefs, subject: string, size: string, kind: 'line' | 'count'): MarkupStyle {
-  const tool = materialTool(chest, subject, size, kind);
-  const shape = materialShape(subject, size, prefs.subjects);
-  const rule = (shape && autoStyleFor(prefs.autoStyles, shape)) || (size.trim() ? autoStyleFor(prefs.autoStyles, size) : undefined);
-  const def = defaultStyle(kind === 'count' ? 'count' : 'polylength');
-  const own = tool && prefs.autoUseToolStyle ? tool.style : undefined;
-  // The tool's whole look when it draws the same way (a count tool for marks), else its colour.
-  const whole = !!own && (tool!.type === 'count') === (kind === 'count');
-  let style: MarkupStyle = whole
-    ? { ...own! }
-    : { ...def, color: own?.color ?? sizeColor(size.trim() || subject), fontColor: own?.fontColor, fontFamily: own?.fontFamily };
-  if (rule) style = withRule(style, rule);
-  if (kind === 'count') {
-    const symbol: CountSymbol = tool?.type === 'count' ? tool.style.symbol : 'diamond';
-    const fill = rule || !whole || !style.fillColor ? style.color : style.fillColor;
-    style = { ...style, symbol, fillColor: fill, fillOpacity: Math.max(style.fillOpacity, 0.75) };
-  }
-  return { ...style, lineStart: 'none', lineEnd: 'none' };
+/** A count look or a line look as a markup style (for drawing it like a markup). */
+export function lookStyle(look: CountLook | LineLook): MarkupStyle {
+  const line = 'lineStyle' in look;
+  return {
+    ...BASE_STYLE,
+    color: look.color,
+    fillColor: look.color,
+    fillOpacity: 0.8,
+    lineWidth: line ? look.width : 1,
+    lineStyle: line ? look.lineStyle : 'solid',
+    symbol: line ? 'diamond' : look.symbol,
+    symbolSize: line ? 4.5 : look.size,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -267,10 +322,13 @@ function longestSegment(pts: Pt[], closed: boolean): number {
 // The marks
 
 export interface DetailMarkOptions {
-  chest: ToolSet[];
-  look: AutoLookPrefs;
+  /** The look of each shape's material (Settings → Detail Marks). */
+  styles: DetailShapeStyle[];
   /** Space between a markup and its material, page points. */
   gap: number;
+  /** Text size relative to the markup's label (default 0.85). */
+  textScale?: number;
+  /** Labels at all (each shape's look also says whether to write them). */
   labels: boolean;
   /** A markup's label lines as the drawing shows them (none when labels are off). */
   parentLabel: (m: Markup) => string[];
@@ -319,26 +377,32 @@ export function detailMarks(doc: DocState, markups: Markup[], o: DetailMarkOptio
               : `${fmtCount(q.pieces)} EA${q.pieceLength ? ` × ${ftIn(q.pieceLength)}` : ''}${it.rule === 'spacing' ? ` ${q.basis}` : ''}`
           }`,
         };
-        const ts = Math.max(6, m.style.fontSize * 0.8);
+        const scale = o.textScale ?? 0.85;
+        const ts = Math.max(5, m.style.fontSize * scale);
+        const look = detailStyleFor(o.styles, subject, it.size);
 
         if (it.rule === 'each') {
           // A count mark with the number of pieces, after the markup's label.
+          if (!look.count.show) continue;
           if (frame === undefined) frame = labelFrame(m, o.parentLabel(m));
           if (!frame) continue;
-          const cs = Math.max(6, frame.size * 0.85);
-          const r0 = cs * 0.42;
-          const v = frame.v0 + cs * 0.6 + countRow * cs * LH;
+          const cs = Math.max(5, frame.size * scale);
+          const r0 = Math.max(0.5, look.count.size);
+          const row = Math.max(cs, r0 * 2.5) * LH;
+          const v = frame.v0 + row / 2 + countRow * row;
           const u = frame.u1 + cs * 0.6;
           countRow++;
-          const style = materialLook(o.chest, o.look, subject, it.size, 'count');
           out.push({
             ...base,
             kind: 'count',
-            style: { ...style, fontSize: cs },
+            style: { ...lookStyle(look.count), fontSize: cs },
             paths: [],
             symbols: [framePoint(frame, u + r0 * 1.25, v)],
             symbolSize: r0,
-            text: o.labels ? { text: `${fmtCount(q.pieces)} × ${name}`, at: framePoint(frame, u + r0 * 2.5 + cs * 0.3, v), angle: frame.angle, anchor: 'start', size: cs } : null,
+            text:
+              o.labels && look.count.label
+                ? { text: `${fmtCount(q.pieces)} × ${name}`, at: framePoint(frame, u + r0 * 2.5 + cs * 0.3, v), angle: frame.angle, anchor: 'start', size: cs }
+                : null,
           });
           continue;
         }
@@ -346,12 +410,15 @@ export function detailMarks(doc: DocState, markups: Markup[], o: DetailMarkOptio
         // Full length and spacing: beside a length, inside an area.
         if (!linear && !ring) continue;
         const kind = it.rule === 'full' ? 'line' : 'spaced';
-        const style = materialLook(o.chest, o.look, subject, it.size, kind === 'line' ? 'line' : 'count');
+        const kl = kind === 'line' ? look.line : look.count;
+        if (!kl.show) continue;
+        const labelled = o.labels && kl.label;
+        const style = lookStyle(kl);
         const lw = kind === 'line' ? style.lineWidth : 0;
-        const symbolSize = Math.max(2.5, ts * 0.32);
+        const symbolSize = Math.max(0.5, look.count.size);
         const reach = kind === 'line' ? lw / 2 : symbolSize * 1.25;
         const d0 = lineAt + reach;
-        lineAt = d0 + reach + gap + (o.labels ? ts * LH : 0);
+        lineAt = d0 + reach + gap + (labelled ? ts * LH : 0);
         let path: Pt[];
         let side: number;
         const pts = m.points;
@@ -392,7 +459,7 @@ export function detailMarks(doc: DocState, markups: Markup[], o: DetailMarkOptio
 
         // The label: by the middle of the longest stretch, on the far side.
         let text: MarkText | null = null;
-        if (o.labels) {
+        if (labelled) {
           const j = longestSegment(path, closed);
           const a = path[j];
           const b = path[(j + 1) % path.length];

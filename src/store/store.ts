@@ -32,7 +32,8 @@ import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
-import { defaultDetailMarkPrefs, type DetailMarkPrefs } from '../core/detailMarks';
+import { PANEL_IDS, dockPanelIn, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, type DockTarget } from './dockLayout';
+import { defaultDetailMarkPrefs, defaultDetailStyles, type DetailMarkPrefs, type DetailShapeStyle } from '../core/detailMarks';
 import { defaultCombineSettings, type CombineSettings } from '../core/combine';
 
 export type ToolMode =
@@ -108,7 +109,7 @@ export interface UIState {
 
 export type PanelId = 'sheets' | 'toolchest' | 'properties' | 'measurements' | 'layers' | 'compare' | 'autotakeoff' | 'markups' | 'summary';
 export type DockSide = 'left' | 'right' | 'top' | 'bottom';
-export const PANEL_IDS: PanelId[] = ['sheets', 'toolchest', 'properties', 'measurements', 'layers', 'compare', 'autotakeoff', 'markups', 'summary'];
+export { PANEL_IDS };
 export const PANEL_TITLES: Record<PanelId, string> = {
   sheets: 'Sheets',
   toolchest: 'Tool Chest',
@@ -133,13 +134,17 @@ export interface PanelPlace {
   float: FloatRect;
   /** Floating panels only: whether the window is showing. */
   open: boolean;
+  /** Docked panels: the section of the dock it is in (0 = the first; see dockLayout.ts). */
+  section?: number;
 }
 
 /** Workspace arrangement: where each panel and the toolbar live. Persisted per browser / install. */
 export interface LayoutState {
   panels: Record<PanelId, PanelPlace>;
-  /** Open (expanded) panel in each dock, or null when the dock is collapsed. */
-  active: Record<DockSide, PanelId | null>;
+  /** Open panel in each section of each dock, or null where the section is collapsed. */
+  active: Record<DockSide, (PanelId | null)[]>;
+  /** Relative sizes of each dock's sections (heights down a side, widths across the top or bottom). */
+  split: Record<DockSide, number[]>;
   size: Record<DockSide, number>;
   floatOrder: PanelId[];
   toolbar: { dock: 'top' | 'left' | 'right' | 'float'; x: number; y: number };
@@ -156,6 +161,10 @@ export interface PanelDrag {
   w: number;
   h: number;
   zone: DockSide | 'float' | null;
+  /** Dropping on a dock section: join it, or split a new section there. */
+  target?: DockTarget;
+  /** Where the panel would go, to highlight while dragging. */
+  hint?: { left: number; top: number; width: number; height: number; label: string };
 }
 
 /** A split pane taken out of the main window: a floating window inside the app, or its own OS window. */
@@ -229,8 +238,10 @@ export interface Prefs {
   subjects: string[];
   /** Combine report: machine allowance, saw kerf and the stock lengths per shape (Settings → Combine). */
   combine: CombineSettings;
-  /** Standard detail material drawn next to its markups (Settings → Drawing & Editing). */
+  /** Standard detail material drawn next to its markups (Settings → Detail Marks). */
   detailMarks: DetailMarkPrefs;
+  /** The look of each shape's detail material (Settings → Detail Marks). */
+  detailStyles: DetailShapeStyle[];
 }
 
 export interface PerfPrefs {
@@ -254,7 +265,7 @@ export interface AutoOptions {
   useprinted: boolean;
 }
 
-export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'subjects' | 'combine' | 'list' | 'auto' | 'speed' | 'workspace';
+export type SettingsTab = 'general' | 'units' | 'editing' | 'keys' | 'subjects' | 'details' | 'combine' | 'list' | 'auto' | 'speed' | 'workspace';
 
 interface TypeDefault {
   style: MarkupStyle;
@@ -413,7 +424,9 @@ export interface AppState {
   // workspace layout
   showPanel: (id: PanelId) => void;
   togglePanel: (id: PanelId) => void;
-  dockPanel: (id: PanelId, dock: DockSide | 'float', float?: Partial<FloatRect>) => void;
+  /** Move a panel to a dock – joining one of its sections or splitting off a new one – or float it. */
+  dockPanel: (id: PanelId, dock: DockSide | 'float', float?: Partial<FloatRect>, target?: DockTarget) => void;
+  setSectionSizes: (side: DockSide, sizes: number[]) => void;
   closeFloat: (id: PanelId) => void;
   setFloatRect: (id: PanelId, rect: Partial<FloatRect>) => void;
   setDockSize: (side: DockSide, px: number) => void;
@@ -535,7 +548,8 @@ export function defaultLayout(): LayoutState {
       summary: { ...place('bottom', 8), float: { x: 190, y: 250, w: 760, h: 360 } },
     },
     // Small screens start with the drawing visible; side panels open as overlays on demand.
-    active: { left: narrow ? null : 'sheets', right: narrow ? null : 'toolchest', top: null, bottom: 'markups' },
+    active: { left: [narrow ? null : 'sheets'], right: [narrow ? null : 'toolchest'], top: [null], bottom: ['markups'] },
+    split: { left: [1], right: [1], top: [1], bottom: [1] },
     size: { left: 250, right: 310, top: 220, bottom: narrow ? 200 : 250 },
     floatOrder: [],
     toolbar: { dock: 'top', x: 200, y: 120 },
@@ -549,15 +563,17 @@ function loadLayout(): LayoutState {
   if (!saved) return d;
   const panels = { ...d.panels };
   for (const id of PANEL_IDS) if (saved.panels?.[id]) panels[id] = { ...d.panels[id], ...saved.panels[id] };
-  return {
+  // Layouts from before docks had sections keep one open panel per dock: normalizeLayout makes them one section.
+  return normalizeLayout({
     ...d,
     ...saved,
     panels,
     active: { ...d.active, ...saved.active },
+    split: { ...d.split, ...saved.split },
     size: { ...d.size, ...saved.size },
     toolbar: { ...d.toolbar, ...saved.toolbar },
     floatOrder: (saved.floatOrder ?? []).filter((id) => PANEL_IDS.includes(id)),
-  };
+  });
 }
 
 /** A pane showing a sheet of a document, that document's tab active (opened at the end if needed). */
@@ -665,6 +681,7 @@ const defaultPrefs = (): Prefs => ({
   subjects: [...DEFAULT_SUBJECTS],
   combine: defaultCombineSettings(),
   detailMarks: defaultDetailMarkPrefs(),
+  detailStyles: defaultDetailStyles(),
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -683,6 +700,7 @@ function loadPrefs(): Prefs {
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
     subjects: Array.isArray(saved.subjects) ? cleanSubjects(saved.subjects.map(String)) : d.subjects,
     detailMarks: { ...d.detailMarks, ...saved.detailMarks },
+    detailStyles: Array.isArray(saved.detailStyles) && saved.detailStyles.length ? saved.detailStyles : d.detailStyles,
     combine: { ...d.combine, ...saved.combine, stock: Array.isArray(saved.combine?.stock) ? saved.combine!.stock : d.combine.stock, other: Array.isArray(saved.combine?.other) ? saved.combine!.other : d.combine.other },
   };
 }
@@ -1293,37 +1311,14 @@ export const useStore = create<AppState>()((set, get, api) => {
       set({ prefs });
     },
 
-    showPanel: (id) => {
-      const l = get().layout;
-      const p = l.panels[id];
-      if (p.dock === 'float') setLayout({ panels: { ...l.panels, [id]: { ...p, open: true } }, floatOrder: [...l.floatOrder.filter((x) => x !== id), id] });
-      else setLayout({ active: { ...l.active, [p.dock]: id } });
-    },
-    togglePanel: (id) => {
-      const l = get().layout;
-      const p = l.panels[id];
-      if (p.dock === 'float') {
-        if (p.open) get().closeFloat(id);
-        else get().showPanel(id);
-      } else if (l.active[p.dock] === id) setLayout({ active: { ...l.active, [p.dock]: null } });
-      else get().showPanel(id);
-    },
-    dockPanel: (id, dock, float) => {
+    showPanel: (id) => setLayout(showPanelIn(get().layout, id)),
+    togglePanel: (id) => setLayout(togglePanelIn(get().layout, id)),
+    dockPanel: (id, dock, float, target) => {
       const l = get().layout;
       if (l.locked) return;
-      const prev = l.panels[id];
-      const active = { ...l.active };
-      if (prev.dock !== 'float' && active[prev.dock] === id) {
-        active[prev.dock] = PANEL_IDS.find((x) => x !== id && l.panels[x].dock === prev.dock) ?? null;
-      }
-      const next: PanelPlace = { ...prev, dock, open: dock === 'float', float: { ...prev.float, ...float } };
-      if (dock !== 'float') active[dock] = id;
-      setLayout({
-        panels: { ...l.panels, [id]: next },
-        active,
-        floatOrder: dock === 'float' ? [...l.floatOrder.filter((x) => x !== id), id] : l.floatOrder.filter((x) => x !== id),
-      });
+      setLayout(dockPanelIn(l, id, dock, float, target));
     },
+    setSectionSizes: (side, sizes) => setLayout(setSectionSizesIn(get().layout, side, sizes)),
     closeFloat: (id) => {
       const l = get().layout;
       setLayout({ panels: { ...l.panels, [id]: { ...l.panels[id], open: false } } });

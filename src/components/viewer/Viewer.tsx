@@ -147,7 +147,6 @@ export function Viewer({ paneId }: { paneId: string }) {
   const layers = useStore((s) => paneDoc(s, paneId).layers);
   const settings = useStore((s) => paneDoc(s, paneId).settings);
   const doc = useStore((s) => paneDoc(s, paneId));
-  const toolChest = useStore((s) => s.toolChest);
   const selection = useStore((s) => s.selection);
   const tool = useStore((s) => s.tool);
   const prefs = useStore(useShallow((s) => s.prefs));
@@ -221,13 +220,13 @@ export function Viewer({ paneId }: { paneId: string }) {
     const dm = prefs.detailMarks;
     if (!dm.show || !doc.standardDetails?.length || !pageMarkups.length) return [];
     return detailMarks(doc, pageMarkups, {
-      chest: toolChest,
-      look: prefs,
+      styles: prefs.detailStyles,
       gap: dm.gap,
-      labels: dm.labels && prefs.showLabels,
+      textScale: dm.textScale,
+      labels: prefs.showLabels,
       parentLabel: (m) => (prefs.showLabels ? labels.get(m.id)?.split('\n').filter(Boolean) ?? [] : []),
     });
-  }, [doc, pageMarkups, labels, toolChest, prefs]);
+  }, [doc, pageMarkups, labels, prefs]);
 
   // ---- sizing
   useLayoutEffect(() => {

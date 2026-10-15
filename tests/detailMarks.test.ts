@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { detailMarks, insetRing, labelFrame, materialLook, offsetPath, pointAlong } from '../src/core/detailMarks';
+import { defaultDetailStyles, detailMarks, detailStyleFor, insetRing, labelFrame, newDetailStyle, offsetPath, OTHER_SHAPES, pointAlong } from '../src/core/detailMarks';
 import { newDetail, newDetailItem } from '../src/core/details';
 import { defaultColumns, defaultLayers } from '../src/core/defaults';
 import { defaultStyle } from '../src/core/markupTypes';
-import { defaultAutoStyles } from '../src/core/autoStyles';
-import { sizeColor } from '../src/core/autoTakeoff';
 import { DEFAULT_SETTINGS, findPreset, scaleFromPreset } from '../src/core/units';
 import { polygonArea } from '../src/core/geometry';
 import type { DocState, Markup, Pt, Sheet } from '../src/types';
@@ -121,8 +119,7 @@ describe('detail material on the drawing', () => {
     settings: DEFAULT_SETTINGS,
     standardDetails: [detail],
   };
-  const look = { autoStyles: defaultAutoStyles(), autoUseToolStyle: true };
-  const opts = (labels: Record<string, string[]> = {}) => ({ chest: [], look, gap: 4, labels: true, parentLabel: (m: Markup) => labels[m.id] ?? [] });
+  const opts = (labels: Record<string, string[]> = {}) => ({ styles: defaultDetailStyles(), gap: 4, labels: true, parentLabel: (m: Markup) => labels[m.id] ?? [] });
 
   it('draws full-length material as a line the same length and direction, away from the label', () => {
     const marks = detailMarks(base, base.markups, opts({ b1: ['W24x55', `24'-0"`] }));
@@ -213,39 +210,89 @@ describe('detail material on the drawing', () => {
   });
 });
 
-describe('the look of the material', () => {
-  const look = { autoStyles: defaultAutoStyles(), autoUseToolStyle: true };
+describe('detail mark presets by shape', () => {
+  const styles = defaultDetailStyles();
 
-  it('follows the line style rule of its shape', () => {
-    const s = materialLook([], look, 'L', 'L3x3x1/4', 'line');
-    expect(s.color).toBe('#e76f51');
-    expect(s.lineStyle).toBe('dotted');
-    expect(s.lineStart).toBe('none');
-    expect(materialLook([], look, 'HSS', 'HSS4x4x1/4', 'line').color).toBe('#1f6feb');
+  it('finds the shape of the material from its size, else its subject, else other shapes', () => {
+    expect(detailStyleFor(styles, 'Clip Angle', 'L4x4x3/8').shape).toBe('L');
+    expect(detailStyleFor(styles, 'Post', 'HSS1-1/2x1-1/2x1/8').shape).toBe('HSS');
+    expect(detailStyleFor(styles, 'BP', '').shape).toBe('BP');
+    expect(detailStyleFor(styles, 'PL', 'PL3/4x12').shape).toBe('PL');
+    expect(detailStyleFor(styles, 'Dowel', '#5 Rebar').shape).toBe(OTHER_SHAPES);
+    // "Clip Angle" is not a C.
+    expect(detailStyleFor(styles, 'Clip Angle', '').shape).toBe(OTHER_SHAPES);
   });
 
-  it('uses a colour per size without a rule, and fills count marks', () => {
-    const s = materialLook([], look, 'Stud', '3/4" stud', 'count');
-    expect(s.color).toBe(sizeColor('3/4" stud'));
-    expect(s.fillColor).toBe(s.color);
-    expect(s.symbol).toBe('diamond');
+  it('starts with each shape in its own colour, L dotted and HSS dashed', () => {
+    const L = detailStyleFor(styles, '', 'L3x3x1/4');
+    expect(L.line.color).toBe('#e76f51');
+    expect(L.line.lineStyle).toBe('dotted');
+    expect(L.count.symbol).toBe('triangle');
+    expect(detailStyleFor(styles, '', 'HSS4x4x1/4').line.lineStyle).toBe('dashed');
+    expect(styles.at(-1)!.shape).toBe(OTHER_SHAPES);
+  });
+});
+
+describe('drawing with the presets', () => {
+  const scale = scaleFromPreset(findPreset(`1/8" = 1'-0"`)!);
+  const ft = 12 / scale.realPerPt;
+  const sheet: Sheet = { id: 's1', fileId: 'f', pageIndex: 0, number: 'S1', title: '', width: 2592, height: 1728, rotation: 0, scale, viewports: [] };
+  const beam: Markup = {
+    id: 'b1',
+    sheetId: 's1',
+    type: 'length',
+    points: [
+      { x: 100, y: 300 },
+      { x: 100 + 24 * ft, y: 300 },
+    ],
+    subject: 'W',
+    label: 'W24x55',
+    comments: '',
+    author: 't',
+    created: 0,
+    modified: 0,
+    status: 'None',
+    checked: false,
+    layer: '',
+    style: defaultStyle('length'),
+    custom: { member_size: 'W24x55' },
+  };
+  const detail = newDetail({
+    conditions: [{ column: 'c:member_size', op: 'eq', value: 'W24x55' }],
+    items: [
+      newDetailItem({ subject: 'L', size: 'L4x4x3/8', rule: 'each', value: '4' }),
+      newDetailItem({ subject: 'L', size: 'L3x3x1/4', rule: 'full', value: '1' }),
+      newDetailItem({ subject: 'Stud', size: '3/4" stud', rule: 'spacing', value: '24' }),
+    ],
+  });
+  const doc: DocState = { files: [], sheets: [sheet], markups: [beam], columns: defaultColumns(), layers: defaultLayers(), settings: DEFAULT_SETTINGS, standardDetails: [detail] };
+  const L = { ...newDetailStyle('L'), count: { show: true, symbol: 'star' as const, size: 9, color: '#112233', label: false }, line: { show: true, lineStyle: 'dashed' as const, width: 6, color: '#445566', label: true } };
+  const other = { ...newDetailStyle(OTHER_SHAPES), count: { show: false, symbol: 'circle' as const, size: 3, color: '#000000', label: true }, line: { show: true, lineStyle: 'solid' as const, width: 1, color: '#000000', label: true } };
+  const run = (styles = [L, other]) => detailMarks(doc, [beam], { styles, gap: 4, labels: true, parentLabel: () => ['24\'-0"'] });
+
+  it('draws count marks with the symbol, size, colour and label of the shape', () => {
+    const count = run().find((m) => m.kind === 'count')!;
+    expect(count.style.symbol).toBe('star');
+    expect(count.symbolSize).toBe(9);
+    expect(count.style.color).toBe('#112233');
+    expect(count.text).toBeNull();
   });
 
-  it('takes the Tool Chest tool of its size', () => {
-    const tool = {
-      id: 't',
-      name: 'Clip Angle',
-      type: 'count' as const,
-      subject: 'L',
-      style: { ...defaultStyle('count'), color: '#123456', symbol: 'triangle' as const },
-      custom: { 'Member Size': 'L4x4x3/8' },
-      layer: '',
-    };
-    const chest = [{ id: 's', name: 'Steel', tools: [tool] }];
-    const s = materialLook(chest as never, { ...look, autoStyles: [] }, 'L', 'L4x4x3/8', 'count');
-    expect(s.color).toBe('#123456');
-    expect(s.symbol).toBe('triangle');
-    // A line style rule for the shape wins over the tool's colour.
-    expect(materialLook(chest as never, look, 'L', 'L4x4x3/8', 'count').color).toBe('#e76f51');
+  it('draws lines with the line style, width, colour and label of the shape', () => {
+    const line = run().find((m) => m.kind === 'line')!;
+    expect(line.style.lineStyle).toBe('dashed');
+    expect(line.style.lineWidth).toBe(6);
+    expect(line.style.color).toBe('#445566');
+    expect(line.text?.text).toBe('L3x3x1/4');
+    // Wider line: further from the beam.
+    const thin = run([{ ...L, line: { ...L.line, width: 1 } }, other]).find((m) => m.kind === 'line')!;
+    expect(line.paths[0].pts[0].y - beam.points[0].y).toBeGreaterThan(thin.paths[0].pts[0].y - beam.points[0].y);
+  });
+
+  it('leaves out what a shape does not show', () => {
+    // Studs are "other shapes", whose count marks are off.
+    expect(run().map((m) => m.kind)).toEqual(['count', 'line']);
+    const none = run([{ ...L, count: { ...L.count, show: false }, line: { ...L.line, show: false } }, other]);
+    expect(none).toEqual([]);
   });
 });

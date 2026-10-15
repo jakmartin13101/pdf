@@ -1,4 +1,5 @@
 import { DraftingCompass, FileDown, FolderOpen, Frame, GitCompareArrows, GripVertical, Hand, Maximize, MousePointer2, Redo2, Save, Sigma, Table2, Undo2, Wand2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react';
+import { isPanelOpen } from '../store/dockLayout';
 import { useRef } from 'react';
 import { beginDockDrag } from './dock/dragging';
 import { DockMenuButton } from './dock/PanelHeader';
@@ -38,10 +39,7 @@ function TB({ icon: Icon, label, onClick, active, disabled, title, small }: {
 
 /** True when a panel is currently showing (open in its dock or as an open floating window). */
 export function usePanelOpen(id: PanelId) {
-  return useStore((s) => {
-    const p = s.layout.panels[id];
-    return p.dock === 'float' ? p.open : s.layout.active[p.dock] === id;
-  });
+  return useStore((s) => isPanelOpen(s.layout, id));
 }
 
 export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | 'float' }) {

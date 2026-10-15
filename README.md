@@ -7,11 +7,11 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.9.0**: the material **standard details add is drawn on the drawing**, beside its markup in the look of
-> its shape – full-length material as a matching line, pieces at a spacing as marks along it, counted pieces as a
-> count mark by the markup's label (1.8.0: the Combine Report of stock lengths to order; 1.7.0: subjects are shapes
-> from your own list, labels and text have their own colour; 1.6.0: every PDF is its own document with its takeoff
-> saved inside it) – see the [changelog](CHANGELOG.md).
+> **Version 1.10.0**: **detail marks set shape by shape** (*Settings → Detail Marks*: count mark symbol, size,
+> colour and label; line style, width, colour and label), **docks split into up to four sections** (the Sheets and
+> the Tool Chest on the left at once, the Markups List beside the Summary), and **program windows you can move** that
+> no longer dim the drawing (1.9.0: standard detail material drawn on the drawing; 1.8.0: the Combine Report; 1.7.0:
+> subjects are shapes from your own list) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -169,14 +169,22 @@ the markup, its label and the material all stay readable:
   dowels), with "13 × 3/4" stud @ 2'-0"".
 * **× quantity** pieces are a **count mark next to the markup's label** with the number of pieces ("4 × L4x4x3/8");
   several are stacked by the label. On a count markup the mark goes by its count label.
-* Each is drawn in the **look of its shape**: the line style rule for that shape (*Settings → Auto Takeoff Line Styles*:
-  L orange dotted, HSS blue dashed…), else the Tool Chest tool for its size (a count tool's symbol for marks), else a
-  colour per size. Text uses the rule's text colour.
+* Each is drawn in the **look set for its shape** in *Settings → Detail Marks* (also *Settings → Detail Marks…*). A
+  material's shape comes from its size (L4x4x3/8 is an L, HSS1-1/2x1-1/2x1/8 an HSS), else its subject. For each shape:
+  * **Count marks** (× quantity and @ spacing): show or not, the **symbol** (circle, square, triangle, diamond, star,
+    check, cross), its **size**, **colour**, and the **label** (number of pieces and size) on or off;
+  * **Lines** (full length): show or not, **solid / dashed / dotted**, the **width**, **colour**, and the **label**
+    (size) on or off.
+
+  Add a shape (pick from your subjects or type one, e.g. RB), remove one, or *Reset to Defaults*. **Other shapes** is
+  the look for material whose shape is not listed (rebar, studs…). A sample of each look is shown in the list. The
+  text size (a share of the markup's label size) and the space from the markup are set at the top.
 * The material moves with its markup and goes away when the detail is taken off; it is not a markup of its own, so it
   is still counted once. Hover it to see the detail and the quantity; click it to select its markup.
-* *Settings → Drawing & Editing → Standard detail material*: draw it or not (also *View* and *Settings* menus →
-  *Standard Detail Material on Drawing*), write its size and number of pieces or not, and the space from the markup.
+* Draw it or not: *Settings → Detail Marks*, or *View* / *Settings* menus → *Standard Detail Material on Drawing*.
   Flattened PDFs (*Edit → Flatten Markups*, *File → Export → Flattened PDF*) draw it too.
+
+<img src="docs/screenshot-detail-styles.png" width="760" alt="Settings: detail marks by shape – count mark and line for each">
 
 ![Detail material drawn beside two beams: the full-length angle as a dotted line, studs at 2'-0" OC, and "4 × L4x4x3/8" by each beam's label](docs/screenshot-detail-marks.png)
 
@@ -246,6 +254,8 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
   [Combine report](#combine-report)).
 * **Auto Takeoff** – line styles by subject (above) and the defaults for finding members.
 * **Speed & Graphics** – see [Speed and graphics](#speed-and-graphics).
+* **Detail Marks** – how standard detail material is drawn, shape by shape (see
+  [Detail material on the drawing](#detail-material-on-the-drawing)).
 * **Workspace** – lock the layout, toolbar position, reset the layout.
 
 <img src="docs/screenshot-keyboard.png" width="560" alt="Settings: keyboard shortcuts">
@@ -398,8 +408,27 @@ columns.
   **left, right, top or bottom**, or **float** in their own movable, resizable window. Drag a panel's header or tab
   (drop zones appear at the edges; drop elsewhere to float) or use its layout menu. The **toolbar** docks top, left,
   right or floats the same way.
+* **Each dock splits into up to four sections** (three splits), each with its own tabs and its own open panel – e.g.
+  the **Sheets thumbnails and the Tool Chest on the left at the same time**, or the Markups List beside the Takeoff
+  Summary at the bottom. Drag a panel onto the lower quarter of a section in a side dock (the right quarter in the top
+  or bottom dock) to split a new section there – the place lights up – or onto the rest of a section to add it to
+  that section's tabs; or use the panel's layout menu: *Split Below / Split Right (New Section)* and *Move to Section*.
+  Drag the splitter between sections to size them (heights down a side, widths across the top or bottom), and the
+  dock's edge for its width or height. A section emptied of panels closes up; each section collapses and opens on its
+  own from its tabs. The side tab strips group the tabs by section.
 * *Window → Lock Workspace Layout* stops accidental moves; *Reset Workspace Layout* restores the default. The layout is
   remembered between sessions.
+
+![The Sheets and the Tool Chest in two sections of the left dock; the Markups List and the Takeoff Summary side by side at the bottom](docs/screenshot-dock-sections.png)
+
+### Program windows
+
+Every program window (Settings, Standard Details, Combine Report, Calibrate, Columns…) **moves**: drag its title bar to
+see what is behind it (double-click the title bar to centre it again); it opens where you left it for the rest of the
+session. Windows **don't dim** the program, and the drawing and panels behind them keep working – pan to look at the
+drawing, select markups – while a window is open. *Esc* or × closes it.
+
+![The Standard Details window moved aside, the drawing behind it](docs/screenshot-movable-window.png)
 
 ### Page labels from a box
 
@@ -487,7 +516,7 @@ tool active), **LABELS** (measurement labels on the drawing).
 ```bash
 npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
-npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine, detail material on the drawing)
+npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine, detail material on the drawing and its presets, dock sections)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff (sample set + addendum; needs `npm run dev` running)
@@ -530,7 +559,8 @@ src/
     combine.ts       combine report: pieces by size, nesting them on the stock lengths to order
     combineReport.ts combine report output: order text, CSV, printable page
     detailMarks.ts   standard detail material on the drawing: offset lines, marks along a member, count marks by labels
-  store/           Zustand store (open documents, each with its undo history; panes and tabs), project.ts
+  store/           Zustand store (open documents, each with its undo history; panes and tabs), dockLayout.ts
+                   (docks split into sections), project.ts
                    (opening, saving into the PDF, closing, autosave), commands
                    (menu and keyboard commands), flatten (markups into new versions of the PDFs)
   components/      viewer (canvas + SVG markup layer), panels, markups list, summary, dialogs,

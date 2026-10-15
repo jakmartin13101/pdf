@@ -1975,20 +1975,34 @@ table.grid {
 
 /* ---------------------------------------------------------------- dialogs */
 
+/* Windows don't dim or block the program: only the window itself takes the mouse. */
 .modal-back {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: none;
   z-index: 2000;
   display: grid;
   place-items: center;
+  pointer-events: none;
+}
+
+.modal-back > .modal {
+  pointer-events: auto;
+}
+
+.modal-back.placed > .modal {
+  position: fixed;
+}
+
+.modal.moving {
+  opacity: 0.92;
 }
 
 .modal {
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08);
   width: min(460px, 94vw);
   max-height: 90vh;
   display: flex;
@@ -1997,6 +2011,10 @@ table.grid {
 
 .modal.wide {
   width: min(860px, 96vw);
+}
+
+.modal.xwide {
+  width: min(1080px, 97vw);
 }
 
 .modal.mid {
@@ -2011,6 +2029,9 @@ table.grid {
   border-bottom: 1px solid var(--border);
   font-weight: 700;
   font-size: 14px;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
 }
 
 .modal-head .title {
@@ -3888,4 +3909,127 @@ button.linkish {
 .cmb-add {
   width: 90px;
   padding: 1px 6px;
+}
+
+/* Settings → Detail Marks */
+.dm-scroll {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.dm-table {
+  width: max-content;
+  min-width: 100%;
+  font-size: 12px;
+}
+
+.dm-table th,
+.dm-table td {
+  padding: 3px 5px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.dm-table th.dm-group {
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.dm-table td.c,
+.dm-table th:not(.dm-group) {
+  text-align: center;
+}
+
+.dm-table select {
+  min-width: 84px;
+}
+
+.dm-table input[type='color'] {
+  width: 30px;
+  height: 22px;
+  padding: 0 1px;
+}
+
+.dm-num {
+  width: 52px;
+}
+
+.dm-sample {
+  display: block;
+  background: #fff;
+  border-radius: 4px;
+}
+
+/* Dock sections: up to four per side, each a tab group with its own open panel. */
+.dock-sections {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.dock-sections.column {
+  flex-direction: column;
+}
+
+.dock-sections.row {
+  flex-direction: row;
+}
+
+.dock-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dock-sections.row > .dock-section.fixed {
+  max-width: 50%;
+}
+
+.dock-divider {
+  flex: none;
+  background: var(--border);
+}
+
+.dock-sections.row > .dock-divider {
+  width: 1px;
+}
+
+.dock-sections.column > .dock-divider {
+  height: 1px;
+}
+
+.dock-sections.row > .splitter-v {
+  align-self: stretch;
+}
+
+.side-tab-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.side-tab-group + .side-tab-group {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.drop-section {
+  position: fixed;
+  z-index: 3001;
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+  pointer-events: none;
+  text-align: center;
 }

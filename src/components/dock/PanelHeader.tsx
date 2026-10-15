@@ -3,6 +3,7 @@ import { PanelsTopLeft } from 'lucide-react';
 import { getState, useStore, PANEL_TITLES, type DockSide, type PanelId } from '../../store/store';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { beginDockDrag } from './dragging';
+import { MAX_SECTIONS, sectionCount, sectionOf, sectionPanels } from '../../store/dockLayout';
 
 export interface PanelContextValue {
   id: PanelId;
@@ -28,7 +29,34 @@ export function dockMenuItems(id: PanelId | 'toolbar'): MenuItem[] {
       { label: locked ? 'Unlock Workspace Layout' : 'Lock Workspace Layout', onClick: () => st.setLayoutLocked(!locked) },
     ];
   }
-  const cur = st.layout.panels[id].dock;
+  const l = st.layout;
+  const cur = l.panels[id].dock;
+  const sectionItems: MenuItem[] = [];
+  if (cur !== 'float') {
+    const n = sectionCount(l, cur);
+    const mine = sectionOf(l, id);
+    const alone = sectionPanels(l, cur, mine).length === 1;
+    const along = cur === 'left' || cur === 'right' ? 'Below' : 'Right';
+    sectionItems.push({
+      label: `Split ${along} (New Section)`,
+      disabled: locked || alone || n >= MAX_SECTIONS,
+      onClick: () => st.dockPanel(id, cur, undefined, { section: mine + 1, split: true }),
+    });
+    if (n > 1)
+      sectionItems.push({
+        label: 'Move to Section',
+        disabled: locked,
+        children: Array.from({ length: n }, (_, s) => s)
+          .filter((s) => s !== mine)
+          .map((s) => ({
+            label: `${s + 1}: ${sectionPanels(l, cur, s)
+              .map((p) => PANEL_TITLES[p])
+              .join(', ')}`,
+            onClick: () => st.dockPanel(id, cur, undefined, { section: s }),
+          })),
+      });
+    sectionItems.push({ sep: true });
+  }
   return [
     ...(['left', 'right', 'top', 'bottom'] as const).map((d) => ({
       label: `Dock ${d[0].toUpperCase()}${d.slice(1)}`,
@@ -38,6 +66,7 @@ export function dockMenuItems(id: PanelId | 'toolbar'): MenuItem[] {
     })),
     { label: 'Float', checked: cur === 'float', disabled: locked, onClick: () => st.dockPanel(id, 'float') },
     { sep: true },
+    ...sectionItems,
     { label: cur === 'float' ? 'Close' : 'Collapse', onClick: () => (cur === 'float' ? st.closeFloat(id) : st.togglePanel(id)) },
     { label: locked ? 'Unlock Workspace Layout' : 'Lock Workspace Layout', onClick: () => st.setLayoutLocked(!locked) },
   ];

@@ -135,3 +135,77 @@ test('panels float, dock to another side and the layout can be locked', async ({
   await page.getByTestId('dock-menu-toolchest').click();
   await expect(page.locator('.menu-item', { hasText: /^Float$/ })).toHaveClass(/disabled/);
 });
+
+test('docks split into sections: the sheets and the tool chest on the left at once', async ({ page }) => {
+  await openSample(page);
+  const left = page.locator('.side-panel.left');
+  await expect(left.getByTestId('dock-section')).toHaveCount(1);
+
+  // Drag the Tool Chest tab onto the lower part of the Sheets panel: a new section below it.
+  const tab = page.getByTestId('tab-tool-chest');
+  const t = (await tab.boundingBox())!;
+  const sheets = (await left.getByTestId('dock-section').first().boundingBox())!;
+  await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sheets.x + sheets.width / 2, sheets.y + sheets.height * 0.9, { steps: 12 });
+  await expect(page.getByTestId('drop-section')).toHaveText('New section below');
+  await page.mouse.up();
+  await expect(left.getByTestId('dock-section')).toHaveCount(2);
+  await expect(left.getByTestId('sheet-thumb').first()).toBeVisible();
+  await expect(left.getByTestId('chest-tool').first()).toBeVisible();
+  await expect(page.getByTestId('dock-left').getByTestId('side-tab-group')).toHaveCount(2);
+
+  // Drag the splitter between them: the sheets get taller, the tool chest shorter.
+  const [a0, b0] = [(await left.getByTestId('dock-section').nth(0).boundingBox())!, (await left.getByTestId('dock-section').nth(1).boundingBox())!];
+  const bar = (await left.locator('.dock-sections > .splitter-h').boundingBox())!;
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + 80, { steps: 6 });
+  await page.mouse.up();
+  const [a1, b1] = [(await left.getByTestId('dock-section').nth(0).boundingBox())!, (await left.getByTestId('dock-section').nth(1).boundingBox())!];
+  expect(a1.height - a0.height).toBeGreaterThan(60);
+  expect(b0.height - b1.height).toBeGreaterThan(60);
+  // And the dock wider.
+  const edge = (await page.locator('.workspace > .splitter-v').first().boundingBox())!;
+  await page.mouse.move(edge.x + 2, edge.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 62, edge.y + 200, { steps: 4 });
+  await page.mouse.up();
+  expect((await left.boundingBox())!.width - sheets.width).toBeGreaterThan(50);
+
+  // From the panel menu: Properties docks left (as a tab with the sheets), then splits off; Layers too.
+  const show = async (tabId: string, id: string) => {
+    if (!(await page.getByTestId(`dock-menu-${id}`).isVisible())) await page.getByTestId(tabId).click();
+  };
+  await show('tab-properties', 'properties');
+  await page.getByTestId('dock-menu-properties').click();
+  await page.getByText('Dock Left', { exact: true }).click();
+  await page.getByTestId('dock-menu-properties').click();
+  await page.getByText('Split Below (New Section)', { exact: true }).click();
+  await show('tab-layers', 'layers');
+  await page.getByTestId('dock-menu-layers').click();
+  await page.getByText('Dock Left', { exact: true }).click();
+  await page.getByTestId('dock-menu-layers').click();
+  await page.getByText('Split Below (New Section)', { exact: true }).click();
+  await expect(left.getByTestId('dock-section')).toHaveCount(4);
+  // Split three times: no more.
+  await show('tab-measurements', 'measurements');
+  await page.getByTestId('dock-menu-measurements').click();
+  await page.getByText('Dock Left', { exact: true }).click();
+  await page.getByTestId('dock-menu-measurements').click();
+  await expect(page.locator('.menu-item', { hasText: 'Split Below (New Section)' })).toHaveClass(/disabled/);
+  await page.keyboard.press('Escape');
+
+  // The bottom dock: the Takeoff Summary next to the Markups List.
+  await show('tab-summary', 'summary');
+  await page.getByTestId('dock-menu-summary').click();
+  await page.getByText('Split Right (New Section)', { exact: true }).click();
+  const bottom = page.getByTestId('dock-bottom');
+  await expect(bottom.getByTestId('dock-section')).toHaveCount(2);
+  await expect(bottom.getByTestId('markup-list-search').or(bottom.locator('.list-toolbar')).first()).toBeVisible();
+  await expect(bottom.locator('.summary').first()).toBeVisible();
+
+  // The layout is kept.
+  await page.reload();
+  await expect(page.locator('.side-panel.left').getByTestId('dock-section')).toHaveCount(4);
+});
