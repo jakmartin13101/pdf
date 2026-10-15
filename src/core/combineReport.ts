@@ -1,11 +1,11 @@
 // Combine report output: lengths as text, the order list, CSV and a printable page.
 
 import type { CombineSettings, SizePlan } from './combine';
-import { fmtNumber, formatLength } from './units';
+import { fmtLen, fmtNumber } from './units';
 
-/** A length for the report: ft-in (to 1/16"), or metres. */
+/** A length for the report: in your units, or metres. */
 export function lenText(inches: number, metric = false): string {
-  return metric ? `${fmtNumber(inches * 0.0254, 3)} m` : formatLength(inches, 'ft-in', 16);
+  return metric ? `${fmtNumber(inches * 0.0254, 3)} m` : fmtLen(inches);
 }
 
 /** "2 × 40'-0" + 1 × 20'-0"" */

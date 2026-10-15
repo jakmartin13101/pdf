@@ -10,7 +10,7 @@
 import type { DetailCondition, DetailItem, DetailOp, DocState, Markup, StandardDetail } from '../types';
 import { allColumns, buildRows, customColId, rowBuilder, type ColumnSpec, type Row } from './columns';
 import { normName, toNum } from './formula';
-import { fmtNumber, formatLength, parseLength } from './units';
+import { bareUnit, fmtLen, fmtNumber, formatLength, parseLength } from './units';
 import { TYPE_INFO } from './markupTypes';
 
 /** The Finish of galvanized material. */
@@ -117,15 +117,15 @@ export function columnValues(rows: Row[], col: string): { value: string; count: 
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, undefined, { numeric: true }));
 }
 
-/** Piece lengths and spacings: ft-in text, bare numbers are inches. Returns inches. */
+/** Piece lengths and spacings: ft-in text, bare numbers are inches (or your metric unit). Returns inches. */
 export function parseDetailLength(text: string): number | null {
   const t = text.trim();
   if (!t) return null;
-  const v = parseLength(t, 'in');
+  const v = parseLength(t, bareUnit('in'));
   return v != null && v > 0 ? v : null;
 }
 
-const ftIn = (inches: number) => formatLength(inches, 'ft-in', 16);
+const ftIn = (inches: number) => fmtLen(inches);
 /** A number of pieces: whole numbers without decimals. */
 const fmtCount = (n: number) => fmtNumber(n, n % 1 ? 2 : 0);
 
@@ -261,7 +261,7 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
         // material shows the measured run, like its markup.
         if (q.pieceLength > 0 && it.rule !== 'full') {
           // Typed lengths are exact: to 1/16" rather than the sheet's measuring precision.
-          const fine = r.scale.unit === 'ft-in' || r.scale.unit === 'in' ? Math.max(r.scale.precision, 16) : r.scale.precision;
+          const fine = r.scale.unit === 'ft-in' ? Math.max(r.scale.precision, 16) : r.scale.precision;
           row.display.length = formatLength(q.pieceLength, r.scale.unit, fine);
         }
         // Qty was 1 only so formulas see the material row on its own; don't add it to Qty totals.

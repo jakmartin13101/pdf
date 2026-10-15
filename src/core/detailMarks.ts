@@ -16,7 +16,7 @@ import { subjectForSize } from './subjects';
 import { bbox, centroid, dist, labelPoint, polygonArea, signedArea } from './geometry';
 import { polylineLabelAnchor, uprightAngle } from './shapes';
 import { normName, toNum } from './formula';
-import { fmtNumber, formatLength } from './units';
+import { fmtLen, fmtNumber } from './units';
 
 export interface DetailMarkPrefs {
   /** Draw the material standard details add next to their markups. */
@@ -334,7 +334,7 @@ export interface DetailMarkOptions {
   parentLabel: (m: Markup) => string[];
 }
 
-const ftIn = (inches: number) => formatLength(inches, 'ft-in', 16);
+const ftIn = (inches: number) => fmtLen(inches);
 const fmtCount = (n: number) => fmtNumber(n, n % 1 ? 2 : 0);
 /** More pieces than this along one markup are not drawn one by one. */
 const MAX_SPACED = 400;

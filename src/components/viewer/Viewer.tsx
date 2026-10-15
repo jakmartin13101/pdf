@@ -10,7 +10,7 @@ import { computeMeasure, drawingLabelLines, measurementText, scaleAt, scaleForMa
 import { bbox, constrainAngle, dist, expandRect, rectFromPoints, rectsIntersect, rectContains, simplify, translate } from '../../core/geometry';
 import { calloutBox, markupRect, RECT_TYPES } from '../../core/shapes';
 import { querySnap, snapIndex, type SnapIndex } from '../../core/pdf';
-import { AREA_SUFFIX, LENGTH_SUFFIX, areaToReport, fmtNumber, formatLength, lengthToReport } from '../../core/units';
+import { AREA_SUFFIX, LENGTH_SUFFIX, areaToReport, fmtLen, fmtNumber, formatLength, lengthToReport } from '../../core/units';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { useOwnerWindow } from '../ownerWindow';
 import { detailMenuItems } from '../detailMenu';
@@ -215,7 +215,7 @@ export function Viewer({ paneId }: { paneId: string }) {
       map.set(m.id, drawingLabelLines(m, computeMeasure(m, sc), sc, settings).join('\n'));
     }
     return map;
-  }, [pageMarkups, sheet, settings]);
+  }, [pageMarkups, sheet, settings, prefs.units]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Material added by standard details, drawn beside its markups.
   const marks = useMemo(() => {
@@ -1354,7 +1354,7 @@ function SelectionTotalsTip({ doc, ids, anchor, view, size }: { doc: DocState; i
   if (!t.markups) return null;
   const s = doc.settings;
   const len = (inches: number) =>
-    s.lengthUnit === 'ft' ? formatLength(inches, 'ft-in', 16) : `${fmtNumber(lengthToReport(inches, s), s.decimals)} ${LENGTH_SUFFIX[s.lengthUnit]}`;
+    s.lengthUnit === 'ft' ? fmtLen(inches) : `${fmtNumber(lengthToReport(inches, s), s.decimals)} ${LENGTH_SUFFIX[s.lengthUnit]}`;
   const lines: string[] = [];
   if (t.length > 0) lines.push(`Length ${len(t.length)}`);
   if (t.count > 0) lines.push(`Count ${fmtNumber(t.count, 0)} EA`);

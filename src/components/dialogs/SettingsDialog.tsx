@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2, X } from 'lucide-react';
 import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolveBindings } from '../../core/keymap';
-import type { AutoStyleRule, CountSymbol, LineStyle, ProjectSettings } from '../../types';
+import type { AutoStyleRule, CountSymbol, LengthUnit, LineStyle, ProjectSettings } from '../../types';
 import { COUNT_SYMBOLS, OTHER_SHAPES, defaultDetailStyles, lookStyle, newDetailStyle, type DetailShapeStyle } from '../../core/detailMarks';
 import { dashArray, symbolPath } from '../../core/shapes';
 import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
@@ -16,14 +16,14 @@ import { allColumns } from '../../core/columns';
 import { desktop, type GpuMode } from '../../brand';
 import { AUTO_MATCH, autoStyleFor, defaultAutoStyles, isAutoMarkup, newAutoStyle, withRule } from '../../core/autoStyles';
 import { MEMBER_FAMILIES } from '../../core/autoTakeoff';
-import { fmtNumber, formatLength, parseLength } from '../../core/units';
+import { LENGTH_UNITS, bareUnit, fmtLen, fmtNumber, parseLength, precisionOptions, userPrecisionFor, type UserUnits } from '../../core/units';
 import { CommitInput } from '../fields';
 import { LineSample, StepSelect } from '../EndAdjuster';
 import { Modal } from './Modal';
 
 const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'general', label: 'General', hint: 'You, theme and tools' },
-  { id: 'units', label: 'Units & Totals', hint: 'This project' },
+  { id: 'units', label: 'Units & Totals', hint: 'Feet-inches, metric, totals' },
   { id: 'editing', label: 'Drawing & Editing', hint: 'Snapping and adjusting' },
   { id: 'lengths', label: 'Length Measurements', hint: 'Maximum length by shape' },
   { id: 'keys', label: 'Keyboard', hint: 'Shortcuts for commands' },
@@ -93,6 +93,53 @@ function General() {
   );
 }
 
+/** The units you measure and type lengths in: yours, for every project. */
+function YourUnits() {
+  const u = useStore((s) => s.prefs.units);
+  const st = getState();
+  const set = (patch: Partial<UserUnits>) => st.setPrefs({ units: { ...u, ...patch } });
+  return (
+    <>
+      <h4 className="set-h">Your units</h4>
+      <div className="field">
+        <label>Measure in</label>
+        <select
+          value={u.unit}
+          onChange={(e) => {
+            const unit = e.target.value as LengthUnit;
+            set({ unit, precision: userPrecisionFor(unit) });
+          }}
+          data-testid="set-user-unit"
+        >
+          {LENGTH_UNITS.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label>Precision</label>
+        <select value={u.precision} onChange={(e) => set({ precision: Number(e.target.value) })} data-testid="set-user-precision">
+          {precisionOptions(u.unit).map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Check checked={u.perSheet} onChange={(v) => set({ perSheet: v })} testId="set-user-per-sheet">
+        Show each sheet's measurements in the units of its own scale
+      </Check>
+      <div className="hint">
+        Measurements, heights, piece lengths and maximums are shown in these units, and lengths you type are rewritten in them:{' '}
+        <b>0-28</b> becomes <b>{fmtLen(28)}</b>. A sheet calibrated in the same units keeps its own precision. Yours: on this computer, for every project.
+      </div>
+      <h4 className="set-h">This project</h4>
+    </>
+  );
+}
+
 function Units() {
   const settings = useStore((s) => s.doc.settings);
   const loaded = useStore((s) => s.loaded);
@@ -100,6 +147,7 @@ function Units() {
   const set = (p: Partial<ProjectSettings>) => st.updateSettings(p);
   return (
     <>
+      <YourUnits />
       <div className="hint">{loaded ? 'Saved with this project (undo with Ctrl+Z).' : 'Open a project to change its units.'}</div>
       <div className="field">
         <label>Length totals</label>
@@ -182,9 +230,9 @@ function Editing() {
             />
           ) : (
             <CommitInput
-              value={formatLength(nudge.real, 'ft-in', 16)}
+              value={fmtLen(nudge.real)}
               onCommit={(v) => {
-                const n = parseLength(v, 'in');
+                const n = parseLength(v, bareUnit('in'));
                 if (n && n > 0) st.setPrefs({ nudge: { ...nudge, real: n } });
                 else st.toast(`Could not read that length. Try 1" or 0'-6"`, 'error');
               }}
@@ -723,11 +771,11 @@ function CombineStock() {
 function MaxInput({ value, onChange, testId }: { value: number; onChange: (inches: number) => void; testId?: string }) {
   return (
     <CommitInput
-      value={value > 0 ? formatLength(value, 'ft-in', 16) : ''}
+      value={value > 0 ? fmtLen(value) : ''}
       placeholder="No maximum"
       onCommit={(v) => {
         if (!v.trim()) return onChange(0);
-        const n = parseLength(v, 'ft');
+        const n = parseLength(v, bareUnit('ft'));
         if (n == null || n <= 0) getState().toast(`“${v}” is not a length`, 'error');
         else onChange(n);
       }}

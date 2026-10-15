@@ -1,7 +1,7 @@
 import type { Markup, MeasureValues, ProjectSettings, Pt, Scale, Sheet, Viewport } from '../types';
 import { angleAt, centroid, pointInRect, polygonArea, polygonPerimeter, polylineLength } from './geometry';
 import { TYPE_INFO } from './markupTypes';
-import { DEFAULT_SCALE, fmtNumber, formatArea, formatLength, formatVolume } from './units';
+import { DEFAULT_SCALE, displayScale, fmtNumber, formatArea, formatLength, formatVolume } from './units';
 
 /** Viewport containing a point; for overlapping viewports the last-defined wins. */
 export function viewportAt(sheet: Sheet, p: Pt): Viewport | undefined {
@@ -16,9 +16,9 @@ export function scaleAt(sheet: Sheet | undefined, p: Pt | undefined): Scale {
   if (!sheet) return DEFAULT_SCALE;
   if (p) {
     const vp = viewportAt(sheet, p);
-    if (vp) return vp.scale;
+    if (vp) return displayScale(vp.scale);
   }
-  return sheet.scale ?? DEFAULT_SCALE;
+  return sheet.scale ? displayScale(sheet.scale) : DEFAULT_SCALE;
 }
 
 export function anchorPoint(m: Pick<Markup, 'type' | 'points'>): Pt | undefined {

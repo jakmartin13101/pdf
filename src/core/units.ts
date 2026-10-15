@@ -278,6 +278,68 @@ export function customScale(paperValue: number, paperUnit: 'in' | 'mm', realInch
 export const DEFAULT_SCALE: Scale = { realPerPt: 1 / PT_PER_IN, label: 'Not calibrated (1" = 1")', unit: 'in', precision: 2 };
 
 // ---------------------------------------------------------------------------
+// The user's units (Settings → Units & Totals): how lengths are shown and typed
+
+export interface UserUnits {
+  /** Lengths shown in: ft-in (1'-1"), decimal feet, inches, m, cm or mm. */
+  unit: LengthUnit;
+  /** ft-in: fraction denominator (1/16"); decimal units: decimal places. */
+  precision: number;
+  /** Measurements in each sheet's own scale units instead. */
+  perSheet: boolean;
+}
+
+export const DEFAULT_USER_UNITS: UserUnits = { unit: 'ft-in', precision: 16, perSheet: false };
+
+/** Precision a unit starts with when chosen (typed lengths: to 1/16" in ft-in). */
+export const userPrecisionFor = (unit: LengthUnit) => (unit === 'ft-in' ? 16 : defaultPrecision(unit));
+
+let current: UserUnits = DEFAULT_USER_UNITS;
+
+export function setUserUnits(u: UserUnits) {
+  current = u;
+}
+
+export function userUnits(): UserUnits {
+  return current;
+}
+
+/** A length in the user's units: typed lengths, heights, piece lengths, maximums (0-28 → 2'-4"). */
+export function fmtLen(inches: number): string {
+  return formatLength(inches, current.unit, current.precision);
+}
+
+/**
+ * What a bare number typed for a length is in: inches or the metric unit when those are the user's
+ * units; otherwise `imperial` (feet unless the field says inches).
+ */
+export function bareUnit(imperial: LengthUnit = 'ft-in'): LengthUnit {
+  return current.unit === 'in' || isMetric(current.unit) ? current.unit : imperial;
+}
+
+/**
+ * Typed length text rewritten in the user's units ("0-28" → 2'-4"). Text that isn't a length, or that
+ * the units would round (decimal feet), is kept as typed.
+ */
+export function normalizeLengthText(text: string, imperial: LengthUnit = 'ft-in'): string {
+  const unit = bareUnit(imperial);
+  const v = parseLength(text, unit);
+  if (v == null || !text.trim()) return text;
+  const f = fmtLen(v);
+  const back = parseLength(f, unit);
+  return back != null && Math.abs(back - v) < 1 / 64 ? f : text;
+}
+
+/**
+ * A sheet scale with its lengths shown in the user's units (its own precision when the units are the
+ * same). Uncalibrated sheets keep paper inches; with "each sheet's units" every scale stays as it is.
+ */
+export function displayScale(s: Scale): Scale {
+  if (current.perSheet || s === DEFAULT_SCALE || s.unit === current.unit) return s;
+  return { ...s, unit: current.unit, precision: current.precision };
+}
+
+// ---------------------------------------------------------------------------
 // Report units
 
 export const DEFAULT_SETTINGS: ProjectSettings = {

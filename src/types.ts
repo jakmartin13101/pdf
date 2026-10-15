@@ -183,7 +183,8 @@ export interface AutoStyleRule {
   opacity: number;
 }
 
-export type ColumnKind = 'text' | 'number' | 'choice' | 'formula';
+/** length: a length (real inches), shown and typed in the user's units (Height). */
+export type ColumnKind = 'text' | 'number' | 'choice' | 'formula' | 'length';
 
 export interface CustomColumn {
   id: string;

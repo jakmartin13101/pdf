@@ -3,11 +3,11 @@ import { ChevronDown, ChevronRight, Crosshair, ListChecks, Lock, PackagePlus, Pi
 import type { CountSymbol, CustomColumn, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
-import { buildRows, customColId, type Row } from '../../core/columns';
+import { buildRows, customColId, lengthValue, type Row } from '../../core/columns';
 import { detailApplies, detailRows } from '../../core/details';
 import { TYPE_INFO, STAMP_TEXTS, textColor } from '../../core/markupTypes';
 import { CommitInput, CommitRange, ColorField, SubjectSelect } from '../fields';
-import { fmtNumber, formatLength, isMetric, parseLength } from '../../core/units';
+import { bareUnit, fmtLen, fmtNumber, formatLength, isMetric, parseLength } from '../../core/units';
 import { scaleForMarkup, viewportAt } from '../../core/measure';
 import { extendSegment } from '../../core/geometry';
 import { EndAdjuster, endNames } from '../EndAdjuster';
@@ -38,7 +38,8 @@ export function PropertiesPanel() {
     const s = new Set(selection);
     return doc.markups.filter((m) => s.has(m.id));
   }, [selection, doc.markups]);
-  const rows = useMemo(() => buildRows(doc, items), [doc, items]);
+  const units = useStore((s) => s.prefs.units);
+  const rows = useMemo(() => buildRows(doc, items), [doc, items, units]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!items.length) {
     return (
@@ -83,6 +84,23 @@ export function PropertiesPanel() {
       );
     }
     const val = common(items, (m) => (m.custom[c.id] ?? '') as string | number);
+    if (c.kind === 'length') {
+      // A length (Height): typed any way (0-28, 2' 4", 28"), shown in the user's units (2'-4").
+      const v = val === undefined ? null : lengthValue(val);
+      return (
+        <CommitInput
+          value={val === undefined ? '' : v == null ? String(val) : fmtLen(v)}
+          placeholder={val === undefined ? '(multiple)' : `e.g. ${fmtLen(42)}`}
+          onCommit={(t) => {
+            if (!t.trim()) return st.setCustomValue(ids, c.id, '');
+            const n = parseLength(t, bareUnit());
+            if (n != null && n >= 0) st.setCustomValue(ids, c.id, n);
+            else st.toast(`“${t}” is not a length`, 'error');
+          }}
+          data-testid={`prop-col-${c.id}`}
+        />
+      );
+    }
     return c.kind === 'choice' || isShapeColumn(c.name) ? (
       <ChoiceInput
         value={val === undefined ? undefined : String(val)}

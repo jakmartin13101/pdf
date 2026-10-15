@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.13.0 – 2026-10-15
+
+### Your units
+- *Settings → Units & Totals → Your units*: measure in Feet-Inches (`1'-1"`, the default), Decimal Feet, Inches,
+  Meters, Centimeters or Millimeters, with a precision (1/16" for feet-inches). Yours: kept on the computer, for every
+  document.
+- Measurements, heights, standard detail piece lengths and spacings, maximum lengths, the selection totals, the arrow
+  key step and the Combine report are shown in your units. A sheet calibrated in the same units keeps its own
+  precision; *Show each sheet's measurements in the units of its own scale* leaves every sheet as calibrated.
+- Lengths you type are rewritten in your units when you finish: `0-28` → `2'-4"`, `1-1` → `1'-1"`. Bare numbers are
+  feet in feet-inches (inches where a field is in inches), inches in inches, the metric unit in metric.
+
+### Height is a length
+- The Height column is a length: typed in your units in the Properties panel, the Markups List and Tool Chest tools,
+  kept exactly and totalled in the document's length unit. Height shows in the Markups List for new files; documents
+  from before get the Height column as a length when they open.
+- Columns can be lengths (*Manage Columns → Length*).
+
+### Fixed
+- Standard detail piece lengths on sheets measured in decimal inches showed 16 decimal places.
+
 ## 1.12.0 – 2026-10-15
 
 ### Sizes with a capital X

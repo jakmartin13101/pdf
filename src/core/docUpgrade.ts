@@ -10,12 +10,16 @@ const isSizeColumn = (name: string) => ['membersize', 'size'].includes(normName(
 /** Columns every document has since they were added to the template (Height, Finish). */
 const ADDED_COLUMNS = ['height', 'finish'];
 
-/** Add the template columns a document from before them is missing (matched by name). */
+/**
+ * Add the template columns a document from before them is missing (matched by name). Height, a text
+ * column in 1.12, is a length since (its values are read as lengths).
+ */
 export function withAddedColumns(columns: CustomColumn[]): CustomColumn[] {
   const have = new Set(columns.map((c) => normName(c.name)));
   const ids = new Set(columns.map((c) => c.id));
   const add = defaultColumns().filter((c) => ADDED_COLUMNS.includes(c.id) && !have.has(normName(c.name)) && !ids.has(c.id));
-  return add.length ? [...columns, ...add] : columns;
+  const fixed = columns.map((c) => (c.id === 'height' && normName(c.name) === 'height' && c.kind === 'text' ? { ...c, kind: 'length' as const } : c));
+  return add.length ? [...fixed, ...add] : fixed;
 }
 
 /** Sizes written the standard way (W24x55 → W24X55) in a document from before. Unchanged documents come back as they are. */

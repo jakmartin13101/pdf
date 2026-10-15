@@ -21,7 +21,7 @@ import type {
   ToolSet,
   Viewport,
 } from '../types';
-import { DEFAULT_SETTINGS } from '../core/units';
+import { DEFAULT_SETTINGS, DEFAULT_USER_UNITS, setUserUnits, type UserUnits } from '../core/units';
 import { applyDetailAssignments, type DetailAssignment } from '../core/details';
 import { MEMBER_FAMILIES, type FoundMember, type MemberFamily } from '../core/autoTakeoff';
 import { defaultAutoStyles } from '../core/autoStyles';
@@ -253,6 +253,8 @@ export interface Prefs {
   propHidden: string[];
   /** Show the Properties panel when a markup is drawn or selected. */
   autoProperties: boolean;
+  /** How lengths are shown and typed: ft-in (1'-1"), inches, decimal feet or metric (Settings → Units & Totals). */
+  units: UserUnits;
 }
 
 export interface PerfPrefs {
@@ -724,6 +726,7 @@ const defaultPrefs = (): Prefs => ({
   maxLengths: defaultMaxLengths(),
   propHidden: [],
   autoProperties: true,
+  units: { ...DEFAULT_USER_UNITS },
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -742,6 +745,7 @@ function loadPrefs(): Prefs {
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
     subjects: Array.isArray(saved.subjects) ? cleanSubjects(saved.subjects.map(String)) : d.subjects,
     detailMarks: { ...d.detailMarks, ...saved.detailMarks },
+    units: { ...d.units, ...saved.units },
     maxLengths: { ...d.maxLengths, ...saved.maxLengths, byShape: { ...saved.maxLengths?.byShape } },
     detailStyles: Array.isArray(saved.detailStyles) && saved.detailStyles.length ? saved.detailStyles : d.detailStyles,
     combine: { ...d.combine, ...saved.combine, stock: Array.isArray(saved.combine?.stock) ? saved.combine!.stock : d.combine.stock, other: Array.isArray(saved.combine?.other) ? saved.combine!.other : d.combine.other },
@@ -970,7 +974,11 @@ export const useStore = create<AppState>()((set, get, api) => {
     compareChanges: {},
     autoTakeoff: null,
     paneSplit: { x: 0.5, y: 0.5 },
-    prefs: loadPrefs(),
+    prefs: (() => {
+      const p = loadPrefs();
+      setUserUnits(p.units);
+      return p;
+    })(),
     toolChest: toolChestFromStorage ?? defaultToolChest(),
     typeDefaults: lsGet('ts.typeDefaults', {}),
     toasts: [],
@@ -1399,6 +1407,7 @@ export const useStore = create<AppState>()((set, get, api) => {
     },
     setPrefs: (patch) => {
       const prefs = { ...get().prefs, ...patch };
+      if (patch.units) setUserUnits(prefs.units);
       lsSet('ts.prefs', prefs);
       set({ prefs });
     },

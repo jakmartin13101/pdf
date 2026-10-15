@@ -7,7 +7,10 @@ import {
   LENGTH_SUFFIX,
   VOLUME_SUFFIX,
   areaToReport,
+  bareUnit,
+  fmtLen,
   fmtNumber,
+  parseLength,
   formatArea,
   formatLength,
   formatVolume,
@@ -15,7 +18,14 @@ import {
   volumeToReport,
 } from './units';
 
-export type ColumnEditor = 'text' | 'number' | 'choice' | 'status' | 'check' | 'color' | 'layer' | 'length' | 'count' | 'none';
+export type ColumnEditor = 'text' | 'number' | 'choice' | 'status' | 'check' | 'color' | 'layer' | 'length' | 'count' | 'customLength' | 'none';
+
+/** A length column's value in real inches: numbers as they are, text (from before, or typed) parsed. */
+export function lengthValue(raw: unknown): number | null {
+  if (raw === '' || raw == null) return null;
+  if (typeof raw === 'number') return isFinite(raw) ? raw : null;
+  return parseLength(String(raw), bareUnit());
+}
 
 export interface ColumnSpec {
   id: string;
@@ -64,9 +74,9 @@ export function allColumns(custom: CustomColumn[], labels?: Record<string, strin
       id: customColId(c),
       name: c.name,
       builtin: false,
-      editor: c.kind === 'formula' ? 'none' : c.kind === 'choice' ? 'choice' : c.kind === 'number' ? 'number' : 'text',
-      numeric: c.kind === 'number' || c.kind === 'formula',
-      align: c.kind === 'number' || c.kind === 'formula' ? 'right' : 'left',
+      editor: c.kind === 'formula' ? 'none' : c.kind === 'choice' ? 'choice' : c.kind === 'number' ? 'number' : c.kind === 'length' ? 'customLength' : 'text',
+      numeric: c.kind === 'number' || c.kind === 'formula' || c.kind === 'length',
+      align: c.kind === 'number' || c.kind === 'formula' || c.kind === 'length' ? 'right' : 'left',
       width: c.kind === 'formula' ? 100 : 110,
       custom: c,
     })),
@@ -198,6 +208,10 @@ export function rowBuilder(doc: DocState): (m: Markup, o?: RowOverrides) => Row 
       if (c.kind === 'number') {
         const n = raw === '' ? 0 : toNum(raw);
         set(id, n, raw === '' ? '' : fmtNumber(n, c.decimals ?? s.decimals) + (c.suffix ? ` ${c.suffix}` : ''));
+      } else if (c.kind === 'length') {
+        // Real inches (older text values are read as lengths); in formulas, the report unit like Length.
+        const inches = lengthValue(raw);
+        set(id, inches == null ? 0 : lengthToReport(inches, s), inches == null ? String(raw) : fmtLen(inches));
       } else set(id, String(raw));
     }
 
@@ -275,5 +289,6 @@ export function formatTotal(colId: string, v: number, doc: DocState): string {
 /** Columns that receive totals (sums) in group headers and the footer. */
 export function isSummable(spec: ColumnSpec): boolean {
   if (!spec.numeric) return false;
-  return spec.id !== 'depth';
+  // Heights and other length columns sort by length but aren't added up.
+  return spec.id !== 'depth' && spec.custom?.kind !== 'length';
 }

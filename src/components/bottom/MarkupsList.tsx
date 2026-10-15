@@ -12,12 +12,12 @@ import { getState, listStyleOf, useStore, type ListState } from '../../store/sto
 import { listStyleMenuItems } from '../../store/commands';
 import { SubjectSelect } from '../fields';
 import { findSubject } from '../../core/subjects';
-import { allColumns, formatTotal, isSummable, type ColumnSpec, type Row } from '../../core/columns';
+import { allColumns, formatTotal, isSummable, lengthValue, type ColumnSpec, type Row } from '../../core/columns';
 import { buildTakeoffRows } from '../../core/details';
 import { TYPE_ICON } from '../icons';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { exportMarkupsCsv } from '../MenuBar';
-import { formatLength, parseLength } from '../../core/units';
+import { bareUnit, fmtLen, formatLength, parseLength } from '../../core/units';
 import { applyToolToSelection } from '../panels/ToolChestPanel';
 import { detailMenuItems } from '../detailMenu';
 
@@ -34,7 +34,9 @@ export function useFilteredRows() {
   const doc = useStore((s) => s.doc);
   const list = useStore((s) => s.list);
   const currentSheetId = useStore((s) => s.currentSheetId);
-  const rows = useMemo(() => buildTakeoffRows(doc, list.showDetails), [doc, list.showDetails]);
+  // (Lengths are written in the user's units: rebuilt when they change.)
+  const units = useStore((s) => s.prefs.units);
+  const rows = useMemo(() => buildTakeoffRows(doc, list.showDetails), [doc, list.showDetails, units]); // eslint-disable-line react-hooks/exhaustive-deps
   const filtered = useMemo(() => {
     const q = list.search.trim().toLowerCase();
     const filters = Object.entries(list.filters).filter(([, v]) => v && v.length >= 0);
@@ -140,6 +142,11 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
       ? formatLength(m.depth ?? 0, row.scale.unit === 'ft' ? 'ft-in' : row.scale.unit, 8)
       : col.editor === 'count'
         ? String(m.countOverride ?? m.points.length)
+        : col.custom?.kind === 'length'
+        ? (() => {
+            const v = lengthValue(m.custom[col.custom!.id]);
+            return v == null ? String(m.custom[col.custom!.id] ?? '') : fmtLen(v);
+          })()
         : col.custom
         ? String(m.custom[col.custom.id] ?? '')
         : String((m as unknown as Record<string, unknown>)[col.id] ?? '');
@@ -148,6 +155,16 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
     onDone();
     if (val === initial) return;
     if (col.custom) {
+      if (col.custom.kind === 'length') {
+        // Stored in inches, shown in the user's units: 0-28 → 2'-4".
+        if (val.trim() === '') st.setCustomValue(ids, col.custom.id, '');
+        else {
+          const v = parseLength(val, bareUnit());
+          if (v != null && v >= 0) st.setCustomValue(ids, col.custom.id, v);
+          else st.toast(`“${val}” is not a length`, 'error');
+        }
+        return;
+      }
       if (col.custom.kind === 'number') {
         if (val.trim() === '') st.setCustomValue(ids, col.custom.id, '');
         else if (isFinite(Number(val))) st.setCustomValue(ids, col.custom.id, Number(val));

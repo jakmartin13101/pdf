@@ -7,7 +7,8 @@ import { defaultStyle, MARKUP_TYPES, MEASURE_TYPES, STAMP_TEXTS, TYPE_INFO } fro
 import { ColorField, SubjectSelect, TextColorField } from '../fields';
 import { ToolSwatch } from '../icons';
 import { uid } from '../../core/ids';
-import { formatLength, parseLength } from '../../core/units';
+import { bareUnit, fmtLen, normalizeLengthText, parseLength } from '../../core/units';
+import { lengthValue } from '../../core/columns';
 
 export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string; toolId?: string; fromMarkupId?: string }) {
   const sets = useStore((s) => s.toolChest);
@@ -24,7 +25,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
     return { id: uid('tool'), name: 'New Tool', type: 'length', subject: '', style: defaultStyle('length'), custom: {} };
   });
   const [targetSet, setTargetSet] = useState(sets.some((s) => s.id === setId) ? setId : sets[0]?.id ?? '');
-  const [depthText, setDepthText] = useState(formatLength(tool.depth ?? 4, 'ft-in', 8));
+  const [depthText, setDepthText] = useState(fmtLen(tool.depth ?? 4));
   const close = () => st.setDialog(null);
   const s = tool.style;
   const setStyle = (patch: Partial<ChestTool['style']>) => setTool({ ...tool, style: { ...s, ...patch } });
@@ -33,7 +34,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
   const save = () => {
     let setIdToUse = targetSet;
     if (!setIdToUse) setIdToUse = st.addToolSet('My Tools');
-    const depth = tool.type === 'volume' ? parseLength(depthText, 'in') ?? 4 : undefined;
+    const depth = tool.type === 'volume' ? parseLength(depthText, bareUnit('in')) ?? 4 : undefined;
     const custom = Object.fromEntries(Object.entries(tool.custom).filter(([, v]) => v !== '' && v != null));
     st.upsertTool(setIdToUse, { ...tool, name: tool.name.trim() || tool.subject || 'New Tool', depth, custom });
     st.toast(`${existing ? 'Updated' : 'Added'} tool “${tool.name}”`, 'success');
@@ -125,7 +126,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
           {tool.type === 'volume' && (
             <div className="field">
               <label>Depth</label>
-              <input value={depthText} onChange={(e) => setDepthText(e.target.value)} placeholder={`e.g. 4" or 0'-6"`} />
+              <input value={depthText} onChange={(e) => setDepthText(e.target.value)} onBlur={(e) => setDepthText(normalizeLengthText(e.target.value, 'in'))} placeholder={`e.g. 4" or 0'-6"`} />
             </div>
           )}
           <div className="field">
@@ -246,6 +247,8 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
                     <option key={o}>{o}</option>
                   ))}
                 </select>
+              ) : c.kind === 'length' ? (
+                <LengthValueInput value={tool.custom[c.name]} onChange={(v) => setTool({ ...tool, custom: { ...tool.custom, [c.name]: v } })} />
               ) : (
                 <input
                   value={String(tool.custom[c.name] ?? '')}
@@ -259,5 +262,30 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** A length column's value on a tool: typed in your units, kept in inches ("0-28" → 2'-4"). */
+function LengthValueInput({ value, onChange }: { value: unknown; onChange: (v: number | string) => void }) {
+  const shown = () => {
+    const v = lengthValue(value);
+    return v == null ? String(value ?? '') : fmtLen(v);
+  };
+  const [text, setText] = useState(shown);
+  return (
+    <input
+      value={text}
+      placeholder={`e.g. ${fmtLen(42)}`}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        if (!text.trim()) return onChange('');
+        const n = parseLength(text, bareUnit());
+        if (n == null || n < 0) return getState().toast(`“${text}” is not a length`, 'error');
+        onChange(n);
+        setText(fmtLen(n));
+      }}
+      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+      data-testid="tool-length-value"
+    />
   );
 }

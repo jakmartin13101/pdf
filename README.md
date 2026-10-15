@@ -7,11 +7,10 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.12.0**: sizes are written with a **capital X** (type `*` for it; `W 8x10` keeps its space), a **new
-> Properties panel** (Subject, Label, Length, Height, Finish, then *Style* and *Properties* that fold open, fields you
-> can hide), the **totals of a selection** beside it, standard detail material showing the **length of each piece**,
-> and a **Galv** tick per material that sets the Finish to Galvanize (1.11.0: maximum lengths by shape; 1.10.0: detail
-> marks by shape, docks split into sections, movable windows) – see the [changelog](CHANGELOG.md).
+> **Version 1.13.0**: **your units** – measure in feet-inches (`1'-1"`, the default), decimal feet, inches, m, cm or
+> mm (*Settings → Units & Totals*); lengths you type are rewritten in them (`0-28` → `2'-4"`), and **Height is a
+> length** (1.12.0: capital X sizes, the new Properties panel, selection totals, Galv; 1.11.0: maximum lengths by
+> shape) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -135,6 +134,26 @@ this off in *Settings → General*) and shows only the main fields:
 
 Other markups (text, callouts, clouds, shapes) keep the full list of fields. Properties has its own section below the
 Tool Chest on the right, so opening it leaves the Tool Chest showing; layouts from before are changed once to match.
+
+### Your units
+
+*Settings → Units & Totals → Your units* sets how you measure: **Feet-Inches** (`1'-1"`, the default), **Decimal
+Feet**, **Inches**, **Meters**, **Centimeters** or **Millimeters**, and the precision (1/16" for feet-inches).
+
+* Measurements on the drawing and in the Markups List, heights, standard detail piece lengths, maximum lengths, the
+  selection totals and the Combine report are shown in your units. A sheet calibrated in the same units keeps its own
+  precision; tick *Show each sheet's measurements in the units of its own scale* to leave every sheet as calibrated.
+* **Lengths you type are rewritten in your units** when you finish typing: `0-28` becomes `2'-4"`, `1-1` becomes
+  `1'-1"`, `13 1/2"` becomes `1'-1 1/2"`. Bare numbers are feet in feet-inches (inches where a field is in inches,
+  such as standard detail lengths), inches in inches, and the metric unit in metric. Text that isn't a length is
+  refused with a message.
+* **Height** is a length: typed in your units in the Properties panel, the Markups List and Tool Chest tools, kept
+  exactly, totalled in the document's length unit. Height shows in the Markups List for new files. Columns you add can
+  be lengths too (*Manage Columns → Length*).
+
+The document's units for **totals** (LF, SF, CY…) are set below, under *This project*.
+
+![Height typed as 0-28 shows 2'-4"](docs/screenshot-units.png)
 
 ### Selection totals
 
@@ -300,8 +319,8 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
 
 * **General** – author name for new markups, theme, mouse wheel (zoom or scroll), measurement labels on the drawing,
   keep tools active, show the Properties panel when a markup is drawn or selected, show hidden Tool Chest tools.
-* **Units & Totals** – the document's units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area
-  labels; saved with the document.
+* **Units & Totals** – your units for measuring and typing lengths (see [Your units](#your-units)); the document's
+  units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area labels, saved with the document.
 * **Length Measurements** – the maximum length of each shape (see [Maximum lengths](#maximum-lengths)).
 * **Drawing & Editing** – snapping to the drawing and to markups, ortho; what the arrow keys move a selection by (screen
   pixels, or a drawing length such as 1" at each markup's own scale – Shift ×10); the step for adjusting ends; standard
@@ -324,7 +343,7 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
 * **Markups List** – the default Markups List layout for files you open from now on (see
   [Markups List layout](#markups-list-layout)).
 
-Preferences are kept on the computer and apply to every document; the units belong to the document.
+Preferences, your units among them, are kept on the computer and apply to every document; the units for totals belong to the document.
 
 ### Subjects (shapes)
 

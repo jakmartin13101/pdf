@@ -22,7 +22,7 @@ import {
   type DetailAssignment,
 } from '../../core/details';
 import { normalizeSize, plf } from '../../core/steelShapes';
-import { fmtNumber, formatLength, LENGTH_SUFFIX } from '../../core/units';
+import { fmtLen, fmtNumber, LENGTH_SUFFIX, normalizeLengthText } from '../../core/units';
 import { offerFile } from '../../store/files';
 import { Modal } from './Modal';
 
@@ -87,7 +87,8 @@ function ItemRow({ item, onChange, onRemove, canRemove }: { item: DetailItem; on
         disabled={item.rule === 'full'}
         placeholder={item.rule === 'full' ? 'measured' : `e.g. 0'-9"`}
         onChange={(e) => onChange({ length: e.target.value })}
-        title={len ? formatLength(len, 'ft-in', 16) : 'Length of each piece (bare numbers are inches). Leave blank to count only.'}
+        onBlur={(e) => len && onChange({ length: normalizeLengthText(e.target.value, 'in') })}
+        title={len ? fmtLen(len) : 'Length of each piece (bare numbers are inches). Leave blank to count only.'}
         className={item.length.trim() && !len ? 'bad' : ''}
         data-testid="item-length"
       />
@@ -104,7 +105,8 @@ function ItemRow({ item, onChange, onRemove, canRemove }: { item: DetailItem; on
           value={item.value}
           placeholder={item.rule === 'spacing' ? `48 or 4'-0"` : '1'}
           onChange={(e) => onChange({ value: e.target.value })}
-          title={item.rule === 'spacing' ? (sp ? `${formatLength(sp, 'ft-in', 16)} on center` : 'Spacing on center (bare numbers are inches)') : item.rule === 'full' ? 'Number of runs' : 'Pieces per markup (per counted item on counts)'}
+          onBlur={(e) => sp && onChange({ value: normalizeLengthText(e.target.value, 'in') })}
+          title={item.rule === 'spacing' ? (sp ? `${fmtLen(sp)} on center` : 'Spacing on center (bare numbers are inches)') : item.rule === 'full' ? 'Number of runs' : 'Pieces per markup (per counted item on counts)'}
           className={item.rule === 'spacing' && item.value.trim() && !sp ? 'bad' : ''}
           data-testid="item-value"
         />
