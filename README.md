@@ -140,6 +140,8 @@ Tool Chest on the right, so opening it leaves the Tool Chest showing; layouts fr
 *Settings → Units & Totals → Your units* sets how you measure: **Feet-Inches** (`1'-1"`, the default), **Decimal
 Feet**, **Inches**, **Meters**, **Centimeters** or **Millimeters**, and the precision (1/16" for feet-inches).
 
+<img src="docs/screenshot-units-settings.png" width="620" alt="Settings: your units">
+
 * Measurements on the drawing and in the Markups List, heights, standard detail piece lengths, maximum lengths, the
   selection totals and the Combine report are shown in your units. A sheet calibrated in the same units keeps its own
   precision; tick *Show each sheet's measurements in the units of its own scale* to leave every sheet as calibrated.
