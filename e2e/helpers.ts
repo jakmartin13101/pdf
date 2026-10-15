@@ -48,3 +48,17 @@ export async function calibrateFoundationPlan(page: Page, applyTo = 'all') {
   await expect(page.getByTestId('calibrate-result')).toContainText(`1/8" = 1'-0"`);
   await page.getByTestId('calibrate-ok').click();
 }
+
+/**
+ * Make sure the Properties panel shows (it opens by itself when markups are selected) and, optionally,
+ * that one of its sections (style, properties, measurement, details) is open.
+ */
+export async function showProperties(page: Page, section?: string) {
+  if (!(await page.locator('[data-panel="properties"]').isVisible())) await page.getByTestId('tab-properties').click();
+  await expect(page.locator('[data-panel="properties"]')).toBeVisible();
+  if (section) {
+    const sec = page.getByTestId(`prop-sec-${section}`);
+    if (!(await sec.evaluate((el) => el.classList.contains('open')))) await page.getByTestId(`prop-sec-head-${section}`).click();
+    await expect(sec).toHaveClass(/open/);
+  }
+}

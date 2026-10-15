@@ -20,8 +20,8 @@ test('a measurement longer than its shape\'s maximum is taken off as pieces alon
   await expect(w).toHaveValue(`40'-0"`);
   await page.getByTestId('settings-done').click();
 
-  // One 63'-0" W24x55 line.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24x55' }).first().click();
+  // One 63'-0" W24X55 line.
+  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0), gy(1));
   await clickAt(page, gx(0) + 63 * FT, gy(1));
   await page.keyboard.press('Escape');
@@ -30,7 +30,7 @@ test('a measurement longer than its shape\'s maximum is taken off as pieces alon
   await expect(rows).toHaveCount(2);
   await expect(rows.locator('[data-col=length]')).toHaveText([`40'-0"`, `23'-0"`]);
   await expect(rows.locator('[data-col=subject]')).toHaveText(['W', 'W']);
-  await expect(rows.locator('[data-col="c:member_size"]')).toHaveText(['W24x55', 'W24x55']);
+  await expect(rows.locator('[data-col="c:member_size"]')).toHaveText(['W24X55', 'W24X55']);
   // Two markups on the drawing, end to end on the line that was drawn.
   const lines = page.locator('.markups g.mk-length');
   await expect(lines).toHaveCount(2);
@@ -44,8 +44,8 @@ test('a measurement longer than its shape\'s maximum is taken off as pieces alon
   expect(ends[0][1][1]).toBeCloseTo(ends[1][0][1], 3);
   expect(ends[0][0][1]).toBeCloseTo(ends[1][1][1], 3);
 
-  // Shapes without a maximum are left alone: a 63'-0" C10x15.3 stays one markup.
-  await page.getByTestId('chest-tool').filter({ hasText: 'C10x15.3' }).first().click();
+  // Shapes without a maximum are left alone: a 63'-0" C10X15.3 stays one markup.
+  await page.getByTestId('chest-tool').filter({ hasText: 'C10X15.3' }).first().click();
   await clickAt(page, gx(0), gy(3));
   await clickAt(page, gx(0) + 63 * FT, gy(3));
   await page.keyboard.press('Escape');
@@ -71,7 +71,7 @@ test('a measurement longer than its shape\'s maximum is taken off as pieces alon
   await page.locator('.menu-item', { hasText: 'Length Measurements…' }).click();
   await page.getByTestId('set-max-enabled').uncheck();
   await page.getByTestId('settings-done').click();
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24x55' }).first().click();
+  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0), gy(4));
   await clickAt(page, gx(0) + 63 * FT, gy(4));
   await page.keyboard.press('Escape');

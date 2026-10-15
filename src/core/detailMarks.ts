@@ -82,7 +82,7 @@ export interface LineLook {
 /** The look of one shape's detail material (Settings → Detail Marks). */
 export interface DetailShapeStyle {
   id: string;
-  /** The shape, e.g. "L" (L4x4x3/8 is an L); OTHER_SHAPES for every shape not listed. */
+  /** The shape, e.g. "L" (L4X4X3/8 is an L); OTHER_SHAPES for every shape not listed. */
   shape: string;
   count: CountLook;
   line: LineLook;
@@ -128,7 +128,7 @@ export function defaultDetailStyles(): DetailShapeStyle[] {
 const sameName = (a: string, b: string) => !!a.trim() && normName(a) === normName(b);
 
 /**
- * The look for a material: the entry of its shape – from its size (L4x4x3/8 → L), else its subject –
+ * The look for a material: the entry of its shape – from its size (L4X4X3/8 → L), else its subject –
  * else the entry for other shapes.
  */
 export function detailStyleFor(styles: DetailShapeStyle[], subject: string, size: string): DetailShapeStyle {
@@ -370,7 +370,7 @@ export function detailMarks(doc: DocState, markups: Markup[], o: DetailMarkOptio
           detailId: d.id,
           itemId: it.id,
           title: `${d.name} (standard detail)`,
-          // "L4x4x3/8 · 4 EA × 0'-11 1/2"", "3/4" stud · 13 EA @ 2'-0" OC", "L3x3x1/4 · 23'-0" full length"
+          // "L4X4X3/8 · 4 EA × 0'-11 1/2"", "3/4" stud · 13 EA @ 2'-0" OC", "L3X3X1/4 · 23'-0" full length"
           sub: `${name} · ${
             it.rule === 'full'
               ? `${ftIn(q.pieceLength)} ${q.basis}`

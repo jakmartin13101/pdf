@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample } from './helpers';
+import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample, showProperties } from './helpers';
 
 test('a standard detail adds material to every markup whose column matches the chosen value', async ({ page }) => {
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  // Two W24x55 beams, 23'-0" each.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24x55' }).first().click();
+  // Two W24X55 beams, 23'-0" each.
+  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
   for (let i = 0; i < 2; i++) {
     await clickAt(page, gx(i) + 9, gy(1));
     await clickAt(page, gx(i + 1) - 9, gy(1));
@@ -18,13 +18,13 @@ test('a standard detail adds material to every markup whose column matches the c
   await page.getByTestId('btn-details').click();
   await page.getByTestId('detail-new').click();
   await page.getByTestId('detail-name').fill('Beam end clips');
-  // IF [Member Size] = W24x55 — both picked from drop-downs.
+  // IF [Member Size] = W24X55 — both picked from drop-downs.
   await page.getByTestId('cond-column').selectOption({ label: 'Member Size' });
-  await page.getByTestId('cond-value').selectOption('W24x55');
+  await page.getByTestId('cond-value').selectOption('W24X55');
   await expect(page.getByTestId('detail-matches')).toHaveText('Matches 2 markups');
-  // ADD Clip Angle L4x4x3/8 × 0'-11 1/2", 4 per beam
+  // ADD Clip Angle L4X4X3/8 × 0'-11 1/2", 4 per beam
   await page.getByTestId('item-subject').fill('Clip Angle');
-  await page.getByTestId('item-size').fill('L4x4x3/8');
+  await page.getByTestId('item-size').fill('L4X4X3/8');
   await page.getByTestId('item-length').fill(`0'-11 1/2"`);
   await page.getByTestId('item-rule').selectOption('each');
   await page.getByTestId('item-value').fill('4');
@@ -35,7 +35,7 @@ test('a standard detail adds material to every markup whose column matches the c
   await page.getByTestId('item-rule').nth(1).selectOption('spacing');
   await page.getByTestId('item-value').nth(1).fill('12');
   await expect(page.getByTestId('detail-formula')).toHaveText(
-    `IF [Member Size] = "W24x55" → ADD Clip Angle L4x4x3/8 × 0'-11 1/2" × 4 EA + Shear Stud 3/4" x 5" stud @ 1'-0" OC (+1)`,
+    `IF [Member Size] = "W24X55" → ADD Clip Angle L4X4X3/8 × 0'-11 1/2" × 4 EA + Shear Stud 3/4"X5" stud @ 1'-0" OC (+1)`,
   );
   const preview = page.getByTestId('detail-preview').locator('tbody tr');
   await expect(preview.nth(0).locator('td').nth(1)).toHaveText('8');
@@ -46,12 +46,12 @@ test('a standard detail adds material to every markup whose column matches the c
   await expect(rows).toHaveCount(6);
   await expect(rows.locator('[data-col=subject]')).toHaveText(['W', '↳ Clip Angle', '↳ Shear Stud', 'W', '↳ Clip Angle', '↳ Shear Stud']);
   await expect(rows.nth(1).locator('[data-col=count]')).toHaveText('4');
-  await expect(rows.nth(1).locator('[data-col="c:member_size"]')).toHaveText('L4x4x3/8');
+  await expect(rows.nth(1).locator('[data-col="c:member_size"]')).toHaveText('L4X4X3/8');
   await expect(page.getByTestId('list-count')).toContainText('2 markups + 4 detail items');
 
   // The summary totals the added material on its own line.
   await page.getByTestId('tab-summary').click();
-  const clip = page.getByTestId('summary-row').filter({ hasText: 'Clip Angle – L4x4x3/8' });
+  const clip = page.getByTestId('summary-row').filter({ hasText: 'Clip Angle – L4X4X3/8' });
   await expect(clip.locator('td').nth(1)).toHaveText('8 EA · 7.67 LF');
 
   // Material can be hidden from the list, summary and exports.
@@ -75,13 +75,13 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  // Two W24x55 beams and a W18x35.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24x55' }).first().click();
+  // Two W24X55 beams and a W18X35.
+  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
   for (let i = 0; i < 2; i++) {
     await clickAt(page, gx(i) + 9, gy(1));
     await clickAt(page, gx(i + 1) - 9, gy(1));
   }
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18x35' }).first().click();
+  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
   await clickAt(page, gx(0) + 9, gy(2));
   await clickAt(page, gx(1) - 9, gy(2));
   await page.keyboard.press('Escape');
@@ -89,7 +89,7 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await expect(rows).toHaveCount(3);
   const subjects = () => rows.locator('[data-col=subject]');
 
-  // Select the first W24x55 and the W18x35, right-click → Standard Details → New Detail for These 2.
+  // Select the first W24X55 and the W18X35, right-click → Standard Details → New Detail for These 2.
   await rows.nth(0).click();
   await rows.nth(2).click({ modifiers: ['Control'] });
   await rows.nth(2).click({ button: 'right' });
@@ -101,16 +101,16 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await expect(page.getByTestId('detail-selected')).toHaveText('2 markups selected – all have this detail');
   await page.getByTestId('detail-name').fill('Bearing plates');
   await page.getByTestId('item-subject').fill('Bearing Plate');
-  await page.getByTestId('item-size').fill('PL1/2x8');
+  await page.getByTestId('item-size').fill('PL1/2X8');
   await page.getByTestId('item-length').fill(`0'-10"`);
   await page.getByTestId('item-rule').selectOption('each');
   await page.getByTestId('item-value').fill('2');
-  await expect(page.getByTestId('detail-formula')).toHaveText(`BY HAND → ADD Bearing Plate PL1/2x8 × 0'-10" × 2 EA`);
+  await expect(page.getByTestId('detail-formula')).toHaveText(`BY HAND → ADD Bearing Plate PL1/2X8 × 0'-10" × 2 EA`);
   await expect(page.getByTestId('detail-preview').locator('tbody tr td').nth(1)).toHaveText('4');
   await page.getByTestId('details-save').click();
   await expect(subjects()).toHaveText(['W', '↳ Bearing Plate', 'W', 'W', '↳ Bearing Plate']);
 
-  // Add it to the other W24x55 from its right-click menu.
+  // Add it to the other W24X55 from its right-click menu.
   await rows.nth(2).click();
   await rows.nth(2).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Standard Details', exact: true }).hover();
@@ -119,7 +119,7 @@ test('details are added by hand to several selected markups', async ({ page }) =
 
   // Properties of all three: ticked; untick takes it off every one of them. One undo puts it back.
   await page.keyboard.press('Control+a');
-  await page.getByTestId('tab-properties').click();
+  await showProperties(page, 'details');
   const check = page.getByTestId('prop-detail-check');
   await expect(check).toBeChecked();
   await check.uncheck();
@@ -127,11 +127,11 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await page.getByTitle('Undo (Ctrl+Z)').click();
   await expect(rows).toHaveCount(6);
 
-  // Switch the rule on (Member Size = W24x55, filled in from the markups), then take one beam off by hand.
+  // Switch the rule on (Member Size = W24X55, filled in from the markups), then take one beam off by hand.
   await page.getByTestId('btn-details').click();
   await page.getByTestId('detail-auto').check();
   await expect(page.getByTestId('detail-matches')).toHaveText('Matches 2 markups + 1 added by hand');
-  await expect(page.getByTestId('detail-formula')).toHaveText(`IF [Member Size] = "W24x55" → ADD Bearing Plate PL1/2x8 × 0'-10" × 2 EA`);
+  await expect(page.getByTestId('detail-formula')).toHaveText(`IF [Member Size] = "W24X55" → ADD Bearing Plate PL1/2X8 × 0'-10" × 2 EA`);
   await page.getByTestId('details-save').click();
   await rows.nth(0).click();
   await rows.nth(0).click({ button: 'right' });
@@ -151,7 +151,7 @@ test('right-click → Add Detail opens a window to add existing details to the s
   await page.goto('/');
   await page.getByTestId('open-example').click();
   const rows = page.getByTestId('markup-row');
-  await page.getByTestId('list-search').fill('HSS8x4x1/4');
+  await page.getByTestId('list-search').fill('HSS8X4X1/4');
   await expect(rows).toHaveCount(2);
   await rows.nth(0).click();
   await rows.nth(1).click({ modifiers: ['Control'] });

@@ -18,7 +18,7 @@ const FONTS: { id: FontFamily; label: string }[] = [
 ];
 
 /**
- * Create or edit a "size tool": a Tool Chest tool whose label (e.g. W18x35) is typed in the chest and
+ * Create or edit a "size tool": a Tool Chest tool whose label (e.g. W18X35) is typed in the chest and
  * stays with the tool. Works for any measurement type, not just steel.
  */
 export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: string }) {
@@ -43,7 +43,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
           style: { ...defaultStyle('length'), color: '#e8112d', lineWidth: 3, fontFamily: 'Helvetica', fontBold: true },
           layer: 'layer-takeoff',
           custom: { Category: 'Structural Steel', Material: 'Steel', Grade: 'A992', Qty: 1 },
-          sizeTool: { family: 'W', value: 'W18x35', setSubject: true, setMemberSize: true },
+          sizeTool: { family: 'W', value: 'W18X35', setSubject: true, setMemberSize: true },
         },
   );
   const [targetSet, setTargetSet] = useState(sets.some((s) => s.id === setId) ? setId! : existing ? sets.find((s) => s.tools.some((t) => t.id === existing.id))?.id ?? '' : sets[0]?.id ?? '');
@@ -115,7 +115,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
       }
     >
       <div className="hint">
-        A size tool keeps the size you type in the Tool Chest (for example <b>W18x35</b>) and labels every markup you place with it until you type a different size. Set the
+        A size tool keeps the size you type in the Tool Chest (for example <b>W18X35</b>) and labels every markup you place with it until you type a different size. Set the
         colour, line and font once here.
       </div>
       <div className="two-col">

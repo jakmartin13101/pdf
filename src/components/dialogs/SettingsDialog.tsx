@@ -82,6 +82,9 @@ function General() {
       <Check checked={prefs.reuse} onChange={(v) => st.setPrefs({ reuse: v })}>
         Keep a tool active after placing a markup (Reuse)
       </Check>
+      <Check checked={prefs.autoProperties} onChange={(v) => st.setPrefs({ autoProperties: v })} testId="set-auto-properties">
+        Show the Properties panel when a markup is drawn or selected
+      </Check>
       <Check checked={ui.showHiddenTools} onChange={(v) => st.setUI({ showHiddenTools: v })}>
         Show hidden Tool Chest tools
       </Check>
@@ -389,7 +392,7 @@ function AutoTakeoff() {
   const prefs = useStore((s) => s.prefs);
   const markups = useStore((s) => s.doc.markups);
   const st = getState();
-  const [tryIt, setTryIt] = useState('W24x55');
+  const [tryIt, setTryIt] = useState('W24X55');
   const rules = prefs.autoStyles;
   const setRules = (autoStyles: AutoStyleRule[]) => st.setPrefs({ autoStyles });
   const opts = prefs.auto;
@@ -891,7 +894,7 @@ function DetailMarksSettings() {
       <div className="hint">
         The material a standard detail adds is drawn next to its markup: full-length material as a <b>line</b> the same length and direction as the markup, pieces at
         a spacing as <b>count marks</b> along it, and counted pieces as a <b>count mark</b> with the number by the markup's label. Set how each shape's material is
-        drawn – a material's shape comes from its size (L4x4x3/8 is an L), else its subject.
+        drawn – a material's shape comes from its size (L4X4X3/8 is an L), else its subject.
       </div>
       <Check checked={dm.show} onChange={(v) => setDm({ show: v })} testId="set-detail-marks">
         Draw standard detail material on the drawing
@@ -1092,7 +1095,7 @@ function Subjects() {
     <>
       <div className="hint">
         A markup's subject is the shape it takes off. These are the subjects to pick from (in the Markups List, Properties and the Tool Chest editor). New markups
-        get the shape of their size: W24x55 → W, HSS6x6x3/8 → HSS. The size itself is the Member Size and the label, and the Takeoff Summary lists each size on its
+        get the shape of their size: W24X55 → W, HSS6X6X3/8 → HSS. The size itself is the Member Size and the label, and the Takeoff Summary lists each size on its
         own line. The list is yours: it applies to every file.
       </div>
       <div className="set-subjects" data-testid="subject-list">
@@ -1142,7 +1145,7 @@ function Subjects() {
           : 'Open a file to check its subjects.'}
       </div>
       <div className="field-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-        <button className="btn sm narrow" disabled={!loaded || !others} onClick={() => cmdConvertSubjects(false)} title="W24x55 → W (the size goes to Member Size when it is empty)" data-testid="subject-convert">
+        <button className="btn sm narrow" disabled={!loaded || !others} onClick={() => cmdConvertSubjects(false)} title="W24X55 → W (the size goes to Member Size when it is empty)" data-testid="subject-convert">
           Change Sizes to Shapes
         </button>
         <button className="btn sm narrow" disabled={!loaded || !others} onClick={() => cmdConvertSubjects(true)} title="Also clear subjects that name no shape in the list" data-testid="subject-convert-clear">

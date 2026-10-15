@@ -1,5 +1,5 @@
 // Nominal weights for common structural shapes, used by the PLF()/PSF() formula functions.
-// Rolled shapes carry their weight in the designation (W18x35 = 35 lb/ft). HSS, angles,
+// Rolled shapes carry their weight in the designation (W18X35 = 35 lb/ft). HSS, angles,
 // plates and bars are computed from their nominal dimensions (steel = 490 lb/ft³).
 
 const STEEL_LB_PER_IN2_FT = 490 / 144; // lb per linear foot per in² of section area
@@ -130,10 +130,10 @@ function round2(n: number) {
 }
 
 export const COMMON_SHAPES = [
-  'W8x31', 'W10x33', 'W12x26', 'W12x40', 'W14x22', 'W14x48', 'W16x26', 'W16x31', 'W18x35', 'W18x40',
-  'W21x44', 'W21x50', 'W24x55', 'W24x68', 'W27x84', 'W30x90', 'W33x118', 'W36x135',
-  'HSS4x4x1/4', 'HSS6x6x3/8', 'HSS8x8x1/2', 'HSS6x4x1/4', 'HSS6.625x.280',
-  'L3x3x1/4', 'L4x4x3/8', 'L6x4x3/8', 'C8x11.5', 'C10x15.3', 'C12x20.7', 'MC12x31',
+  'W8X31', 'W10X33', 'W12X26', 'W12X40', 'W14X22', 'W14X48', 'W16X26', 'W16X31', 'W18X35', 'W18X40',
+  'W21X44', 'W21X50', 'W24X55', 'W24X68', 'W27X84', 'W30X90', 'W33X118', 'W36X135',
+  'HSS4X4X1/4', 'HSS6X6X3/8', 'HSS8X8X1/2', 'HSS6X4X1/4', 'HSS6.625X.280',
+  'L3X3X1/4', 'L4X4X3/8', 'L6X4X3/8', 'C8X11.5', 'C10X15.3', 'C12X20.7', 'MC12X31',
   'PL3/8', 'PL1/2', 'PL3/4', 'PL1', 'Pipe 4 Std', 'Pipe 6 Std', '18K4', '24K6',
 ];
 
@@ -145,30 +145,48 @@ export interface ShapeFamily {
 
 /** Families offered when creating a steel shape tool. `id` is the prefix added to a typed size. */
 export const SHAPE_FAMILIES: ShapeFamily[] = [
-  { id: 'W', label: 'W – Wide flange', example: 'W18x35' },
-  { id: 'HSS', label: 'HSS – Tube / round HSS', example: 'HSS6x6x3/8' },
-  { id: 'L', label: 'L – Angle', example: 'L4x4x3/8' },
-  { id: 'C', label: 'C – Channel', example: 'C10x15.3' },
-  { id: 'MC', label: 'MC – Misc. channel', example: 'MC12x31' },
-  { id: 'WT', label: 'WT – Structural tee', example: 'WT9x17.5' },
-  { id: 'S', label: 'S – American standard beam', example: 'S12x31.8' },
-  { id: 'HP', label: 'HP – Bearing pile', example: 'HP12x53' },
-  { id: 'PL', label: 'PL – Plate / flat bar', example: 'PL1/2x8' },
+  { id: 'W', label: 'W – Wide flange', example: 'W18X35' },
+  { id: 'HSS', label: 'HSS – Tube / round HSS', example: 'HSS6X6X3/8' },
+  { id: 'L', label: 'L – Angle', example: 'L4X4X3/8' },
+  { id: 'C', label: 'C – Channel', example: 'C10X15.3' },
+  { id: 'MC', label: 'MC – Misc. channel', example: 'MC12X31' },
+  { id: 'WT', label: 'WT – Structural tee', example: 'WT9X17.5' },
+  { id: 'S', label: 'S – American standard beam', example: 'S12X31.8' },
+  { id: 'HP', label: 'HP – Bearing pile', example: 'HP12X53' },
+  { id: 'PL', label: 'PL – Plate / flat bar', example: 'PL1/2X8' },
   { id: 'Pipe', label: 'Pipe', example: 'Pipe 6 Std' },
   { id: '', label: 'Joist (K-series)', example: '24K6' },
   { id: '', label: 'Other / free text', example: '' },
 ];
 
 /**
- * Normalise a size typed into a size tool: "18x35" in the W family becomes "W18x35",
- * "w24x55" becomes "W24x55", "6 std" in Pipe becomes "Pipe 6 std". Other text is kept as typed.
+ * Size separators as a capital X, as sizes are written in the list and exports: W24x55, w24*55 and
+ * W24 × 55 become W24X55, HSS6x6x3/8 becomes HSS6X6X3/8. "*" can be typed for the X. Other spaces stay
+ * as typed (W 8x10 → W 8X10).
+ */
+export function upperX(raw: string): string {
+  return raw.replace(/([\d"”″])\s*[xX×*]\s*(?=[\d.#])/g, '$1X');
+}
+
+/** Text that is a size (W24x55, w 8*10, HSS6x6x3/8, 2x4) written the standard way; other text as typed. */
+export function sizeText(text: string): string {
+  return /^\s*(2L|[A-Za-z]{1,4})\s?\d/.test(text) || /\d\s*[*×]\s*\d/.test(text) ? normalizeSize('', text) : text;
+}
+
+/**
+ * Normalise a typed size: separators become a capital X ("*" works too), a short lower-case shape code
+ * is capitalised (w24x55 → W24X55), and in a size tool's family a bare size gets the family prefix
+ * (18x35 in W → W18X35, 6 std in Pipe → Pipe 6 std). A space after the shape is kept: W 8x10 → W 8X10.
  */
 export function normalizeSize(family: string, raw: string): string {
-  const v = raw.trim().replace(/(\d)\s*[xX×]\s*(?=[\d.])/g, '$1x');
-  if (!family || !v) return v;
+  let v = upperX(raw.trim().replace(/\s+/g, ' '));
+  if (!v) return v;
+  v = v.replace(/^([a-z]{1,4})(?=\s?\d)/, (m) => m.toUpperCase());
+  if (!family) return v;
   if (v.toLowerCase().startsWith(family.toLowerCase())) {
-    const rest = v.slice(family.length).trim();
-    return family === 'Pipe' ? `Pipe ${rest}` : family + rest;
+    const rest = v.slice(family.length);
+    if (family === 'Pipe') return `Pipe ${rest.trim()}`;
+    return family + (rest.startsWith(' ') ? ' ' : '') + rest.trim();
   }
   if (/^[\d.]/.test(v)) return family === 'Pipe' ? `Pipe ${v}` : family + v;
   return v;

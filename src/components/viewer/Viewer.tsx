@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import type { Markup, MarkupType, Pt, Rect, Sheet } from '../../types';
+import type { DocState, Markup, MarkupType, Pt, Rect, Sheet } from '../../types';
+import { selectionTotals } from '../../core/selectionTotals';
 import { findSheet, getState, paneDoc, useStore, type ToolMode, type ViewRequest } from '../../store/store';
 import { DetailMarkShape, MarkupShape } from './MarkupShape';
 import { detailMarks, type DetailMark } from '../../core/detailMarks';
@@ -9,7 +10,7 @@ import { computeMeasure, drawingLabelLines, measurementText, scaleAt, scaleForMa
 import { bbox, constrainAngle, dist, expandRect, rectFromPoints, rectsIntersect, rectContains, simplify, translate } from '../../core/geometry';
 import { calloutBox, markupRect, RECT_TYPES } from '../../core/shapes';
 import { querySnap, snapIndex, type SnapIndex } from '../../core/pdf';
-import { formatLength } from '../../core/units';
+import { AREA_SUFFIX, LENGTH_SUFFIX, areaToReport, fmtNumber, formatLength, lengthToReport } from '../../core/units';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { useOwnerWindow } from '../ownerWindow';
 import { detailMenuItems } from '../detailMenu';
@@ -1237,6 +1238,9 @@ export function Viewer({ paneId }: { paneId: string }) {
           {scaleAtCursor && tool.kind !== 'calibrate' && <span className="live-scale">{scaleAtCursor.label}</span>}
         </div>
       )}
+      {tool.kind === 'select' && selectedOnPage.length > 0 && (
+        <SelectionTotalsTip doc={doc} ids={selection} anchor={bbox(selectedOnPage.flatMap((m) => m.points))} view={view} size={size} />
+      )}
       {mouse && hoverTip && (
         <div className="hover-tip" style={{ left: mouse.x + 16, top: mouse.y + 16 }}>
           <b>{hoverTip.title}</b>
@@ -1338,6 +1342,37 @@ function TextEditor({ m, zoom }: { m: Markup; zoom: number }) {
         padding: Math.max(2, m.style.fontSize * 0.25) * zoom,
       }}
     />
+  );
+}
+
+/**
+ * Totals of the selection, in a small box by it: total length, count, area of the selected markups (3
+ * beams of 10'-0" → 30'-0"), and the standard detail material they carry.
+ */
+function SelectionTotalsTip({ doc, ids, anchor, view, size }: { doc: DocState; ids: string[]; anchor: Rect; view: View; size: { w: number; h: number } }) {
+  const t = useMemo(() => selectionTotals(doc, ids), [doc, ids]);
+  if (!t.markups) return null;
+  const s = doc.settings;
+  const len = (inches: number) =>
+    s.lengthUnit === 'ft' ? formatLength(inches, 'ft-in', 16) : `${fmtNumber(lengthToReport(inches, s), s.decimals)} ${LENGTH_SUFFIX[s.lengthUnit]}`;
+  const lines: string[] = [];
+  if (t.length > 0) lines.push(`Length ${len(t.length)}`);
+  if (t.count > 0) lines.push(`Count ${fmtNumber(t.count, 0)} EA`);
+  if (t.area > 0) lines.push(`Area ${fmtNumber(areaToReport(t.area, s), s.decimals)} ${AREA_SUFFIX[s.areaUnit]}`);
+  if (t.material.pieces > 0) lines.push(`Detail material ${fmtNumber(t.material.pieces, 0)} EA${t.material.length > 0 ? ` · ${len(t.material.length)}` : ''}`);
+  if (!lines.length) return null;
+  // Above the selection's top right corner, kept inside the pane.
+  const x = Math.min(Math.max(8, view.x + (anchor.x + anchor.w) * view.zoom + 10), Math.max(8, size.w - 190));
+  const y = Math.min(Math.max(8, view.y + anchor.y * view.zoom - 12 - lines.length * 17), Math.max(8, size.h - 30 - lines.length * 17));
+  return (
+    <div className="sel-totals" style={{ left: x, top: y }} data-testid="selection-totals">
+      <b>
+        {t.markups} selected
+      </b>
+      {lines.map((l) => (
+        <span key={l}>{l}</span>
+      ))}
+    </div>
   );
 }
 

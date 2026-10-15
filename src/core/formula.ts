@@ -220,7 +220,7 @@ export const FUNCTIONS: Record<string, string> = {
   OR: 'OR(a, b, …)',
   NOT: 'NOT(a)',
   CONCAT: 'CONCAT(a, b, …)',
-  PLF: 'PLF(shape) – steel weight lb/ft, e.g. PLF("W18x35") = 35',
+  PLF: 'PLF(shape) – steel weight lb/ft, e.g. PLF("W18X35") = 35',
   PSF: 'PSF(plate) – plate weight lb/sf, e.g. PSF("PL1/2") = 20.42',
 };
 

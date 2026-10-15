@@ -32,7 +32,9 @@ import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
-import { PANEL_IDS, dockPanelIn, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, type DockTarget } from './dockLayout';
+import { MAX_SECTIONS, PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, sectionCount, sectionOf, sectionPanels, setSectionSizesIn, showPanelIn, togglePanelIn, type DockTarget } from './dockLayout';
+import { sizeText } from '../core/steelShapes';
+import { upgradeToolChest } from '../core/docUpgrade';
 import { defaultMaxLengths, splitMarkupAtMax, type MaxLengthPrefs } from '../core/maxLength';
 import { defaultDetailMarkPrefs, defaultDetailStyles, type DetailMarkPrefs, type DetailShapeStyle } from '../core/detailMarks';
 import { defaultCombineSettings, type CombineSettings } from '../core/combine';
@@ -150,6 +152,8 @@ export interface LayoutState {
   floatOrder: PanelId[];
   toolbar: { dock: 'top' | 'left' | 'right' | 'float'; x: number; y: number };
   locked: boolean;
+  /** Properties has had a section of its own (so opening it on a selection leaves the Tool Chest showing). */
+  propsOwn?: boolean;
 }
 
 export interface PanelDrag {
@@ -245,6 +249,10 @@ export interface Prefs {
   detailStyles: DetailShapeStyle[];
   /** Maximum lengths by shape: longer measurements are taken off as pieces (Settings → Length Measurements). */
   maxLengths: MaxLengthPrefs;
+  /** Fields left out of the Properties section of the Properties panel (their values stay in the markups). */
+  propHidden: string[];
+  /** Show the Properties panel when a markup is drawn or selected. */
+  autoProperties: boolean;
 }
 
 export interface PerfPrefs {
@@ -549,7 +557,8 @@ export function defaultLayout(): LayoutState {
     panels: {
       sheets: place('left', 0),
       toolchest: place('right', 1),
-      properties: place('right', 2),
+      // Properties in its own section below the Tool Chest: it opens when a markup is drawn or selected.
+      properties: { ...place('right', 2), section: 1 },
       measurements: place('right', 3),
       layers: place('right', 4),
       compare: place('right', 5),
@@ -558,8 +567,9 @@ export function defaultLayout(): LayoutState {
       summary: { ...place('bottom', 8), float: { x: 190, y: 250, w: 760, h: 360 } },
     },
     // Small screens start with the drawing visible; side panels open as overlays on demand.
-    active: { left: [narrow ? null : 'sheets'], right: [narrow ? null : 'toolchest'], top: [null], bottom: ['markups'] },
-    split: { left: [1], right: [1], top: [1], bottom: [1] },
+    active: { left: [narrow ? null : 'sheets'], right: [narrow ? null : 'toolchest', null], top: [null], bottom: ['markups'] },
+    split: { left: [1], right: [1.3, 1], top: [1], bottom: [1] },
+    propsOwn: true,
     size: { left: 250, right: 310, top: 220, bottom: narrow ? 200 : 250 },
     floatOrder: [],
     toolbar: { dock: 'top', x: 200, y: 120 },
@@ -574,7 +584,7 @@ function loadLayout(): LayoutState {
   const panels = { ...d.panels };
   for (const id of PANEL_IDS) if (saved.panels?.[id]) panels[id] = { ...d.panels[id], ...saved.panels[id] };
   // Layouts from before docks had sections keep one open panel per dock: normalizeLayout makes them one section.
-  return normalizeLayout({
+  const l = normalizeLayout({
     ...d,
     ...saved,
     panels,
@@ -584,6 +594,25 @@ function loadLayout(): LayoutState {
     toolbar: { ...d.toolbar, ...saved.toolbar },
     floatOrder: (saved.floatOrder ?? []).filter((id) => PANEL_IDS.includes(id)),
   });
+  return l.propsOwn ? l : { ...propertiesOwnSection(l), propsOwn: true };
+}
+
+/**
+ * Once: Properties sharing its dock section with other panels gets a section of its own below them (closed
+ * unless it was showing), so opening it on a selection doesn't hide the Tool Chest.
+ */
+function propertiesOwnSection(l: LayoutState): LayoutState {
+  const p = l.panels.properties;
+  if (p.dock === 'float') return l;
+  const sec = sectionOf(l, 'properties');
+  if (sectionPanels(l, p.dock, sec).length < 2 || sectionCount(l, p.dock) >= MAX_SECTIONS) return l;
+  const wasOpen = isPanelOpen(l, 'properties');
+  const others = sectionPanels(l, p.dock, sec).filter((x) => x !== 'properties');
+  const next = dockPanelIn(l, 'properties', p.dock, undefined, { section: sec + 1, split: true });
+  const act = [...next.active[p.dock]];
+  act[sec] = wasOpen ? others[0] : l.active[p.dock][sec];
+  act[sec + 1] = wasOpen ? 'properties' : null;
+  return { ...next, active: { ...next.active, [p.dock]: act } };
 }
 
 /** A pane showing a sheet of a document, that document's tab active (opened at the end if needed). */
@@ -693,6 +722,8 @@ const defaultPrefs = (): Prefs => ({
   detailMarks: defaultDetailMarkPrefs(),
   detailStyles: defaultDetailStyles(),
   maxLengths: defaultMaxLengths(),
+  propHidden: [],
+  autoProperties: true,
 });
 
 /** Saved preferences over the defaults (nested settings merged, so new options get their defaults). */
@@ -725,7 +756,9 @@ let clipColumns: CustomColumn[] = [];
 const keepStyle = (d: DocState, cur: DocState): DocState => (d.listStyle === cur.listStyle ? d : { ...d, listStyle: cur.listStyle });
 
 export const useStore = create<AppState>()((set, get, api) => {
-  const toolChestFromStorage = lsGet<ToolSet[] | null>('ts.toolchest', null);
+  const savedChest = lsGet<ToolSet[] | null>('ts.toolchest', null);
+  // Saved before sizes were written with a capital X.
+  const toolChestFromStorage = savedChest ? upgradeToolChest(savedChest) : null;
 
   const commit = (fn: (d: DocState) => DocState) => {
     const { doc, past } = get();
@@ -769,7 +802,7 @@ export const useStore = create<AppState>()((set, get, api) => {
       if (col) custom[col.id] = size;
     }
     // The subject is a shape from the user's list: a size tool's size's shape, else the tool's own
-    // subject when it is one, else the shape of the tool's Member Size (W24x55 → W), else none.
+    // subject when it is one, else the shape of the tool's Member Size (W24X55 → W), else none.
     const toolSize = chestTool && Object.entries(chestTool.custom).find(([k]) => normName(k) === 'membersize')?.[1];
     const subject =
       (size ? subjectForSize(size, prefs.subjects) : undefined) ??
@@ -1073,7 +1106,12 @@ export const useStore = create<AppState>()((set, get, api) => {
     setCursor: (cursor) => set({ cursor }),
 
     setTool: (tool) => set({ tool, editingTextId: null }),
-    setSelection: (selection) => set({ selection }),
+    setSelection: (selection) => {
+      set({ selection });
+      // The Properties panel shows when markups are drawn or selected (Settings → General).
+      const { prefs, layout } = get();
+      if (selection.length && prefs.autoProperties && !isPanelOpen(layout, 'properties')) get().showPanel('properties');
+    },
     focusMarkup: (id, zoom = true) => {
       const m = get().doc.markups.find((x) => x.id === id);
       if (!m) return;
@@ -1172,7 +1210,12 @@ export const useStore = create<AppState>()((set, get, api) => {
     addPointsToMarkup: (id, pts) => mapMarkups(new Set([id]), (m) => ({ ...m, points: [...m.points, ...pts] })),
     updateMarkup: (id, patch) => mapMarkups(new Set([id]), (m) => ({ ...m, ...patch })),
     updateMarkups: (ids, fn) => mapMarkups(new Set(ids), fn),
-    setCustomValue: (ids, colId, value) => mapMarkups(new Set(ids), (m) => ({ ...m, custom: { ...m.custom, [colId]: value } })),
+    setCustomValue: (ids, colId, value) => {
+      // Sizes are written the standard way: w8*10 → W8X10.
+      const col = get().doc.columns.find((c) => c.id === colId);
+      const v = typeof value === 'string' && col && ['membersize', 'size'].includes(normName(col.name)) ? sizeText(value) : value;
+      mapMarkups(new Set(ids), (m) => ({ ...m, custom: { ...m.custom, [colId]: v } }));
+    },
     deleteMarkups: (ids) => {
       const s = new Set(ids);
       commit((d) => ({ ...d, markups: d.markups.filter((m) => !s.has(m.id)) }));

@@ -1,4 +1,4 @@
-// Automatic takeoff: finds the member-size labels on a framing plan (W24x55, HSS8x4x1/4, Pipe 4 Std…)
+// Automatic takeoff: finds the member-size labels on a framing plan (W24X55, HSS8X4X1/4, Pipe 4 Std…)
 // and the line each one labels, so beams and tubing can be taken off as length measurements in one go.
 //
 //   1. Line work: every straight stroked segment of the PDF, with its line weight and dash
@@ -288,16 +288,16 @@ export function placeText(str: string, transform: number[], width: number, base:
 const DIM = String.raw`(?:\d+[- ]\d+\/\d+|\d+\/\d+|\d*\.\d+|\d+)`;
 const X = String.raw`\s?[xX×]\s?`;
 const PATTERNS: { family: MemberFamily; re: RegExp; size: (m: RegExpExecArray) => string }[] = [
-  { family: 'tube', re: new RegExp(String.raw`\b(HSS|TS)\s?(${DIM})${X}(${DIM})${X}(${DIM})(?![\d/])`, 'g'), size: (m) => `HSS${d(m[2])}x${d(m[3])}x${d(m[4])}` },
-  { family: 'tube', re: new RegExp(String.raw`\bHSS\s?(${DIM})${X}(${DIM})(?![\d/]|\s?[xX×]\s?\d)`, 'g'), size: (m) => `HSS${d(m[1])}x${d(m[2])}` },
+  { family: 'tube', re: new RegExp(String.raw`\b(HSS|TS)\s?(${DIM})${X}(${DIM})${X}(${DIM})(?![\d/])`, 'g'), size: (m) => `HSS${d(m[2])}X${d(m[3])}X${d(m[4])}` },
+  { family: 'tube', re: new RegExp(String.raw`\bHSS\s?(${DIM})${X}(${DIM})(?![\d/]|\s?[xX×]\s?\d)`, 'g'), size: (m) => `HSS${d(m[1])}X${d(m[2])}` },
   {
     family: 'tube',
     re: new RegExp(String.raw`\bPIPE\s?(${DIM})\s?(?:"|in\.?|Ø)?\s?(STD|XXS|XS|X-STRONG|XX-STRONG|EXTRA STRONG|SCH(?:EDULE)?\.?\s?\d+)\b`, 'gi'),
     size: (m) => `Pipe ${d(m[1])} ${pipeGrade(m[2])}`,
   },
-  { family: 'beam', re: new RegExp(String.raw`\b(W|S|M|HP)\s?(\d{1,2}(?:\.\d+)?)${X}(\d{1,3}(?:\.\d+)?)(?![\d/]|\s?[xX×])`, 'g'), size: (m) => `${m[1]}${m[2]}x${m[3]}` },
-  { family: 'channel', re: new RegExp(String.raw`\b(C|MC)\s?(\d{1,2})${X}(\d{1,3}(?:\.\d+)?)(?![\d/]|\s?[xX×])`, 'g'), size: (m) => `${m[1]}${m[2]}x${m[3]}` },
-  { family: 'angle', re: new RegExp(String.raw`\b(2L|L)\s?(${DIM})${X}(${DIM})${X}(${DIM})(?![\d/])`, 'g'), size: (m) => `${m[1]}${d(m[2])}x${d(m[3])}x${d(m[4])}` },
+  { family: 'beam', re: new RegExp(String.raw`\b(W|S|M|HP)\s?(\d{1,2}(?:\.\d+)?)${X}(\d{1,3}(?:\.\d+)?)(?![\d/]|\s?[xX×])`, 'g'), size: (m) => `${m[1]}${m[2]}X${m[3]}` },
+  { family: 'channel', re: new RegExp(String.raw`\b(C|MC)\s?(\d{1,2})${X}(\d{1,3}(?:\.\d+)?)(?![\d/]|\s?[xX×])`, 'g'), size: (m) => `${m[1]}${m[2]}X${m[3]}` },
+  { family: 'angle', re: new RegExp(String.raw`\b(2L|L)\s?(${DIM})${X}(${DIM})${X}(${DIM})(?![\d/])`, 'g'), size: (m) => `${m[1]}${d(m[2])}X${d(m[3])}X${d(m[4])}` },
 ];
 const d = (s: string) => s.trim().replace(/\s+/, '-').replace(/^\./, '0.');
 function pipeGrade(g: string) {

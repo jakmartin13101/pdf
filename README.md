@@ -7,10 +7,11 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.11.0**: **maximum lengths by shape** (*Settings → Length Measurements*): a length longer than its
-> shape's maximum is taken off as pieces along the same line – with W at 40'-0", a 63'-0" line becomes a 40'-0" and a
-> 23'-0" markup (1.10.0: detail marks by shape, docks split into sections, movable windows; 1.9.0: standard detail
-> material drawn on the drawing; 1.8.0: the Combine Report) – see the [changelog](CHANGELOG.md).
+> **Version 1.12.0**: sizes are written with a **capital X** (type `*` for it; `W 8x10` keeps its space), a **new
+> Properties panel** (Subject, Label, Length, Height, Finish, then *Style* and *Properties* that fold open, fields you
+> can hide), the **totals of a selection** beside it, standard detail material showing the **length of each piece**,
+> and a **Galv** tick per material that sets the Finish to Galvanize (1.11.0: maximum lengths by shape; 1.10.0: detail
+> marks by shape, docks split into sections, movable windows) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -108,6 +109,41 @@ A five-minute tour with the sample set:
 
 <img src="docs/screenshot-size-tool.png" width="520" alt="New Steel Shape / Size Tool dialog">
 
+### Sizes
+
+Sizes are written with a **capital X** – `W24X55`, `HSS6X6X3/8`, `L4X4X3/8` – the way they appear in the Markups List
+and the exports. Type `*` (or `x`) for the X: `w8*10` becomes `W8X10`. A short shape code typed in lower case is
+capitalised, and a **space after the shape is kept** if you type one: `W 8*10` becomes `W 8X10`. This applies to
+Member Size cells and fields, size tools, labels that are sizes, detail material and the sizes the automatic takeoff
+reads. Files from earlier versions are brought up to date when they open (W24x55 → W24X55), and so is the Tool
+Chest. Weights (PLF/PSF) read sizes either way.
+
+### Properties panel
+
+For **measurements and counts** the Properties panel opens on its own when you draw a markup or select one (switch
+this off in *Settings → General*) and shows only the main fields:
+
+* **Subject**, **Label**, **Length** (the count, area or volume for those; the totals for several), **Height** and
+  **Finish** (Galvanize, Prime, Paint, Powder Coat, Bare or anything typed).
+* **Style** ▸ – folds open for the line and text styles and colours (colour, width, line style, ends, symbol, font,
+  text colour, size, fill, opacity).
+* **Properties** ▸ – folds open with a box for **every other column** of the Markups List (Piece Mark, Member Size,
+  Material, Grade, Qty, Weight, Level, Grid, Notes, your own columns…) and Comments, Status, Layer, Author. The ☑
+  button chooses which of them the list shows: hidden fields keep their values in the markup and in the Markups List.
+* **Measurement** ▸ (scale, adjusting ends, count quantity, cutouts) and **Standard Details** ▸ fold open the same way.
+  Each section stays open or shut as you left it.
+
+Other markups (text, callouts, clouds, shapes) keep the full list of fields. Properties has its own section below the
+Tool Chest on the right, so opening it leaves the Tool Chest showing; layouts from before are changed once to match.
+
+### Selection totals
+
+Selecting markups – on the drawing or in the Markups List – shows a small box beside the selection with their
+**totals**: 3 beams of 10'-0" show *Length 30'-0"*, 3 counts of 10 show *Count 30 EA*, areas add up their area, and the
+material their standard details add is totalled too.
+
+![The Properties panel and the totals of three selected beams](docs/screenshot-properties.png)
+
 ### Maximum lengths
 
 *Settings → Length Measurements* (also *Settings → Length Measurements…*) sets the **longest piece of each shape** –
@@ -146,9 +182,9 @@ Select a count markup (or right-click it on the drawing or in the list):
 markup's Properties) defines rules that add material wherever the takeoff matches:
 
 ```
-IF [Member Size] = "W24x55"                          → ADD Clip Angle  L4x4x3/8  × 0'-11 1/2"  × 4 EA
-IF [Subject] = "HSS" AND [Type] = "Count Measurement" → ADD Base Plate  PL3/4x12  × 1'-0"  × 1 EA
-IF [Subject] = "PIPE" AND [Category] = "Misc Metals"  → ADD Post  HSS1-1/2x1-1/2x1/8  × 3'-6"  @ 4'-0" OC (+1)
+IF [Member Size] = "W24X55"                          → ADD Clip Angle  L4X4X3/8  × 0'-11 1/2"  × 4 EA  GALV
+IF [Subject] = "HSS" AND [Type] = "Count Measurement" → ADD Base Plate  PL3/4X12  × 1'-0"  × 1 EA
+IF [Subject] = "PIPE" AND [Category] = "Misc Metals"  → ADD Post  HSS1-1/2X1-1/2X1/8  × 3'-6"  @ 4'-0" OC (+1)
 ```
 
 * **IF** – pick the column from a drop-down, then the value from a drop-down of the values that column holds in the
@@ -156,9 +192,11 @@ IF [Subject] = "PIPE" AND [Category] = "Misc Metals"  → ADD Post  HSS1-1/2x1-1
 * **ADD** – one or more materials, each with **Subject**, **Size** and **Length** (each piece; bare numbers are inches),
   and how many: **@ spacing OC** along the measured length (an area's perimeter), with an optional end piece;
   **× quantity** per markup or per counted item; or **full length** of the measured run. The markup's Qty multiplies
-  the result.
+  the result. Tick **Galv** on a material to make its *Finish* **Galvanize** (the rest keep the markup's finish).
 * The added material appears under each matching markup in the Markups List (*Standard Detail*, read-only) and as its
-  own lines in the Takeoff Summary and exports. The size fills Member Size, so Weight computes for it (steel shapes,
+  own lines in the Takeoff Summary and exports. Its **Length** is the length of **each piece** you typed (4 clip angles
+  at 0'-11 1/2" show 0'-11 1/2" and a count of 4), and full-length material shows the measured run like its markup;
+  totals, weights, the Summary and the Combine report use all of the pieces. The size fills Member Size, so Weight computes for it (steel shapes,
   plate, pipe, rod and rebar). *Detail material* in the list (or the summary) shows or hides it.
 * **By hand** – select any markups (Ctrl+click or box-select in the drawing or the Markups List), right-click →
   **Add Detail to N Markups…**: a window lists every detail already made – tick one to add it to all the selected
@@ -261,7 +299,7 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
 <img src="docs/screenshot-settings.png" width="640" alt="Settings: auto takeoff line styles by subject">
 
 * **General** – author name for new markups, theme, mouse wheel (zoom or scroll), measurement labels on the drawing,
-  keep tools active, show hidden Tool Chest tools.
+  keep tools active, show the Properties panel when a markup is drawn or selected, show hidden Tool Chest tools.
 * **Units & Totals** – the document's units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area
   labels; saved with the document.
 * **Length Measurements** – the maximum length of each shape (see [Maximum lengths](#maximum-lengths)).

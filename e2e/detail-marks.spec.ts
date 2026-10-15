@@ -11,8 +11,8 @@ const len = (p: { x: number; y: number }[]) => Math.hypot(p[1].x - p[0].x, p[1].
 const dir = (p: { x: number; y: number }[]) => Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x);
 
 async function beams(page: Page) {
-  // A W24x55 along grid line B (horizontal) and one down grid line 2 (vertical).
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24x55' }).first().click();
+  // A W24X55 along grid line B (horizontal) and one down grid line 2 (vertical).
+  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0) + 9, gy(1));
   await clickAt(page, gx(1) - 9, gy(1));
   await clickAt(page, gx(2), gy(0) + 9);
@@ -33,16 +33,16 @@ test('material added by a standard detail is drawn beside its markup', async ({ 
   await page.getByTestId('detail-new').click();
   await page.getByTestId('detail-name').fill('Beam material');
   await page.getByTestId('cond-column').selectOption({ label: 'Member Size' });
-  await page.getByTestId('cond-value').selectOption('W24x55');
+  await page.getByTestId('cond-value').selectOption('W24X55');
   // Clip angles × 4 (counted), a top angle the full length, studs @ 2'-0" OC.
   await page.getByTestId('item-subject').fill('L');
-  await page.getByTestId('item-size').fill('L4x4x3/8');
+  await page.getByTestId('item-size').fill('L4X4X3/8');
   await page.getByTestId('item-length').fill(`0'-11 1/2"`);
   await page.getByTestId('item-rule').selectOption('each');
   await page.getByTestId('item-value').fill('4');
   await page.getByTestId('add-item').click();
   await page.getByTestId('item-subject').nth(1).fill('L');
-  await page.getByTestId('item-size').nth(1).fill('L3x3x1/4');
+  await page.getByTestId('item-size').nth(1).fill('L3X3X1/4');
   await page.getByTestId('item-rule').nth(1).selectOption('full');
   await page.getByTestId('item-value').nth(1).fill('1');
   await page.getByTestId('add-item').click();
@@ -74,10 +74,10 @@ test('material added by a standard detail is drawn beside its markup', async ({ 
     const off = Math.abs((line[0].x - beam[0].x) * nx + (line[0].y - beam[0].y) * ny);
     expect(off).toBeGreaterThan(2);
     expect(off).toBeLessThan(12);
-    await expect(mine.filter({ hasText: 'L3x3x1/4' })).toHaveCount(1);
+    await expect(mine.filter({ hasText: 'L3X3X1/4' })).toHaveCount(1);
 
     // × 4: one count mark with the number, by the beam's label.
-    const count = mine.filter({ hasText: '4 × L4x4x3/8' });
+    const count = mine.filter({ hasText: '4 × L4X4X3/8' });
     await expect(count).toHaveCount(1);
     const label = await page.locator(`.markups g[data-mid="${id}"] .mk-label`).boundingBox();
     const mark = await count.locator('.mk-count').boundingBox();
@@ -100,7 +100,7 @@ test('material added by a standard detail is drawn beside its markup', async ({ 
   }
 
   // Hover shows the material; clicking it picks the beam.
-  const countMark = marks.filter({ hasText: '4 × L4x4x3/8' }).first();
+  const countMark = marks.filter({ hasText: '4 × L4X4X3/8' }).first();
   const owner = await countMark.getAttribute('data-mid');
   const count = countMark.locator('.mk-count');
   const box = (await count.boundingBox())!;
@@ -152,10 +152,10 @@ test('material added by a standard detail is drawn beside its markup', async ({ 
   expect(await page.locator('.modal-back').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   await win.getByRole('button', { name: 'Close' }).first().click();
 
-  const angle = marks.filter({ hasText: 'L3x3x1/4' }).first().locator('path:not(.mk-hit)').first();
+  const angle = marks.filter({ hasText: 'L3X3X1/4' }).first().locator('path:not(.mk-hit)').first();
   await expect(angle).toHaveCSS('stroke', 'rgb(0, 85, 255)');
   expect(await angle.evaluate((el) => getComputedStyle(el).strokeDasharray)).not.toBe('none');
-  await expect(marks.filter({ hasText: '4 × L4x4x3/8' })).toHaveCount(0);
+  await expect(marks.filter({ hasText: '4 × L4X4X3/8' })).toHaveCount(0);
   const star = page.locator('[data-testid=detail-mark].mk-detail-count .mk-count').first();
   expect(await star.getAttribute('d')).toMatch(/(L[^L]*){9}/); // a star: ten points
 

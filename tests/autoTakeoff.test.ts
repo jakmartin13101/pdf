@@ -34,23 +34,23 @@ describe('automatic takeoff', () => {
     const t = (str: string, angle = 0): PlacedText => ({ str, ox: 0, oy: 0, angle, w: str.length * 6, fh: 10 });
     const labels = findMemberLabels(
       [
-        t('W24x55'),
+        t('W24X55'),
         t('W 18 X 35 (TYP.)'),
-        t('HSS8x4x1/4'),
+        t('HSS8X4X1/4'),
         t('HSS 3 1/2 x 3 1/2 x 1/4'),
-        t('HSS6.625x.280'),
-        t('TS6x6x3/8'),
+        t('HSS6.625X.280'),
+        t('TS6X6X3/8'),
         t('PIPE 4" STD'),
-        t('C10x15.3'),
-        t('L4x4x3/8 LINTEL'),
-        t('HSS6x6x3/8 COLUMNS (TYP.)'),
+        t('C10X15.3'),
+        t('L4X4X3/8 LINTEL'),
+        t('HSS6X6X3/8 COLUMNS (TYP.)'),
         t('24K6 @ 5\'-0" O.C.'),
-        t('W30x90 (MOMENT FRAME)'),
+        t('W30X90 (MOMENT FRAME)'),
       ],
       ['beam', 'tube', 'channel'],
     );
-    expect(labels.map((l) => l.size)).toEqual(['W24x55', 'W18x35', 'HSS8x4x1/4', 'HSS3-1/2x3-1/2x1/4', 'HSS6.625x0.280', 'HSS6x6x3/8', 'Pipe 4 Std', 'C10x15.3', 'W30x90']);
-    expect(labels.find((l) => l.size === 'W30x90')!.s1).toBeCloseTo(6 * 6);
+    expect(labels.map((l) => l.size)).toEqual(['W24X55', 'W18X35', 'HSS8X4X1/4', 'HSS3-1/2X3-1/2X1/4', 'HSS6.625X0.280', 'HSS6X6X3/8', 'Pipe 4 Std', 'C10X15.3', 'W30X90']);
+    expect(labels.find((l) => l.size === 'W30X90')!.s1).toBeCloseTo(6 * 6);
   });
 
   it('pairs each label with the solid member line beside it', () => {
@@ -62,38 +62,38 @@ describe('automatic takeoff', () => {
       { x1: 250, y1: 150, x2: 250, y2: 250, width: 3, dashed: false },
     ];
     const texts: PlacedText[] = [
-      { str: 'W24x55', ox: 230, oy: 192, angle: 0, w: 40, fh: 10 },
-      { str: 'W18x35', ox: 230, oy: 252, angle: 0, w: 40, fh: 10 },
+      { str: 'W24X55', ox: 230, oy: 192, angle: 0, w: 40, fh: 10 },
+      { str: 'W18X35', ox: 230, oy: 252, angle: 0, w: 40, fh: 10 },
       // reading upwards, beside the vertical line
-      { str: 'HSS8x4x1/4', ox: 262, oy: 230, angle: -Math.PI / 2, w: 55, fh: 10 },
+      { str: 'HSS8X4X1/4', ox: 262, oy: 230, angle: -Math.PI / 2, w: 55, fh: 10 },
     ];
     const found = matchMembers(findMemberLabels(texts, ['beam', 'tube']), strokes);
     expect(found.map((f) => [f.size, f.p1, f.p2, f.dashed])).toEqual([
-      ['HSS8x4x1/4', { x: 250, y: 150 }, { x: 250, y: 250 }, false],
-      ['W24x55', { x: 110, y: 200 }, { x: 390, y: 200 }, false],
-      ['W18x35', { x: 110, y: 260 }, { x: 390, y: 260 }, false],
+      ['HSS8X4X1/4', { x: 250, y: 150 }, { x: 250, y: 250 }, false],
+      ['W24X55', { x: 110, y: 200 }, { x: 390, y: 200 }, false],
+      ['W18X35', { x: 110, y: 260 }, { x: 390, y: 260 }, false],
     ]);
   });
 
   it('finds every labelled beam and tube on the sample roof framing plan', async () => {
     const { strokes, texts } = await loadPage('public/samples/Sample-Structural-Set.pdf', 2);
     const found = matchMembers(findMemberLabels(texts, ['beam', 'tube', 'channel']), strokes);
-    expect(tally(found.map((f) => f.size))).toEqual({ W24x55: 24, W18x35: 22, W30x90: 1, 'HSS8x4x1/4': 2, 'HSS6x6x1/4': 1 });
+    expect(tally(found.map((f) => f.size))).toEqual({ W24X55: 24, W18X35: 22, W30X90: 1, 'HSS8X4X1/4': 2, 'HSS6X6X1/4': 1 });
     // Bays are 25'-0" x 20'-0" at 1/8" = 1'-0" (9 pt per foot); lines stop 1'-0" short of each grid line.
     const lengths = (size: string) => [...new Set(found.filter((f) => f.size === size).map((f) => Math.round(Math.hypot(f.p2.x - f.p1.x, f.p2.y - f.p1.y) / 9)))].sort((a, b) => a - b);
-    expect(lengths('W18x35')).toEqual([18, 23]);
-    expect(lengths('W24x55')).toEqual([23]);
-    expect(lengths('HSS8x4x1/4')).toEqual([7]); // canopy outriggers, labelled reading upwards
-    expect(lengths('HSS6x6x1/4')).toEqual([21]);
+    expect(lengths('W18X35')).toEqual([18, 23]);
+    expect(lengths('W24X55')).toEqual([23]);
+    expect(lengths('HSS8X4X1/4')).toEqual([7]); // canopy outriggers, labelled reading upwards
+    expect(lengths('HSS6X6X1/4')).toEqual([21]);
     // The column note names a tube size but is not a member.
-    expect(found.some((f) => f.size === 'HSS6x6x3/8')).toBe(false);
+    expect(found.some((f) => f.size === 'HSS6X6X3/8')).toBe(false);
     // Members already measured are recognised.
-    const w30 = found.find((f) => f.size === 'W30x90')!;
-    // (The W30x90 is drawn 4 pt from the W18x35 on the same grid line: a measurement counts for the nearer one.)
+    const w30 = found.find((f) => f.size === 'W30X90')!;
+    // (The W30X90 is drawn 4 pt from the W18X35 on the same grid line: a measurement counts for the nearer one.)
     const existing = [{ id: 'm1', type: 'length', points: [{ x: w30.p1.x + 1, y: w30.p1.y + 1 }, { x: w30.p2.x - 1, y: w30.p2.y + 1 }] }] as never;
     const taken = existingMeasurements(found, existing);
-    expect([...taken].map(([id, mk]) => [found.find((f) => f.id === id)!.size, mk])).toEqual([['W30x90', 'm1']]);
-    const frame = found.find((f) => f.size === 'W30x90')!;
+    expect([...taken].map(([id, mk]) => [found.find((f) => f.id === id)!.size, mk])).toEqual([['W30X90', 'm1']]);
+    const frame = found.find((f) => f.size === 'W30X90')!;
     expect(frame.width).toBe(5);
     expect(found.every((f) => !f.dashed)).toBe(true);
   });
@@ -121,9 +121,9 @@ describe('continuous member lines', () => {
 
   it('splits a girder drawn straight through its columns at the column squares', async () => {
     expect(await run({})).toEqual([
-      { size: 'W18x40', x: GIRDER_X, from: TOP, to: c1, ends: ['end', 'column'] }, // 20'-0"
-      { size: 'W18x40', x: GIRDER_X, from: c1, to: c2, ends: ['column', 'column'] }, // 25'-0"
-      { size: 'W18x40', x: GIRDER_X, from: c2, to: c3, ends: ['column', 'column'] }, // 25'-0"
+      { size: 'W18X40', x: GIRDER_X, from: TOP, to: c1, ends: ['end', 'column'] }, // 20'-0"
+      { size: 'W18X40', x: GIRDER_X, from: c1, to: c2, ends: ['column', 'column'] }, // 25'-0"
+      { size: 'W18X40', x: GIRDER_X, from: c2, to: c3, ends: ['column', 'column'] }, // 25'-0"
     ]);
     expect([(c1 - TOP) / FT, (c2 - c1) / FT, (c3 - c2) / FT]).toEqual([20, 25, 25]);
   });

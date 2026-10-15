@@ -1,18 +1,18 @@
 import { expect, test } from '@playwright/test';
-import { clickAt, gotoSheet, gx, gy, openSample } from './helpers';
+import { clickAt, gotoSheet, gx, gy, openSample, showProperties } from './helpers';
 
 const rows = (page: import('@playwright/test').Page) => page.getByTestId('markup-row');
 
 test('subjects are shapes from a list each user keeps', async ({ page }) => {
   await openSample(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18x35' }).first().click();
+  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
   await clickAt(page, gx(0) + 9, gy(0));
   await clickAt(page, gx(1) - 9, gy(0));
   await page.keyboard.press('Escape');
   // The subject is the shape; the size is the Member Size and the label.
   await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('W');
-  await expect(rows(page).first().locator('[data-col="c:member_size"]')).toHaveText('W18x35');
+  await expect(rows(page).first().locator('[data-col="c:member_size"]')).toHaveText('W18X35');
 
   // Settings → Subjects: take BO off the list, add RB.
   await page.keyboard.press('Control+Comma');
@@ -36,20 +36,20 @@ test('subjects are shapes from a list each user keeps', async ({ page }) => {
 
   // Properties: the same list.
   await rows(page).first().click();
-  await page.getByTestId('tab-properties').click();
+  await showProperties(page);
   await expect(page.getByTestId('prop-subject')).toHaveValue('HSS');
   await page.getByTestId('prop-subject').selectOption('RB');
   await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('RB');
 });
 
 test('subjects from before (sizes) change to shapes in one step', async ({ page }) => {
-  // A takeoff made with version 1.6 (subjects such as W24x55, HSS Column, Metal Deck).
+  // A takeoff made with version 1.6 (subjects such as W24X55, HSS Column, Metal Deck).
   await page.goto('/');
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: /Open Takeoff Project/ }).click()]);
   await chooser.setFiles('e2e/fixtures/Older-Takeoff.takeoff.json');
   await expect(page.getByTestId('doc-tab')).toHaveCount(2);
-  await page.getByTestId('list-search').fill('W24x55');
-  await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('W24x55');
+  await page.getByTestId('list-search').fill('W24X55');
+  await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('W24X55');
   await expect(rows(page).first().locator('[data-col=subject] .subject-other')).toHaveCount(1); // not in the list
   await page.keyboard.press('Control+Comma');
   await page.getByTestId('set-tab-subjects').click();
@@ -57,24 +57,24 @@ test('subjects from before (sizes) change to shapes in one step', async ({ page 
   await page.getByTestId('subject-convert').click();
   await page.getByTestId('settings-done').click();
   await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('W');
-  await expect(rows(page).first().locator('[data-col="c:member_size"]')).toHaveText('W24x55');
+  await expect(rows(page).first().locator('[data-col="c:member_size"]')).toHaveText('W24X55');
   // Shapes the list has no subject for (Metal Deck) stay until cleared; one undo puts all back.
   await page.getByTestId('list-search').fill('Metal Deck');
   await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('Metal Deck');
   await page.getByTitle('Undo (Ctrl+Z)').click();
-  await page.getByTestId('list-search').fill('W24x55');
-  await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('W24x55');
+  await page.getByTestId('list-search').fill('W24X55');
+  await expect(rows(page).first().locator('[data-col=subject]')).toHaveText('W24X55');
 });
 
 test('labels and text can have their own colour', async ({ page }) => {
   await openSample(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18x35' }).first().click();
+  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
   await clickAt(page, gx(0) + 9, gy(0));
   await clickAt(page, gx(1) - 9, gy(0));
   await page.keyboard.press('Escape');
   await rows(page).first().click();
-  await page.getByTestId('tab-properties').click();
+  await showProperties(page, 'style');
   const label = page.locator('.mk-label').first();
   const line = page.locator('[data-mid] path:not(.mk-hit)').first();
   const lineColor = await line.evaluate((el) => getComputedStyle(el).stroke);

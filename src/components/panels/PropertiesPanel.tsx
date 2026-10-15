@@ -1,18 +1,20 @@
-import { useMemo } from 'react';
-import { Crosshair, Lock, PackagePlus, Pin, Play, Scissors, SlidersHorizontal } from 'lucide-react';
-import type { CountSymbol, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
+import { useMemo, useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronRight, Crosshair, ListChecks, Lock, PackagePlus, Pin, Play, Scissors, SlidersHorizontal } from 'lucide-react';
+import type { CountSymbol, CustomColumn, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { buildRows, customColId, type Row } from '../../core/columns';
 import { detailApplies, detailRows } from '../../core/details';
 import { TYPE_INFO, STAMP_TEXTS, textColor } from '../../core/markupTypes';
 import { CommitInput, CommitRange, ColorField, SubjectSelect } from '../fields';
-import { formatLength, isMetric, parseLength } from '../../core/units';
+import { fmtNumber, formatLength, isMetric, parseLength } from '../../core/units';
 import { scaleForMarkup, viewportAt } from '../../core/measure';
 import { extendSegment } from '../../core/geometry';
 import { EndAdjuster, endNames } from '../EndAdjuster';
 import { TYPE_ICON } from '../icons';
-import { COMMON_SHAPES } from '../../core/steelShapes';
+import { COMMON_SHAPES, sizeText } from '../../core/steelShapes';
+import { normName } from '../../core/formula';
+import { lsGet, lsSet } from '../../core/persistence';
 import { PanelHeader } from '../dock/PanelHeader';
 
 /** Columns holding a steel designation get shape suggestions (and feed PLF()/PSF()). */
@@ -30,6 +32,8 @@ function common<T>(items: Markup[], get: (m: Markup) => T): T | undefined {
 export function PropertiesPanel() {
   const selection = useStore((s) => s.selection);
   const doc = useStore((s) => s.doc);
+  const hidden = useStore((s) => s.prefs.propHidden);
+  const [choosing, setChoosing] = useState(false);
   const items = useMemo(() => {
     const s = new Set(selection);
     return doc.markups.filter((m) => s.has(m.id));
@@ -63,175 +67,127 @@ export function PropertiesPanel() {
   const hasFill = items.some((m) => ['area', 'volume', 'polygon', 'rectangle', 'ellipse', 'cloud', 'text', 'callout', 'count', 'highlight'].includes(m.type));
   const hasEnds = items.every((m) => ['length', 'line', 'arrow', 'polyline', 'polylength', 'callout'].includes(m.type));
   const hasText = items.some((m) => TYPE_INFO[m.type].measure || ['text', 'callout'].includes(m.type));
+  const byName = (n: string) => doc.columns.find((c) => normName(c.name) === n);
+  const heightCol = byName('height');
+  const finishCol = byName('finish');
+  /** Columns in the main fields; every other one is under Properties. */
+  const mainCols = new Set([heightCol?.id, finishCol?.id].filter(Boolean) as string[]);
 
-  return (
-    <div className="panel" style={{ height: '100%' }}>
-      <PanelHeader icon={Icon ? <Icon size={14} /> : undefined} title={one ? `${TYPE_INFO[one.type].listName}` : `${items.length} markups selected`}>
-        {one && (
-          <button className="icon-btn" title="Zoom to markup" onClick={() => st.focusMarkup(one.id)}>
-            <Crosshair size={14} />
-          </button>
-        )}
-        {one && (
-          <button className="icon-btn" title="Add to Tool Chest" onClick={() => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: one.id })}>
-            <PackagePlus size={14} />
-          </button>
-        )}
-        {one && (
-          <button className="icon-btn" title="Use these properties as the default for this tool" onClick={() => {
-            st.setTypeDefault(one.type, { style: one.style, subject: one.subject });
-            st.toast(`Saved as default ${TYPE_INFO[one.type].label} style`, 'success');
-          }}>
-            <Pin size={14} />
-          </button>
-        )}
-      </PanelHeader>
-      <div className="panel-body">
-        <div className="form" data-testid="properties">
-          {one && row && TYPE_INFO[one.type].measure && (
-            <>
-              <div className="readout big" data-testid="prop-measurement">
-                {row.display.measurement || '—'}
-              </div>
-              <div className="field">
-                <label>Scale</label>
-                <span className="hint" style={{ color: sheet?.scale || vp ? 'var(--text)' : 'var(--warn)' }}>
-                  {row.scale.label}
-                  {vp ? ` (viewport “${vp.name}”)` : ''}
-                </span>
-              </div>
-              {(one.type === 'area' || one.type === 'volume') && (
-                <div className="field">
-                  <label>Perimeter</label>
-                  <span className="readout">{row.display.perimeter}</span>
-                </div>
-              )}
-              {one.type === 'volume' && (
-                <div className="field">
-                  <label>Area</label>
-                  <span className="readout">{row.display.area}</span>
-                </div>
-              )}
-              {one.type === 'volume' && (
-                <div className="field">
-                  <label>Depth</label>
-                  <CommitInput
-                    value={formatLength(one.depth ?? 0, row.scale.unit === 'ft' ? 'ft-in' : row.scale.unit, 8)}
-                    onCommit={(v) => {
-                      const d = parseLength(v, row.scale.unit === 'ft-in' || row.scale.unit === 'ft' ? 'in' : row.scale.unit);
-                      if (d != null && d >= 0) set({ depth: d });
-                      else st.toast('Could not read that depth. Try 6" or 0\'-6"', 'error');
-                    }}
-                  />
-                </div>
-              )}
-              {one.cutouts?.length ? (
-                <div className="field">
-                  <label>Cutouts</label>
-                  <div className="field-row">
-                    <span className="hint">{one.cutouts.length}</span>
-                    <button className="btn sm narrow" onClick={() => set({ cutouts: [] })}>
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              {(one.type === 'area' || one.type === 'volume') && (
-                <button className="btn sm" onClick={() => st.setTool({ kind: 'cutout', markupId: one.id })}>
-                  Add Cutout (hole)
-                </button>
-              )}
-              {one.type === 'count' && <CountControls m={one} />}
-            </>
-          )}
+  const customField = (c: CustomColumn) => {
+    const id = customColId(c);
+    if (c.kind === 'formula') {
+      return (
+        <span className="readout" title={`= ${c.formula}`}>
+          {one && row ? row.display[id] || '0' : rows.reduce((s, r) => s + (Number(r.values[id]) || 0), 0).toLocaleString('en-US', { maximumFractionDigits: c.decimals ?? 2 }) + (c.suffix ? ` ${c.suffix}` : '') + ' (sum)'}
+        </span>
+      );
+    }
+    const val = common(items, (m) => (m.custom[c.id] ?? '') as string | number);
+    return c.kind === 'choice' || isShapeColumn(c.name) ? (
+      <ChoiceInput
+        value={val === undefined ? undefined : String(val)}
+        options={c.kind === 'choice' ? c.options ?? [] : COMMON_SHAPES}
+        onCommit={(v) => st.setCustomValue(ids, c.id, v)}
+        testId={`prop-col-${c.id}`}
+      />
+    ) : (
+      <CommitInput
+        value={val === undefined ? '' : String(val)}
+        placeholder={val === undefined ? '(multiple)' : c.defaultValue ? `default ${c.defaultValue}` : ''}
+        inputMode={c.kind === 'number' ? 'decimal' : undefined}
+        onCommit={(v) => {
+          if (c.kind === 'number') {
+            if (v.trim() === '') st.setCustomValue(ids, c.id, '');
+            else if (isFinite(Number(v))) st.setCustomValue(ids, c.id, Number(v));
+            else st.toast(`${c.name} must be a number`, 'error');
+          } else st.setCustomValue(ids, c.id, v);
+        }}
+        data-testid={`prop-col-${c.id}`}
+      />
+    );
+  };
 
-          {items.every((m) => m.type === 'length' && m.points.length === 2) && <AdjustEnds items={items} />}
+  const subjectField = (
+    <div className="field">
+      <label>Subject</label>
+      <SubjectSelect
+        value={common(items, (m) => m.subject) ?? ''}
+        multiple={common(items, (m) => m.subject) === undefined}
+        onChange={(v) => set({ subject: v })}
+        editList
+        data-testid="prop-subject"
+      />
+    </div>
+  );
+  const labelField = (
+    <div className="field">
+      <label>Label</label>
+      <CommitInput
+        value={common(items, (m) => m.label) ?? ''}
+        placeholder={items.length > 1 ? '(multiple)' : 'Shown on drawing'}
+        onCommit={(v) => set({ label: sizeText(v) })}
+        data-testid="prop-label"
+      />
+    </div>
+  );
 
-          <DetailSection items={items} rows={rows} />
+  /** The other fields: built-in ones, then the custom columns. Each can be hidden from this list. */
+  const builtins: { key: string; name: string; show: boolean; node: () => ReactNode }[] = [
+    { key: 'comments', name: 'Comments', show: true, node: () => <CommitInput multiline value={common(items, (m) => m.comments) ?? ''} onCommit={(v) => set({ comments: v })} /> },
+    {
+      key: 'status',
+      name: 'Status',
+      show: true,
+      node: () => (
+        <select value={common(items, (m) => m.status) ?? ''} onChange={(e) => set({ status: e.target.value as MarkupStatus })}>
+          {common(items, (m) => m.status) === undefined && <option value="">(multiple)</option>}
+          {STATUSES.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: 'layer',
+      name: 'Layer',
+      show: true,
+      node: () => (
+        <select value={common(items, (m) => m.layer) ?? '__multi'} onChange={(e) => set({ layer: e.target.value })}>
+          {common(items, (m) => m.layer) === undefined && <option value="__multi">(multiple)</option>}
+          <option value="">(none)</option>
+          {doc.layers.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    { key: 'author', name: 'Author', show: true, node: () => <CommitInput value={common(items, (m) => m.author) ?? ''} onCommit={(v) => set({ author: v })} /> },
+    {
+      key: 'options',
+      name: 'Options',
+      show: true,
+      node: () => (
+        <div className="field-row">
+          <label className="inline" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+            <input type="checkbox" checked={!!common(items, (m) => m.checked)} onChange={(e) => set({ checked: e.target.checked })} /> Checked
+          </label>
+          <label className="inline" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+            <input type="checkbox" checked={!!common(items, (m) => !!m.locked)} onChange={(e) => set({ locked: e.target.checked })} /> <Lock size={12} /> Locked
+          </label>
+        </div>
+      ),
+    },
+  ];
+  const otherFields = [
+    ...builtins.filter((b) => b.show),
+    ...doc.columns.filter((c) => !mainCols.has(c.id)).map((c) => ({ key: `c:${c.id}`, name: c.name, show: true, node: () => customField(c) })),
+  ];
+  const hiddenSet = new Set(hidden);
 
-          <div className={one && TYPE_INFO[one.type].measure ? 'form-section' : ''} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <h4>General</h4>
-            <div className="field">
-              <label>Subject</label>
-              <SubjectSelect
-                value={common(items, (m) => m.subject) ?? ''}
-                multiple={common(items, (m) => m.subject) === undefined}
-                onChange={(v) => set({ subject: v })}
-                editList
-                data-testid="prop-subject"
-              />
-            </div>
-            <div className="field">
-              <label>Label</label>
-              <CommitInput value={common(items, (m) => m.label) ?? ''} placeholder={items.length > 1 ? '(multiple)' : 'Shown on drawing'} onCommit={(v) => set({ label: v })} />
-            </div>
-            {(types.has('text') || types.has('callout')) && one && (
-              <div className="field">
-                <label>Text</label>
-                <CommitInput multiline value={one.text ?? ''} onCommit={(v) => set({ text: v })} />
-              </div>
-            )}
-            {types.has('stamp') && one && (
-              <div className="field">
-                <label>Stamp</label>
-                <select value={STAMP_TEXTS.includes(one.text ?? '') ? one.text : '__custom'} onChange={(e) => e.target.value !== '__custom' && set({ text: e.target.value })}>
-                  {STAMP_TEXTS.map((t) => (
-                    <option key={t}>{t}</option>
-                  ))}
-                  <option value="__custom">Custom…</option>
-                </select>
-              </div>
-            )}
-            {types.has('stamp') && one && (
-              <div className="field">
-                <label>Stamp text</label>
-                <CommitInput value={one.text ?? ''} onCommit={(v) => set({ text: v })} />
-              </div>
-            )}
-            <div className="field">
-              <label>Comments</label>
-              <CommitInput multiline value={common(items, (m) => m.comments) ?? ''} onCommit={(v) => set({ comments: v })} />
-            </div>
-            <div className="field">
-              <label>Status</label>
-              <select value={common(items, (m) => m.status) ?? ''} onChange={(e) => set({ status: e.target.value as MarkupStatus })}>
-                {common(items, (m) => m.status) === undefined && <option value="">(multiple)</option>}
-                {STATUSES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Layer</label>
-              <select value={common(items, (m) => m.layer) ?? '__multi'} onChange={(e) => set({ layer: e.target.value })}>
-                {common(items, (m) => m.layer) === undefined && <option value="__multi">(multiple)</option>}
-                <option value="">(none)</option>
-                {doc.layers.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Author</label>
-              <CommitInput value={common(items, (m) => m.author) ?? ''} onCommit={(v) => set({ author: v })} />
-            </div>
-            <div className="field">
-              <label>Options</label>
-              <div className="field-row">
-                <label className="inline" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                  <input type="checkbox" checked={!!common(items, (m) => m.checked)} onChange={(e) => set({ checked: e.target.checked })} /> Checked
-                </label>
-                <label className="inline" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                  <input type="checkbox" checked={!!common(items, (m) => !!m.locked)} onChange={(e) => set({ locked: e.target.checked })} /> <Lock size={12} /> Locked
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="form-section">
-            <h4>Appearance</h4>
+  const appearance = (
+    <>
             <div className="field">
               <label>Color</label>
               <ColorField value={(style('color') as string) ?? null} onChange={(v) => v && setStyle('color', v)} />
@@ -354,60 +310,254 @@ export function PropertiesPanel() {
                 <CommitRange value={(style('fontSize') as number) ?? 14} min={6} max={72} step={1} onCommit={(v) => setStyle('fontSize', v)} format={(v) => `${v} pt`} />
               </div>
             )}
+    </>
+  );
+
+  const measurementDetails = one && row && TYPE_INFO[one.type].measure && (
+    <>
+      <div className="field">
+        <label>Scale</label>
+        <span className="hint" style={{ color: sheet?.scale || vp ? 'var(--text)' : 'var(--warn)' }}>
+          {row.scale.label}
+          {vp ? ` (viewport “${vp.name}”)` : ''}
+        </span>
+      </div>
+      {(one.type === 'area' || one.type === 'volume') && (
+        <div className="field">
+          <label>Perimeter</label>
+          <span className="readout">{row.display.perimeter}</span>
+        </div>
+      )}
+      {one.type === 'volume' && (
+        <div className="field">
+          <label>Area</label>
+          <span className="readout">{row.display.area}</span>
+        </div>
+      )}
+      {one.type === 'volume' && (
+        <div className="field">
+          <label>Depth</label>
+          <CommitInput
+            value={formatLength(one.depth ?? 0, row.scale.unit === 'ft' ? 'ft-in' : row.scale.unit, 8)}
+            onCommit={(v) => {
+              const d = parseLength(v, row.scale.unit === 'ft-in' || row.scale.unit === 'ft' ? 'in' : row.scale.unit);
+              if (d != null && d >= 0) set({ depth: d });
+              else st.toast('Could not read that depth. Try 6" or 0\'-6"', 'error');
+            }}
+          />
+        </div>
+      )}
+      {one.cutouts?.length ? (
+        <div className="field">
+          <label>Cutouts</label>
+          <div className="field-row">
+            <span className="hint">{one.cutouts.length}</span>
+            <button className="btn sm narrow" onClick={() => set({ cutouts: [] })}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {(one.type === 'area' || one.type === 'volume') && (
+        <button className="btn sm" onClick={() => st.setTool({ kind: 'cutout', markupId: one.id })}>
+          Add Cutout (hole)
+        </button>
+      )}
+      {one.type === 'count' && <CountControls m={one} />}
+    </>
+  );
+
+  // The quantity of the selection: its measurement, or the totals of several.
+  const quantity = (() => {
+    if (one && row) return { label: one.type === 'count' ? 'Count' : one.type === 'area' ? 'Area' : one.type === 'volume' ? 'Volume' : one.type === 'angle' ? 'Angle' : 'Length', text: row.display.measurement || '—' };
+    const sum = (k: string) => rows.reduce((a, r) => a + (Number(r.values[k]) || 0), 0);
+    const s = doc.settings;
+    const parts: string[] = [];
+    if (sum('length')) parts.push(`${fmtNumber(sum('length'), s.decimals)} ${s.lengthUnit === 'ft' ? 'LF' : s.lengthUnit}`);
+    if (types.has('count')) parts.push(`${fmtNumber(sum('count'), 0)} EA`);
+    if (sum('area')) parts.push(`${fmtNumber(sum('area'), s.decimals)} ${s.areaUnit.toUpperCase()}`);
+    return { label: types.size === 1 && types.has('count') ? 'Count' : 'Total', text: parts.join(' · ') || '—' };
+  })();
+
+  const header = (
+    <PanelHeader icon={Icon ? <Icon size={14} /> : undefined} title={one ? `${TYPE_INFO[one.type].listName}` : `${items.length} markups selected`}>
+      {one && (
+        <button className="icon-btn" title="Zoom to markup" onClick={() => st.focusMarkup(one.id)}>
+          <Crosshair size={14} />
+        </button>
+      )}
+      {one && (
+        <button className="icon-btn" title="Add to Tool Chest" onClick={() => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: one.id })}>
+          <PackagePlus size={14} />
+        </button>
+      )}
+      {one && (
+        <button
+          className="icon-btn"
+          title="Use these properties as the default for this tool"
+          onClick={() => {
+            st.setTypeDefault(one.type, { style: one.style, subject: one.subject });
+            st.toast(`Saved as default ${TYPE_INFO[one.type].label} style`, 'success');
+          }}
+        >
+          <Pin size={14} />
+        </button>
+      )}
+    </PanelHeader>
+  );
+
+  if (allMeasure) {
+    // Measurements and counts: the main fields, then Style, Properties and the rest folded away.
+    const toggleField = (key: string, show: boolean) => st.setPrefs({ propHidden: show ? hidden.filter((k) => k !== key) : [...hidden, key] });
+    return (
+      <div className="panel" style={{ height: '100%' }}>
+        {header}
+        <div className="panel-body">
+          <div className="form" data-testid="properties">
+            <div className="prop-main" data-testid="prop-main">
+              {subjectField}
+              {labelField}
+              <div className="field">
+                <label>{quantity.label}</label>
+                <span className="readout big-ish" data-testid="prop-measurement">
+                  {quantity.text}
+                </span>
+              </div>
+              {heightCol && (
+                <div className="field">
+                  <label>{heightCol.name}</label>
+                  {customField(heightCol)}
+                </div>
+              )}
+              {finishCol && (
+                <div className="field">
+                  <label>{finishCol.name}</label>
+                  {customField(finishCol)}
+                </div>
+              )}
+            </div>
+
+            <PropSection id="style" title="Style" hint="Line, text and colours">
+              {appearance}
+            </PropSection>
+
+            <PropSection
+              id="properties"
+              title="Properties"
+              hint={`${otherFields.filter((f) => !hiddenSet.has(f.key)).length} of ${otherFields.length} fields`}
+              extra={
+                <button
+                  className={`icon-btn${choosing ? ' on' : ''}`}
+                  title="Choose the fields shown here (hidden ones keep their values)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setChoosing(!choosing);
+                  }}
+                  data-testid="prop-fields"
+                >
+                  <ListChecks size={13} />
+                </button>
+              }
+              forceOpen={choosing}
+            >
+              {choosing && <div className="hint">Tick the fields to show in this list. Hidden fields keep their values in the markup and the Markups List.</div>}
+              {otherFields.map((f) =>
+                choosing ? (
+                  <label key={f.key} className="prop-field-pick" data-testid="prop-field-pick">
+                    <input type="checkbox" checked={!hiddenSet.has(f.key)} onChange={(e) => toggleField(f.key, e.target.checked)} /> {f.name}
+                  </label>
+                ) : hiddenSet.has(f.key) ? null : (
+                  <div className="field" key={f.key} data-testid="prop-field" data-key={f.key}>
+                    <label title={f.name}>{f.name}</label>
+                    {f.node()}
+                  </div>
+                ),
+              )}
+              {choosing ? (
+                <button className="btn sm" onClick={() => setChoosing(false)} data-testid="prop-fields-done">
+                  Done
+                </button>
+              ) : (
+                <button className="btn sm" onClick={() => st.setDialog({ kind: 'columns' })}>
+                  Manage Columns…
+                </button>
+              )}
+            </PropSection>
+
+            <PropSection id="measurement" title="Measurement" hint="Scale, ends, count">
+              {measurementDetails}
+              {items.every((m) => m.type === 'length' && m.points.length === 2) && <AdjustEnds items={items} />}
+              {items.length > 1 && <SelectionTotals rows={rows} />}
+            </PropSection>
+
+            <PropSection id="details" title="Standard Details" hint="Material added">
+              <DetailSection items={items} rows={rows} />
+            </PropSection>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel" style={{ height: '100%' }}>
+      {header}
+      <div className="panel-body">
+        <div className="form" data-testid="properties">
+          <DetailSection items={items} rows={rows} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <h4>General</h4>
+            {subjectField}
+            {labelField}
+            {(types.has('text') || types.has('callout')) && one && (
+              <div className="field">
+                <label>Text</label>
+                <CommitInput multiline value={one.text ?? ''} onCommit={(v) => set({ text: v })} />
+              </div>
+            )}
+            {types.has('stamp') && one && (
+              <div className="field">
+                <label>Stamp</label>
+                <select value={STAMP_TEXTS.includes(one.text ?? '') ? one.text : '__custom'} onChange={(e) => e.target.value !== '__custom' && set({ text: e.target.value })}>
+                  {STAMP_TEXTS.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                  <option value="__custom">Custom…</option>
+                </select>
+              </div>
+            )}
+            {types.has('stamp') && one && (
+              <div className="field">
+                <label>Stamp text</label>
+                <CommitInput value={one.text ?? ''} onCommit={(v) => set({ text: v })} />
+              </div>
+            )}
+            {builtins.map((b) => (
+              <div className="field" key={b.key}>
+                <label>{b.name}</label>
+                {b.node()}
+              </div>
+            ))}
+          </div>
+
+          <div className="form-section">
+            <h4>Appearance</h4>
+            {appearance}
           </div>
 
           {doc.columns.length > 0 && (
             <div className="form-section">
               <h4>Takeoff Data (Custom Columns)</h4>
-              {doc.columns.map((c) => {
-                const id = customColId(c);
-                if (c.kind === 'formula') {
-                  return (
-                    <div className="field" key={c.id}>
-                      <label title={c.formula}>{c.name}</label>
-                      <span className="readout" title={`= ${c.formula}`}>
-                        {one && row ? row.display[id] || '0' : rows.reduce((s, r) => s + (Number(r.values[id]) || 0), 0).toLocaleString('en-US', { maximumFractionDigits: c.decimals ?? 2 }) + (c.suffix ? ` ${c.suffix}` : '') + ' (sum)'}
-                      </span>
-                    </div>
-                  );
-                }
-                const val = common(items, (m) => (m.custom[c.id] ?? '') as string | number);
-                return (
-                  <div className="field" key={c.id}>
-                    <label title={c.name}>{c.name}</label>
-                    {c.kind === 'choice' || isShapeColumn(c.name) ? (
-                      <ChoiceInput
-                        value={val === undefined ? undefined : String(val)}
-                        options={c.kind === 'choice' ? c.options ?? [] : COMMON_SHAPES}
-                        onCommit={(v) => st.setCustomValue(ids, c.id, v)}
-                      />
-                    ) : (
-                      <CommitInput
-                        value={val === undefined ? '' : String(val)}
-                        placeholder={val === undefined ? '(multiple)' : c.defaultValue ? `default ${c.defaultValue}` : ''}
-                        inputMode={c.kind === 'number' ? 'decimal' : undefined}
-                        onCommit={(v) => {
-                          if (c.kind === 'number') {
-                            if (v.trim() === '') st.setCustomValue(ids, c.id, '');
-                            else if (isFinite(Number(v))) st.setCustomValue(ids, c.id, Number(v));
-                            else st.toast(`${c.name} must be a number`, 'error');
-                          } else st.setCustomValue(ids, c.id, v);
-                        }}
-                        data-testid={`prop-col-${c.id}`}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+              {doc.columns.map((c) => (
+                <div className="field" key={c.id}>
+                  <label title={c.name}>{c.name}</label>
+                  {customField(c)}
+                </div>
+              ))}
               <button className="btn sm" onClick={() => st.setDialog({ kind: 'columns' })}>
                 Manage Columns…
               </button>
-            </div>
-          )}
-          {allMeasure && items.length > 1 && (
-            <div className="form-section">
-              <h4>Selection Totals</h4>
-              <SelectionTotals rows={rows} />
             </div>
           )}
         </div>
@@ -416,11 +566,37 @@ export function PropertiesPanel() {
   );
 }
 
-function ChoiceInput({ value, options, onCommit }: { value: string | undefined; options: string[]; onCommit: (v: string) => void }) {
+/** Which Properties sections are open, kept between sessions. */
+const SECTION_KEY = 'ts.propSections';
+
+/** A section of the Properties panel that folds open and shut (Style, Properties…). */
+function PropSection({ id, title, hint, extra, forceOpen, children }: { id: string; title: string; hint?: string; extra?: ReactNode; forceOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState<boolean>(() => !!lsGet<Record<string, boolean>>(SECTION_KEY, {})[id]);
+  const shown = open || !!forceOpen;
+  const toggle = () => {
+    const next = !shown;
+    setOpen(next);
+    lsSet(SECTION_KEY, { ...lsGet<Record<string, boolean>>(SECTION_KEY, {}), [id]: next });
+  };
+  return (
+    <div className={`prop-sec${shown ? ' open' : ''}`} data-testid={`prop-sec-${id}`}>
+      <div className="prop-sec-head" role="button" tabIndex={0} onClick={toggle} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggle()} aria-expanded={shown} data-testid={`prop-sec-head-${id}`}>
+        {shown ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        <b>{title}</b>
+        {hint && <span className="hint">{hint}</span>}
+        <span style={{ flex: 1 }} />
+        {extra}
+      </div>
+      {shown && <div className="prop-sec-body">{children}</div>}
+    </div>
+  );
+}
+
+function ChoiceInput({ value, options, onCommit, testId }: { value: string | undefined; options: string[]; onCommit: (v: string) => void; testId?: string }) {
   const listId = useMemo(() => `opts-${Math.random().toString(36).slice(2)}`, []);
   return (
     <>
-      <CommitInput value={value ?? ''} placeholder={value === undefined ? '(multiple)' : 'Choose or type…'} list={listId} onCommit={onCommit} />
+      <CommitInput value={value ?? ''} placeholder={value === undefined ? '(multiple)' : 'Choose or type…'} list={listId} onCommit={onCommit} data-testid={testId} />
       <datalist id={listId}>
         {options.map((o) => (
           <option key={o} value={o} />

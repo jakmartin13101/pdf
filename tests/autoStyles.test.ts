@@ -13,30 +13,30 @@ describe('auto takeoff line styles', () => {
     newAutoStyle({ text: 'C', enabled: false, color: '#000000' }),
   ];
   it('takes the first enabled rule the subject matches', () => {
-    expect(autoStyleFor(rules, 'W30x90')?.color).toBe('#b5179e');
+    expect(autoStyleFor(rules, 'W30X90')?.color).toBe('#b5179e');
     expect(autoStyleFor(rules, 'w24x55')?.color).toBe('#1aa34a'); // case does not matter
-    expect(autoStyleFor(rules, 'HSS8x4x1/4')?.lineStyle).toBe('dashed');
+    expect(autoStyleFor(rules, 'HSS8X4X1/4')?.lineStyle).toBe('dashed');
     expect(autoStyleFor(rules, 'pipe  4 std')?.color).toBe('#0b8f8a');
     expect(autoStyleFor(rules, 'Pipe 4 Std XS')).toBeUndefined(); // "is" means the whole subject
-    expect(autoStyleFor(rules, 'C10x15.3')).toBeUndefined(); // rule switched off
+    expect(autoStyleFor(rules, 'C10X15.3')).toBeUndefined(); // rule switched off
   });
 
   it('a rule beats the Tool Chest tool, which beats a colour per size', () => {
     const chest = defaultToolChest();
-    expect(chestToolForSize(chest, 'W24x55')?.name).toBe('W24x55');
-    const ruled = autoLook(chest, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'W24x55');
+    expect(chestToolForSize(chest, 'W24X55')?.name).toBe('W24X55');
+    const ruled = autoLook(chest, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'W24X55');
     expect([ruled.style.color, ruled.style.lineStyle, ruled.rule?.text]).toEqual(['#1aa34a', 'solid', 'W']);
-    const tool = autoLook(chest, { autoStyles: [], autoUseToolStyle: true }, 'W24x55');
-    expect([tool.style.color, tool.style.lineWidth]).toEqual(['#f46036', 3.5]); // the W24x55 tool's look
-    const plain = autoLook(chest, { autoStyles: [], autoUseToolStyle: false }, 'W24x55');
+    const tool = autoLook(chest, { autoStyles: [], autoUseToolStyle: true }, 'W24X55');
+    expect([tool.style.color, tool.style.lineWidth]).toEqual(['#f46036', 3.5]); // the W24X55 tool's look
+    const plain = autoLook(chest, { autoStyles: [], autoUseToolStyle: false }, 'W24X55');
     expect(plain.style.color).not.toBe('#f46036');
-    expect(autoLook(chest, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'HSS6x6x1/4').style.lineStyle).toBe('dashed');
+    expect(autoLook(chest, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'HSS6X6X1/4').style.lineStyle).toBe('dashed');
   });
 
   it('recognises measurements made by the automatic takeoff', () => {
     const m = (p: Partial<Markup>) => ({ type: 'length', comments: '', ...p }) as Markup;
     expect(isAutoMarkup(m({ auto: true }))).toBe(true);
-    expect(isAutoMarkup(m({ comments: 'Automatic takeoff from the label “W24x55”' }))).toBe(true);
+    expect(isAutoMarkup(m({ comments: 'Automatic takeoff from the label “W24X55”' }))).toBe(true);
     expect(isAutoMarkup(m({}))).toBe(false);
   });
 });

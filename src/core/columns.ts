@@ -91,7 +91,7 @@ export interface DetailRowInfo {
   detailId: string;
   detailName: string;
   itemId: string;
-  /** Summary line name, e.g. "Clip Angle – L4x4x3/8". */
+  /** Summary line name, e.g. "Clip Angle – L4X4X3/8". */
   summaryKey: string;
   warning?: string;
   /** Added to the markup by hand rather than by the detail's rule. */

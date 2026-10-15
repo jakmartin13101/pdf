@@ -1,7 +1,7 @@
 // Standard details: rules that look at the takeoff and add material.
 //
-//   IF [Member Size] = W24x55  →  ADD Clip Angle  L4x4x3/8  × 0'-11 1/2"  × 4 per beam
-//   IF [Subject] = Handrail    →  ADD Post  HSS1-1/2x1-1/2x1/8  × 3'-6"  @ 4'-0" OC
+//   IF [Member Size] = W24X55  →  ADD Clip Angle  L4X4X3/8  × 0'-11 1/2"  × 4 per beam
+//   IF [Subject] = Handrail    →  ADD Post  HSS1-1/2X1-1/2X1/8  × 3'-6"  @ 4'-0" OC
 //
 // Each matching markup gets one read-only material row per item. Material rows flow through the
 // same columns as markups (so formula columns such as Weight compute for them), the Markups List,
@@ -12,6 +12,9 @@ import { allColumns, buildRows, customColId, rowBuilder, type ColumnSpec, type R
 import { normName, toNum } from './formula';
 import { fmtNumber, formatLength, parseLength } from './units';
 import { TYPE_INFO } from './markupTypes';
+
+/** The Finish of galvanized material. */
+export const GALVANIZE = 'Galvanize';
 
 export const DETAIL_OPS: { id: DetailOp; label: string }[] = [
   { id: 'eq', label: '=' },
@@ -184,7 +187,7 @@ export function itemSubject(item: DetailItem, d: StandardDetail): string {
   return item.subject.trim() || item.size.trim() || d.name.trim() || 'Material';
 }
 
-/** Readable form of a detail: IF [Member Size] = "W24x55" → ADD Clip Angle L4x4x3/8 × 0'-11 1/2" × 4. */
+/** Readable form of a detail: IF [Member Size] = "W24X55" → ADD Clip Angle L4X4X3/8 × 0'-11 1/2" × 4. */
 export function describeDetail(d: StandardDetail, doc: DocState): string {
   const cols = allColumns(doc.columns);
   const name = (id: string) => cols.find((c) => c.id === id)?.name ?? id;
@@ -203,6 +206,7 @@ export function describeDetail(d: StandardDetail, doc: DocState): string {
         parts.push(`@ ${sp ? ftIn(sp) : '?'} OC${it.addEnd ? ' (+1)' : ''}`);
       } else parts.push(`× ${it.value.trim() || '1'} EA`);
     }
+    if (it.galv) parts.push('GALV');
     return parts.join(' ');
   });
   const when = d.auto === false ? 'BY HAND' : `IF ${cond || '(no condition)'}`;
@@ -218,6 +222,7 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
   const byNorm = new Map(doc.columns.map((c) => [normName(c.name), c]));
   const sizeCol = byNorm.get('membersize') ?? byNorm.get('size');
   const catCol = byNorm.get('category');
+  const finishCol = byNorm.get('finish');
   const qtyCustom = qtyCol ? doc.columns.find((c) => customColId(c) === qtyCol) : undefined;
   const out: Row[] = [];
   for (const r of rows) {
@@ -233,6 +238,7 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
         // Pieces are already multiplied by the markup's Qty; the material row stands for itself.
         if (qtyCustom && qtyCustom.kind === 'number') custom[qtyCustom.id] = 1;
         if (catCol && catCol.kind !== 'formula' && d.category.trim()) custom[catCol.id] = d.category.trim();
+        if (finishCol && finishCol.kind !== 'formula' && it.galv) custom[finishCol.id] = GALVANIZE;
         const subject = itemSubject(it, d);
         const synthetic: Markup = {
           ...r.markup,
@@ -251,6 +257,13 @@ export function detailRows(doc: DocState, rows: Row[]): Row[] {
           type: 'Standard Detail',
           measurement: q.warning ? `⚠ ${q.warning}` : measurement,
         });
+        // The Length shows each piece (what was typed for it); totals and formulas use all of them. Full-length
+        // material shows the measured run, like its markup.
+        if (q.pieceLength > 0 && it.rule !== 'full') {
+          // Typed lengths are exact: to 1/16" rather than the sheet's measuring precision.
+          const fine = r.scale.unit === 'ft-in' || r.scale.unit === 'in' ? Math.max(r.scale.precision, 16) : r.scale.precision;
+          row.display.length = formatLength(q.pieceLength, r.scale.unit, fine);
+        }
         // Qty was 1 only so formulas see the material row on its own; don't add it to Qty totals.
         if (qtyCol) {
           row.values[qtyCol] = 0;
@@ -319,8 +332,8 @@ export function exampleDetails(doc: DocState): StandardDetail[] {
   return [
     newDetail({
       name: 'W24 beam end connections',
-      conditions: [{ column: sizeCol, op: 'eq', value: 'W24x55' }],
-      items: [newDetailItem({ subject: 'Clip Angle', size: 'L4x4x3/8', length: `0'-11 1/2"`, rule: 'each', value: '4' })],
+      conditions: [{ column: sizeCol, op: 'eq', value: 'W24X55' }],
+      items: [newDetailItem({ subject: 'Clip Angle', size: 'L4X4X3/8', length: `0'-11 1/2"`, rule: 'each', value: '4' })],
       category: 'Misc Metals',
     }),
     newDetail({
@@ -329,7 +342,7 @@ export function exampleDetails(doc: DocState): StandardDetail[] {
         { column: catCol, op: 'eq', value: 'Joists & Deck' },
         { column: 'type', op: 'eq', value: TYPE_INFO.area.listName },
       ],
-      items: [newDetailItem({ subject: 'Edge Angle', size: 'L3x3x1/4', rule: 'full', value: '1' })],
+      items: [newDetailItem({ subject: 'Edge Angle', size: 'L3X3X1/4', rule: 'full', value: '1' })],
       category: 'Joists & Deck',
     }),
     newDetail({
@@ -348,7 +361,7 @@ export function exampleDetails(doc: DocState): StandardDetail[] {
         { column: 'type', op: 'eq', value: TYPE_INFO.count.listName },
       ],
       items: [
-        newDetailItem({ subject: 'Base Plate', size: 'PL3/4x12', length: `1'-0"`, rule: 'each', value: '1' }),
+        newDetailItem({ subject: 'Base Plate', size: 'PL3/4X12', length: `1'-0"`, rule: 'each', value: '1' }),
         newDetailItem({ subject: 'Anchor Rod', size: 'ROD3/4', length: `1'-6"`, rule: 'each', value: '4' }),
       ],
       category: 'Structural Steel',

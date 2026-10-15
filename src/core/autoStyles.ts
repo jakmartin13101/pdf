@@ -63,7 +63,7 @@ export function chestToolForSize(chest: ToolSet[], size: string): ChestTool | un
   return hits.find((t) => t.type === 'length') ?? hits[0];
 }
 
-/** Subject an auto takeoff member gets: the shape of its size from the user's subjects (W24x55 → W). */
+/** Subject an auto takeoff member gets: the shape of its size from the user's subjects (W24X55 → W). */
 export const autoSubject = (size: string, subjects: string[] = DEFAULT_SUBJECTS) => subjectForSize(size, subjects) ?? '';
 
 export interface AutoLookPrefs {

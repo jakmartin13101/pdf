@@ -1,5 +1,5 @@
 // Subjects: a markup's subject is the shape it takes off (W, HSS, L, BP, C, BO…), picked from a list
-// each user keeps (Settings → Subjects). The size itself (W24x55) is the Member Size and the label.
+// each user keeps (Settings → Subjects). The size itself (W24X55) is the Member Size and the label.
 
 /** The subjects the program starts with. */
 export const DEFAULT_SUBJECTS = ['W', 'HSS', 'L', 'C', 'MC', 'WT', 'S', 'HP', 'PL', 'BP', 'BO', 'PIPE'];
@@ -14,7 +14,7 @@ export function findSubject(value: string, subjects: string[]): string | undefin
 
 /**
  * The subject a size belongs to: the longest subject in the list the size starts with, where the
- * subject is not followed by another letter (W24x55 → W, WT12x34 → WT only, HSS6x6x3/8 → HSS,
+ * subject is not followed by another letter (W24X55 → W, WT12X34 → WT only, HSS6X6X3/8 → HSS,
  * Pipe 4 Std → PIPE).
  */
 export function subjectForSize(size: string, subjects: string[]): string | undefined {
@@ -51,8 +51,8 @@ export function cleanSubjects(list: string[]): string[] {
 }
 
 /**
- * A subject from before subjects were shapes (W24x55, HSS6x6x3/8 Column) as a shape and a size:
- * { subject: 'W', size: 'W24x55' }. Undefined when it names no shape in the list.
+ * A subject from before subjects were shapes (W24X55, HSS6X6X3/8 Column) as a shape and a size:
+ * { subject: 'W', size: 'W24X55' }. Undefined when it names no shape in the list.
  */
 export function splitOldSubject(value: string, subjects: string[]): { subject: string; size?: string } | undefined {
   const exact = findSubject(value, subjects);

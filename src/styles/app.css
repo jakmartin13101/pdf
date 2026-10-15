@@ -2868,7 +2868,7 @@ kbd {
 }
 .dd-item {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.05fr) minmax(0, 1fr) 40px 26px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.05fr) minmax(0, 1fr) 40px 48px 26px;
   gap: 6px;
   align-items: center;
 }
@@ -4043,4 +4043,97 @@ button.linkish {
 .set-max-table td,
 .set-max-table th {
   padding: 3px 10px;
+}
+
+/* Totals of the selection, by it on the drawing */
+.sel-totals {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px;
+  min-width: 120px;
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.sel-totals b {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* Properties panel: the main fields, then sections that fold open */
+.prop-main {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-bottom: 4px;
+}
+
+.readout.big-ish {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.prop-sec {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+}
+
+.prop-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+}
+
+.prop-sec-head:hover {
+  background: var(--bg-hover);
+}
+
+.prop-sec-head .hint {
+  font-size: 11px;
+}
+
+.prop-sec.open .prop-sec-head {
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+
+.prop-sec-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px;
+}
+
+.prop-sec-body > .form-section {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.prop-field-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn.on {
+  background: var(--accent-soft);
+  color: var(--accent);
 }

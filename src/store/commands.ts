@@ -355,7 +355,7 @@ export function listStyleMenuItems(): { label?: string; onClick?: () => void; se
 // Subjects (shapes)
 
 /**
- * Turn this document's subjects from before subjects were shapes into shapes: W24x55 → W (the size
+ * Turn this document's subjects from before subjects were shapes into shapes: W24X55 → W (the size
  * goes to Member Size when that is empty). With `clearOthers`, subjects that name no shape in the list
  * (Metal Deck…) are cleared. One undo step; returns how many markups changed.
  */

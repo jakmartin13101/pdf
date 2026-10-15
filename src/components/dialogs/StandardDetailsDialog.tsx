@@ -76,7 +76,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: { item: DetailItem; on
       <input value={item.subject} placeholder="e.g. Clip Angle" onChange={(e) => onChange({ subject: e.target.value })} data-testid="item-subject" />
       <input
         value={item.size}
-        placeholder="e.g. L4x4x3/8"
+        placeholder="e.g. L4X4X3/8"
         onChange={(e) => onChange({ size: e.target.value })}
         onBlur={(e) => onChange({ size: normalizeSize('', e.target.value) })}
         title={w ? `${fmtNumber(w, 2)} lb/ft` : 'Steel sizes (W, HSS, L, PL, Pipe…) give a weight per foot'}
@@ -113,6 +113,10 @@ function ItemRow({ item, onChange, onRemove, canRemove }: { item: DetailItem; on
       <label className="dd-end" title="Add one piece for the far end (posts at both ends)">
         <input type="checkbox" checked={item.addEnd} disabled={item.rule !== 'spacing'} onChange={(e) => onChange({ addEnd: e.target.checked })} />
         +1
+      </label>
+      <label className="dd-end" title="Galvanized: the material's Finish is Galvanize">
+        <input type="checkbox" checked={!!item.galv} onChange={(e) => onChange({ galv: e.target.checked || undefined })} data-testid="item-galv" />
+        Galv
       </label>
       <button className="icon-btn" title="Remove this material" disabled={!canRemove} onClick={onRemove}>
         <Trash2 size={13} />
@@ -468,6 +472,7 @@ export function StandardDetailsDialog({ detailId, newForMarkupId, newForMarkupId
                 <span>Quantity by</span>
                 <span>Spacing / qty</span>
                 <span />
+                <span title="Galvanized: the Finish is Galvanize">Finish</span>
                 <span />
               </div>
               {sel.items.map((it) => (

@@ -9,6 +9,8 @@ export function defaultColumns(): CustomColumn[] {
     { id: 'category', name: 'Category', kind: 'choice', options: ['Structural Steel', 'Misc Metals', 'Joists & Deck', 'Concrete', 'Architectural', 'Mechanical', 'Plumbing', 'Electrical', 'General'] },
     { id: 'piece_mark', name: 'Piece Mark', kind: 'text' },
     { id: 'member_size', name: 'Member Size', kind: 'text' },
+    { id: 'height', name: 'Height', kind: 'text' },
+    { id: 'finish', name: 'Finish', kind: 'choice', options: ['Galvanize', 'Prime', 'Paint', 'Powder Coat', 'Bare'] },
     { id: 'material', name: 'Material', kind: 'choice', options: ['Steel', 'Galvanized Steel', 'Stainless Steel', 'Aluminum', 'Concrete', 'Masonry', 'Wood', 'Other'] },
     { id: 'grade', name: 'Grade', kind: 'choice', options: ['A992', 'A36', 'A500 Gr. C', 'A572 Gr. 50', 'A53 Gr. B', 'F1554 Gr. 36', '4000 psi', '5000 psi'] },
     { id: 'qty', name: 'Qty', kind: 'number', defaultValue: '1', decimals: 0 },
@@ -47,6 +49,7 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'count',
   'c:category',
   'c:member_size',
+  'c:finish',
   'c:qty',
   'c:weight',
   'c:level',
@@ -66,7 +69,7 @@ function tool(
 ): ChestTool {
   const base = defaultStyle(type);
   const { subject, depth, text, ...styleExtra } = extra;
-  // Subjects are shapes: the one given, else the shape of the tool's Member Size (W24x55 → W), else none.
+  // Subjects are shapes: the one given, else the shape of the tool's Member Size (W24X55 → W), else none.
   const size = custom['Member Size'];
   const shape = subjectFor(subject, DEFAULT_SUBJECTS) || (size ? subjectForSize(String(size), DEFAULT_SUBJECTS) : undefined) || '';
   // Measurement fills follow the tool colour; text boxes and callouts keep their white background.
@@ -98,19 +101,19 @@ export function defaultToolChest(): ToolSet[] {
       id: uid(),
       name: 'Structural Steel',
       tools: [
-        tool('W12x26', 'length', '#d7263d', steel('W12x26', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 3 }),
-        tool('W18x35', 'length', '#e8112d', steel('W18x35', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 3 }),
-        tool('W24x55', 'length', '#f46036', steel('W24x55', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 3.5 }),
-        tool('W30x90', 'length', '#b5179e', steel('W30x90', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 4 }),
-        tool('HSS6x6x3/8 Column', 'count', '#2e86de', steel('HSS6x6x3/8', { Grade: 'A500 Gr. C', 'Labor Category': 'Fab & Erect' }), {
+        tool('W12X26', 'length', '#d7263d', steel('W12X26', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 3 }),
+        tool('W18X35', 'length', '#e8112d', steel('W18X35', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 3 }),
+        tool('W24X55', 'length', '#f46036', steel('W24X55', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 3.5 }),
+        tool('W30X90', 'length', '#b5179e', steel('W30X90', { Grade: 'A992', 'Labor Category': 'Fab & Erect' }), { lineWidth: 4 }),
+        tool('HSS6X6X3/8 Column', 'count', '#2e86de', steel('HSS6X6X3/8', { Grade: 'A500 Gr. C', 'Labor Category': 'Fab & Erect' }), {
           subject: 'HSS Column',
           symbol: 'square',
           symbolSize: 10,
         }),
-        tool('HSS6x6x3/8 Beam', 'length', '#2e86de', steel('HSS6x6x3/8', { Grade: 'A500 Gr. C' }), { subject: 'HSS6x6x3/8', lineStyle: 'dashed', lineWidth: 3 }),
-        tool('W10x33 Column', 'count', '#0b7a75', steel('W10x33', { Grade: 'A992' }), { subject: 'Column', symbol: 'diamond', symbolSize: 10 }),
-        tool('L4x4x3/8', 'polylength', '#2a9d8f', steel('L4x4x3/8', { Grade: 'A36', Category: 'Misc Metals' }), { lineWidth: 2.5 }),
-        tool('C10x15.3', 'length', '#6a4c93', steel('C10x15.3', { Grade: 'A36' }), { lineWidth: 2.5, lineStyle: 'dashed' }),
+        tool('HSS6X6X3/8 Beam', 'length', '#2e86de', steel('HSS6X6X3/8', { Grade: 'A500 Gr. C' }), { subject: 'HSS6X6X3/8', lineStyle: 'dashed', lineWidth: 3 }),
+        tool('W10X33 Column', 'count', '#0b7a75', steel('W10X33', { Grade: 'A992' }), { subject: 'Column', symbol: 'diamond', symbolSize: 10 }),
+        tool('L4X4X3/8', 'polylength', '#2a9d8f', steel('L4X4X3/8', { Grade: 'A36', Category: 'Misc Metals' }), { lineWidth: 2.5 }),
+        tool('C10X15.3', 'length', '#6a4c93', steel('C10X15.3', { Grade: 'A36' }), { lineWidth: 2.5, lineStyle: 'dashed' }),
         tool('1/2" Plate', 'area', '#ff9f1c', steel('PL1/2', { Grade: 'A36', Category: 'Misc Metals' }), { fillOpacity: 0.3 }),
       ],
     },
@@ -120,10 +123,10 @@ export function defaultToolChest(): ToolSet[] {
       tools: [
         tool('Joist 24K6', 'length', '#8338ec', steel('24K6', { Category: 'Joists & Deck', Grade: '' }), { subject: 'Joist 24K6', lineStyle: 'dashed', lineWidth: 2 }),
         tool('Metal Deck', 'area', '#3a86ff', { Category: 'Joists & Deck', Material: 'Galvanized Steel', Qty: 1, 'Member Size': '1.5B 20ga' }, { fillOpacity: 0.18 }),
-        tool('Base Plate', 'count', '#ef476f', steel('PL3/4x12', { Category: 'Structural Steel', Connection: 'Base Plate' }), { subject: 'BP', symbol: 'square', symbolSize: 8 }),
+        tool('Base Plate', 'count', '#ef476f', steel('PL3/4X12', { Category: 'Structural Steel', Connection: 'Base Plate' }), { subject: 'BP', symbol: 'square', symbolSize: 8 }),
         tool('Anchor Bolts', 'count', '#118ab2', { Category: 'Structural Steel', Material: 'Steel', Grade: 'F1554 Gr. 36', Qty: 4, 'Member Size': '3/4" AB' }, { symbol: 'cross', symbolSize: 8 }),
-        tool('Clip Angle', 'count', '#06d6a0', steel('L4x4x3/8', { Connection: 'Clip Angle', Category: 'Misc Metals' }), { symbol: 'triangle', symbolSize: 8 }),
-        tool('Embed Plate', 'count', '#9c6644', steel('PL1/2x8', { Connection: 'Embed Plate', Category: 'Misc Metals' }), { symbol: 'diamond', symbolSize: 8 }),
+        tool('Clip Angle', 'count', '#06d6a0', steel('L4X4X3/8', { Connection: 'Clip Angle', Category: 'Misc Metals' }), { symbol: 'triangle', symbolSize: 8 }),
+        tool('Embed Plate', 'count', '#9c6644', steel('PL1/2X8', { Connection: 'Embed Plate', Category: 'Misc Metals' }), { symbol: 'diamond', symbolSize: 8 }),
       ],
     },
     {
@@ -134,7 +137,7 @@ export function defaultToolChest(): ToolSet[] {
         tool('Guardrail', 'polylength', '#f4a261', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { lineWidth: 3, lineStyle: 'dashed' }),
         tool('Stair', 'count', '#264653', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { symbol: 'star', symbolSize: 12 }),
         tool('Ladder', 'count', '#2a9d8f', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { symbol: 'triangle', symbolSize: 10 }),
-        tool('Lintel', 'length', '#bc4749', steel('L6x4x3/8', { Category: 'Misc Metals' }), { lineWidth: 2.5 }),
+        tool('Lintel', 'length', '#bc4749', steel('L6X4X3/8', { Category: 'Misc Metals' }), { lineWidth: 2.5 }),
       ],
     },
     {

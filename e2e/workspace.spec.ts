@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample } from './helpers';
+import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample, showProperties } from './helpers';
 
 test('size tool keeps its typed size as the label until it is changed', async ({ page }) => {
   await openSample(page);
@@ -13,7 +13,7 @@ test('size tool keeps its typed size as the label until it is changed', async ({
   await page.getByTestId('shape-tool-save').click();
 
   const tool = page.getByTestId('chest-tool').filter({ hasText: 'W Beam' });
-  await expect(tool.getByTestId('size-box')).toHaveValue('W24x68');
+  await expect(tool.getByTestId('size-box')).toHaveValue('W24X68');
   await tool.click();
   await clickAt(page, gx(0) + 9, gy(0));
   await clickAt(page, gx(1) - 9, gy(0));
@@ -29,18 +29,18 @@ test('size tool keeps its typed size as the label until it is changed', async ({
   const rows = page.getByTestId('markup-row');
   await expect(rows).toHaveCount(2);
   await expect(rows.locator('[data-col=subject]')).toHaveText(['W', 'W']);
-  await expect(rows.locator('[data-col="c:member_size"]')).toHaveText(['W24x68', 'W21x44']);
+  await expect(rows.locator('[data-col="c:member_size"]')).toHaveText(['W24X68', 'W21X44']);
   // 23'-0" at 68 and 44 plf
   await expect(rows.locator('[data-col="c:weight"]')).toHaveText(['1,564 lbs', '1,012 lbs']);
 
   // The size stays with the tool across sessions.
   await page.reload();
-  await expect(page.getByTestId('chest-tool').filter({ hasText: 'W Beam' }).getByTestId('size-box')).toHaveValue('W21x44');
+  await expect(page.getByTestId('chest-tool').filter({ hasText: 'W Beam' }).getByTestId('size-box')).toHaveValue('W21X44');
 });
 
 test('tool chest tools can be hidden and shown again', async ({ page }) => {
   await openSample(page);
-  const w12 = page.getByTestId('chest-tool').filter({ hasText: 'W12x26' });
+  const w12 = page.getByTestId('chest-tool').filter({ hasText: 'W12X26' });
   await expect(w12).toHaveCount(1);
   await w12.click({ button: 'right' });
   await page.getByText('Hide Tool', { exact: true }).click();
@@ -59,14 +59,14 @@ test('count markups take a manual quantity, resume counting and split', async ({
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'HSS6x6x3/8 Column' }).click();
+  await page.getByTestId('chest-tool').filter({ hasText: 'HSS6X6X3/8 Column' }).click();
   for (let i = 0; i < 3; i++) await clickAt(page, gx(i), gy(2));
   await page.keyboard.press('Escape');
 
   const rows = page.getByTestId('markup-row');
   await expect(rows).toHaveCount(1);
   await rows.first().click();
-  await page.getByTestId('tab-properties').click();
+  await showProperties(page, 'measurement');
 
   await page.getByTestId('prop-count-override').fill('10');
   await page.getByTestId('prop-count-override').press('Enter');

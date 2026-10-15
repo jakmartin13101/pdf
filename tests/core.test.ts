@@ -188,18 +188,25 @@ describe('markup rows', () => {
   });
 });
 
-import { normalizeSize } from '../src/core/steelShapes';
+import { normalizeSize, sizeText } from '../src/core/steelShapes';
 
 describe('size tools', () => {
   it('normalizes typed sizes to the tool family', () => {
-    expect(normalizeSize('W', '18x35')).toBe('W18x35');
-    expect(normalizeSize('W', 'w24 X 55')).toBe('W24x55');
-    expect(normalizeSize('W', 'W 12 x 26')).toBe('W12x26');
+    expect(normalizeSize('W', '18x35')).toBe('W18X35');
+    expect(normalizeSize('W', 'w24 X 55')).toBe('W24X55');
+    // A space after the shape is kept; "*" is an X.
+    expect(normalizeSize('W', 'W 12 x 26')).toBe('W 12X26');
+    expect(normalizeSize('W', 'W 8*10')).toBe('W 8X10');
+    expect(normalizeSize('', 'w8*10')).toBe('W8X10');
+    expect(normalizeSize('', 'hss 6*6*3/8')).toBe('HSS 6X6X3/8');
     expect(normalizeSize('Pipe', 'pipe 4 xs')).toBe('Pipe 4 xs');
-    expect(normalizeSize('HSS', '6x6x3/8')).toBe('HSS6x6x3/8');
+    expect(normalizeSize('HSS', '6x6x3/8')).toBe('HSS6X6X3/8');
     expect(normalizeSize('Pipe', '6 Std')).toBe('Pipe 6 Std');
     expect(normalizeSize('', 'Custom beam')).toBe('Custom beam');
     expect(normalizeSize('L', '')).toBe('');
+    expect(sizeText('w8*10')).toBe('W8X10');
+    expect(sizeText('Beam at grid 4')).toBe('Beam at grid 4');
+    expect(sizeText('2*4 blocking')).toBe('2X4 blocking');
   });
 });
 

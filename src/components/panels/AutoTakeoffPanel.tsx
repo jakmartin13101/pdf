@@ -189,7 +189,7 @@ export function AutoTakeoffPanel() {
       <div className="panel-body">
         <div className="form" data-testid="auto-panel">
           <div className="hint">
-            Finds member-size labels (W24x55, HSS8x4x1/4, Pipe 4 Std…) and measures the line each one names, using the sheet's scale. Review the members on the
+            Finds member-size labels (W24X55, HSS8X4X1/4, Pipe 4 Std…) and measures the line each one names, using the sheet's scale. Review the members on the
             drawing, then create the measurements.
           </div>
 

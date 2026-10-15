@@ -37,7 +37,7 @@ export function summableCustomColumns(doc: DocState) {
 
 /**
  * The summary line a markup goes on: its subject (a shape such as W) and its Member Size, so each size
- * gets its own line (W24x55, W18x35…). A size that already names the subject stands on its own.
+ * gets its own line (W24X55, W18X35…). A size that already names the subject stands on its own.
  */
 export function summaryKey(subject: string, size: string): string {
   const s = subject.trim();

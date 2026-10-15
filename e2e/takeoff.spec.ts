@@ -35,7 +35,7 @@ test('tool chest tools carry subject and data; formula column computes weight', 
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18x35' }).first().click();
+  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
   for (let i = 0; i < 2; i++) {
     await clickAt(page, gx(i) + 9, gy(0));
     await clickAt(page, gx(i + 1) - 9, gy(0));
@@ -44,7 +44,7 @@ test('tool chest tools carry subject and data; formula column computes weight', 
   const rows = page.getByTestId('markup-row');
   await expect(rows).toHaveCount(2);
   await expect(rows.first().locator('[data-col=subject]')).toHaveText('W'); // the shape; the size is the Member Size
-  await expect(rows.first().locator('[data-col="c:member_size"]')).toHaveText('W18x35');
+  await expect(rows.first().locator('[data-col="c:member_size"]')).toHaveText('W18X35');
   // 23'-0" x 35 plf = 805 lbs each
   await expect(rows.first().locator('[data-col="c:weight"]')).toHaveText('805 lbs');
   await expect(page.getByTestId('total-c:weight')).toHaveText('1,610 lbs');
@@ -54,7 +54,7 @@ test('count tool accumulates clicks into one count markup', async ({ page }) => 
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'HSS6x6x3/8 Column' }).click();
+  await page.getByTestId('chest-tool').filter({ hasText: 'HSS6X6X3/8 Column' }).click();
   for (let i = 0; i < 4; i++) await clickAt(page, gx(i), gy(2));
   await page.keyboard.press('Escape');
   const rows = page.getByTestId('markup-row');

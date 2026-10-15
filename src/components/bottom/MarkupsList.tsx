@@ -1,4 +1,6 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { sizeText } from '../../core/steelShapes';
+
 import { SPLITTABLE } from '../../core/maxLength';
 import { cmdSplitAtMax } from '../../store/commands';
 import { PanelContext, PanelHeader } from '../dock/PanelHeader';
@@ -166,7 +168,9 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
       if (d != null) st.updateMarkups(ids.filter((id) => st.doc.markups.find((x) => x.id === id)?.type === 'volume'), (x) => ({ ...x, depth: d }));
       return;
     }
-    st.updateMarkups(ids, (x) => ({ ...x, [col.id]: val }) as Markup);
+    // A label that is a size is written the standard way (w8*10 → W8X10).
+    const value = col.id === 'label' ? sizeText(val) : val;
+    st.updateMarkups(ids, (x) => ({ ...x, [col.id]: value }) as Markup);
   };
   const keys = (e: React.KeyboardEvent) => {
     e.stopPropagation();

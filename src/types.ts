@@ -280,6 +280,8 @@ export interface DetailItem {
   value: string;
   /** Spacing rule: add one for the end piece (posts at both ends). */
   addEnd: boolean;
+  /** Galvanized: the material's Finish is Galvanize. */
+  galv?: boolean;
 }
 
 export interface StandardDetail {
@@ -296,7 +298,7 @@ export interface StandardDetail {
 }
 
 /**
- * A "size tool" keeps a typed size (e.g. W18x35) on the tool itself. Every markup placed with it is
+ * A "size tool" keeps a typed size (e.g. W18X35) on the tool itself. Every markup placed with it is
  * labelled with that size until the size is changed in the Tool Chest.
  */
 export interface SizeToolConfig {

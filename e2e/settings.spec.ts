@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clickAt, gotoSheet, gx, gy, openSample, toScreen } from './helpers';
+import { clickAt, gotoSheet, gx, gy, openSample, toScreen, showProperties } from './helpers';
 
 const menu = async (page: Page, top: string, item: string) => {
   await page.locator('.menu-btn', { hasText: new RegExp(`^${top}$`) }).click();
@@ -43,7 +43,7 @@ test('auto takeoff lines follow the style rules, and can be fine-adjusted before
   await w.getByTestId('rule-color').fill('#0a8f6e');
   await w.getByTestId('rule-style').selectOption('dashed');
   await w.getByTestId('rule-width').fill('4');
-  await page.getByTestId('rule-try').fill('W30x90');
+  await page.getByTestId('rule-try').fill('W30X90');
   await expect(page.getByTestId('rule-try-result')).toContainText('starts with “W”');
   await page.getByTestId('settings-done').click();
 
@@ -53,12 +53,12 @@ test('auto takeoff lines follow the style rules, and can be fine-adjusted before
   await expect(page.getByTestId('auto-status')).toHaveText('50 members in 5 sizes');
   // The preview draws each member with its rule's line.
   const line = (size: string) => page.locator(`[data-testid=auto-member][data-size="${size}"] [data-testid=auto-member-line]`).first();
-  await expect(line('W24x55')).toHaveAttribute('stroke', '#0a8f6e');
-  await expect(line('W24x55')).toHaveAttribute('stroke-dasharray', /\d/);
-  await expect(line('HSS6x6x1/4')).toHaveAttribute('stroke', '#1f6feb'); // default rule: HSS blue
+  await expect(line('W24X55')).toHaveAttribute('stroke', '#0a8f6e');
+  await expect(line('W24X55')).toHaveAttribute('stroke-dasharray', /\d/);
+  await expect(line('HSS6X6X1/4')).toHaveAttribute('stroke', '#1f6feb'); // default rule: HSS blue
 
-  // Pick the first W24x55 (grid 2, A-B) in the list: it is zoomed to and gets − / + buttons.
-  const group = page.getByTestId('auto-group').filter({ has: page.locator('.auto-size', { hasText: /^W24x55$/ }) });
+  // Pick the first W24X55 (grid 2, A-B) in the list: it is zoomed to and gets − / + buttons.
+  const group = page.getByTestId('auto-group').filter({ has: page.locator('.auto-size', { hasText: /^W24X55$/ }) });
   await group.locator('.auto-group-head button').first().click();
   const row = group.getByTestId('auto-member-row').first();
   const len = row.getByTestId('auto-member-length');
@@ -98,7 +98,7 @@ test('auto takeoff lines follow the style rules, and can be fine-adjusted before
   await page.getByTestId('tb-fit-page').click();
   await page.keyboard.press('Escape');
   await clickAt(page, (gx(0) + gx(1)) / 2, gy(1));
-  await page.getByTestId('tab-properties').click();
+  await showProperties(page, 'measurement');
   await expect(page.getByTestId('prop-measurement')).toHaveText(`23'-6"`);
   await page.getByTestId('prop-adjust-start-plus').click(); // step is still 6"
   await expect(page.getByTestId('prop-measurement')).toHaveText(`24'-0"`);

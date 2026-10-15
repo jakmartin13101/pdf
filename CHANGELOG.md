@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.12.0 – 2026-10-15
+
+### Sizes with a capital X
+- Sizes are written with a capital X (W24X55, HSS6X6X3/8) in the Markups List and exports. `*` can be typed for the
+  X (`w8*10` → `W8X10`); a space after the shape is kept (`W 8*10` → `W 8X10`). Member Size cells and fields, size
+  tools, labels that are sizes, standard detail material, the Tool Chest and the automatic takeoff.
+- Files and Tool Chests from earlier versions are brought up to date when they open.
+
+### Properties panel
+- Measurements and counts show the main fields – Subject, Label, Length (or Count, Area…), Height and Finish – then
+  *Style* (line and text styles and colours) and *Properties* (a box for every other column, Comments, Status, Layer,
+  Author) that fold open, and *Measurement* and *Standard Details*. Sections stay open or shut as left.
+- *Properties* has a field chooser: hidden fields keep their values in the markups and the Markups List.
+- The panel opens when a markup is drawn or selected (*Settings → General* to switch off). Properties has its own
+  section below the Tool Chest, so the Tool Chest stays in view; saved layouts are changed once to match.
+- New columns **Height** and **Finish** (Galvanize, Prime, Paint, Powder Coat, Bare); Finish shows in the Markups List.
+  Documents from before get them when they open.
+
+### Selection totals
+- Selecting markups shows a box beside the selection with their total length, count and area, and the standard detail
+  material on them (3 × 10'-0" beams: 30'-0"; 3 counts of 10: 30 EA).
+
+### Standard details
+- Material added by a quantity or a spacing shows the length of each piece in the Length column (with the number of
+  pieces in Count); full-length material shows the measured run. Totals, weights and reports still use every piece.
+- **Galv** tick per material: its Finish is Galvanize. Shown as GALV in the rule.
+
 ## 1.11.0 – 2026-10-15
 
 ### Maximum lengths by shape

@@ -302,7 +302,7 @@ export function ToolChestPanel() {
           );
         })}
         <div className="hint" style={{ padding: 10 }}>
-          Click a tool to start a takeoff with its subject, appearance and column values. Size tools carry the size you type (e.g. W18x35) onto every markup until you change
+          Click a tool to start a takeoff with its subject, appearance and column values. Size tools carry the size you type (e.g. W18X35) onto every markup until you change
           it. Right-click for options, including Hide; the eye button shows hidden tools.
         </div>
       </div>
