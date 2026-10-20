@@ -521,6 +521,9 @@ columns.
   Single View (Close Other Panes)* for all but the active one – it has no key unless you give it one. Each pane has its
   own document tabs, sheet selector, zoom and pan; the active pane is outlined and receives tools. Drag a divider to
   resize the panes beside it.
+
+![Split many times: four panes side by side, one of them split four ways](docs/screenshot-split-many.png)
+
 * **Detach a pane** with the ↗ button in its header (or *Window → Detach Active Pane*). In the desktop app it becomes
   its own window you can move to another monitor and resize; in a browser that blocks pop-ups it floats inside the
   app (drag its header to move, the corner to resize). A detached pane uses the main window's toolbar, menus and
