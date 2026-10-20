@@ -193,7 +193,7 @@ test('tabs move between panes by dragging or from their menu', async ({ page }) 
   // Split: the new pane shows the current document; its + menu shows the other one there too.
   await page.getByTestId('doc-tab').first().click();
   await page.locator('.menu-btn', { hasText: 'Window' }).click();
-  await page.getByRole('menuitem', { name: 'Split Vertical', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Split Vertical/ }).click();
   await expect(tabsOf(page, 1)).toHaveText([SET]);
   await page.getByTestId('pane').nth(1).getByTestId('doc-tab-add').click();
   await page.locator('.context-menu').getByRole('menuitem', { name: `Show ${ADDENDUM} Here` }).click();
