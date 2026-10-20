@@ -7,12 +7,10 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.15.0**: a new **Measurements panel** – the measuring tools in a row, *Page Scale*, and *Count / Length
-> Measurement Properties* with **Depth, Width and Height** (a count with a Height takes off a length: 3 plates ×
-> 1'-2" = 3'-6") and the units each measurement is written in; Tool Chest, Measurements and Properties **stacked
-> down the right side**, every side panel **resizable** at any window size; a **thumbnail size slider**; and
-> **keyboard shortcuts for split view** (1.14.0: Combine report orders stock-length pieces whole; 1.13.0: your units)
-> – see the [changelog](CHANGELOG.md).
+> **Version 1.16.0**: **split the view as many times as you want** – every split (Ctrl+Shift+2 side by side,
+> Ctrl+Shift+3 one above the other) splits the active pane again, and panes close with their × (1.15.0: the new
+> Measurements panel with Depth, Width and a count's Height, stacked resizable side panels, the thumbnail slider; 1.14.0:
+> Combine report orders stock-length pieces whole) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -514,11 +512,15 @@ columns.
 
 ### Split view and workspace layout
 
-* **Split the document**: *Window → Split Vertical / Split Horizontal / Four Ways*, the status-bar buttons, or the
-  keys – **Ctrl+Shift+2** split vertical (side by side), **Ctrl+Shift+3** split horizontal, **Ctrl+Shift+4** four ways,
-  **Ctrl+Shift+1** single view (the keys of the split showing go back to one view). Change the keys in *Settings →
-  Keyboard*. Each pane has its own document tabs, sheet selector, zoom and pan; the active pane is outlined and
-  receives tools. Drag the divider to resize; close a pane with its ×.
+* **Split the document as many times as you want**: *Window → Split Vertical / Split Horizontal / Split Four Ways*,
+  the status-bar buttons, or the keys – **Ctrl+Shift+2** side by side, **Ctrl+Shift+3** one above the other,
+  **Ctrl+Shift+4** four ways. Each split splits the **active pane** again (the new pane becomes the active one), so
+  panes can be split inside splits in any mix; splitting beside panes already side by side shares the space evenly.
+  Change the keys in *Settings → Keyboard*.
+* **Panes are closed by hand**: the × in a pane's header (the pane's documents stay open in the others), or *Window →
+  Single View (Close Other Panes)* for all but the active one – it has no key unless you give it one. Each pane has its
+  own document tabs, sheet selector, zoom and pan; the active pane is outlined and receives tools. Drag a divider to
+  resize the panes beside it.
 * **Detach a pane** with the ↗ button in its header (or *Window → Detach Active Pane*). In the desktop app it becomes
   its own window you can move to another monitor and resize; in a browser that blocks pop-ups it floats inside the
   app (drag its header to move, the corner to resize). A detached pane uses the main window's toolbar, menus and

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.16.0 – 2026-10-20
+
+### Split view
+- Split as many times as you want: each split – Split Vertical (Ctrl+Shift+2), Split Horizontal (Ctrl+Shift+3), Split
+  Four Ways (Ctrl+Shift+4), the Window menu or the status-bar buttons – splits the active pane again, inside other
+  splits in any mix. The new pane is the active one; panes split beside others the same way share the space evenly.
+  There is no longer a limit of four panes (new panes from tabs and panes put back from their own window too).
+- Panes are closed by hand with their ×. Pressing a split's keys again splits again (it no longer goes back to one
+  view). *Window → Single View (Close Other Panes)* has no key by default (one can be set in Settings → Keyboard).
+- Every divider resizes the panes beside it. Narrow panes keep their buttons; the sheet picker gives way.
+
 ## 1.15.0 – 2026-10-20
 
 ### Measurements panel

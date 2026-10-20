@@ -203,15 +203,18 @@ export function runCommand(id: string) {
       return;
     }
     case 'view.single':
-      if (st.loaded) st.setPaneLayout('single');
+      if (st.loaded) st.singleView();
       return;
+    // Each split splits the active pane again, as often as wanted; panes are closed with their ×.
     case 'view.splitV':
+      if (st.loaded) st.splitPane('row');
+      return;
     case 'view.splitH':
-    case 'view.split4': {
-      if (!st.loaded) return;
-      const layout = id === 'view.splitV' ? 'vertical' : id === 'view.splitH' ? 'horizontal' : 'grid';
-      return st.setPaneLayout(st.paneLayout === layout ? 'single' : layout);
-    }
+      if (st.loaded) st.splitPane('col');
+      return;
+    case 'view.split4':
+      if (st.loaded) st.splitPane('grid');
+      return;
     case 'tab.newPane': {
       const t = activeTab();
       if (t) st.tabToNewPane(t.paneId, t.docId);

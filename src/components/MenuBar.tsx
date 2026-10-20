@@ -47,7 +47,7 @@ export function MenuBar() {
   const lastSaved = useStore((s) => s.lastSaved);
   const ui = useStore((s) => s.ui);
   const layout = useStore((s) => s.layout);
-  const paneLayout = useStore((s) => s.paneLayout);
+  const attachedCount = useStore((s) => s.panes.filter((p) => !p.detached).length);
   const panes = useStore((s) => s.panes);
   const activePaneId = useStore((s) => s.activePaneId);
   const prefs = useStore((s) => s.prefs);
@@ -214,10 +214,10 @@ export function MenuBar() {
     Window: [
       ...docTabItems(),
       { sep: true },
-      { label: 'Single View', shortcut: sc('view.single'), checked: paneLayout === 'single', disabled: !loaded, onClick: () => st().setPaneLayout('single') },
-      { label: 'Split Vertical', shortcut: sc('view.splitV'), checked: paneLayout === 'vertical', disabled: !loaded, onClick: () => st().setPaneLayout('vertical') },
-      { label: 'Split Horizontal', shortcut: sc('view.splitH'), checked: paneLayout === 'horizontal', disabled: !loaded, onClick: () => st().setPaneLayout('horizontal') },
-      { label: 'Split Four Ways', shortcut: sc('view.split4'), checked: paneLayout === 'grid', disabled: !loaded, onClick: () => st().setPaneLayout('grid') },
+      { label: 'Split Vertical', shortcut: sc('view.splitV'), disabled: !loaded, onClick: () => st().splitPane('row') },
+      { label: 'Split Horizontal', shortcut: sc('view.splitH'), disabled: !loaded, onClick: () => st().splitPane('col') },
+      { label: 'Split Four Ways', shortcut: sc('view.split4'), disabled: !loaded, onClick: () => st().splitPane('grid') },
+      { label: 'Single View (Close Other Panes)', shortcut: sc('view.single'), checked: attachedCount === 1, disabled: !loaded || attachedCount === 1, onClick: () => st().singleView() },
       {
         label: 'Detach Active Pane',
         disabled: !loaded || panes.filter((p) => !p.detached).length < 2 || !!panes.find((p) => p.id === activePaneId)?.detached,

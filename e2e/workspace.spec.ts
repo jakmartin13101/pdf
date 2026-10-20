@@ -98,10 +98,33 @@ test('document splits into panes that show different sheets', async ({ page }) =
   await expect(page.getByTestId('pane-sheet').nth(1).locator('option:checked')).toHaveText('S1.02 – Roof Framing Plan');
   await expect(panes.nth(1).locator('canvas').first()).toBeVisible();
 
-  await page.getByTestId('split-grid').click();
+  // Split as often as wanted: the active pane (the new one) splits again, side by side…
+  await page.getByTestId('split-vertical').click();
+  await page.getByTestId('split-vertical').click();
   await expect(panes).toHaveCount(4);
+  const xs = await panes.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.x), Math.round(r.width)]));
+  // Four across, evenly.
+  for (let i = 1; i < 4; i++) expect(xs[i][0]).toBeGreaterThan(xs[i - 1][0] + 50);
+  expect(Math.max(...xs.map((x) => x[1])) - Math.min(...xs.map((x) => x[1]))).toBeLessThan(6);
+  // …one above the other, and four ways.
   await page.getByTestId('split-horizontal').click();
-  await expect(panes).toHaveCount(2);
+  await expect(panes).toHaveCount(5);
+  await page.getByTestId('split-grid').click();
+  await expect(panes).toHaveCount(8);
+  await page.screenshot({ path: 'test-results/split-many.png' });
+  // Drag a divider: the panes beside it change size.
+  const div = page.getByTestId('pane-divider').first();
+  const db = (await div.boundingBox())!;
+  const w0 = (await panes.first().boundingBox())!.width;
+  await page.mouse.move(db.x + db.width / 2, db.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(db.x + db.width / 2 + 60, db.y + 40, { steps: 5 });
+  await page.mouse.up();
+  expect((await panes.first().boundingBox())!.width).toBeGreaterThan(w0 + 40);
+  // Panes close by hand, one at a time…
+  await page.getByTestId('pane-close').last().click();
+  await expect(panes).toHaveCount(7);
+  // …or all but the active one.
   await page.getByTestId('split-single').click();
   await expect(panes).toHaveCount(1);
 });

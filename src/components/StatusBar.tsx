@@ -142,21 +142,22 @@ export function StatusBar() {
   );
 }
 
+/** Split the active pane again (as often as wanted), or go back to one pane; panes also close with their ×. */
 function SplitButtons() {
-  const layout = useStore((s) => s.paneLayout);
+  const count = useStore((s) => s.panes.filter((p) => !p.detached).length);
   const sc = useShortcuts();
   const st = getState();
-  const btn = (id: typeof layout, Icon: typeof Square, title: string, cmd: string) => (
-    <button className={`icon-btn${layout === id ? ' active' : ''}`} title={sc(cmd) ? `${title} (${sc(cmd)})` : title} onClick={() => st.setPaneLayout(id)} data-testid={`split-${id}`}>
+  const btn = (id: string, Icon: typeof Square, title: string, cmd: string, run: () => void, active = false) => (
+    <button className={`icon-btn${active ? ' active' : ''}`} title={sc(cmd) ? `${title} (${sc(cmd)})` : title} onClick={run} data-testid={`split-${id}`}>
       <Icon size={13} />
     </button>
   );
   return (
-    <div className="sb-nav" title="Split the view to work on several sheets at once">
-      {btn('single', Square, 'Single view', 'view.single')}
-      {btn('vertical', Columns2, 'Split vertical (side by side)', 'view.splitV')}
-      {btn('horizontal', Rows2, 'Split horizontal (stacked)', 'view.splitH')}
-      {btn('grid', Grid2x2, 'Split four ways', 'view.split4')}
+    <div className="sb-nav" title="Split the view to work on several sheets at once" data-panes={count}>
+      {btn('single', Square, count > 1 ? 'Single view: close the other panes' : 'Single view', 'view.single', () => st.singleView(), count === 1)}
+      {btn('vertical', Columns2, 'Split the active pane side by side', 'view.splitV', () => st.splitPane('row'))}
+      {btn('horizontal', Rows2, 'Split the active pane one above the other', 'view.splitH', () => st.splitPane('col'))}
+      {btn('grid', Grid2x2, 'Split the active pane four ways', 'view.split4', () => st.splitPane('grid'))}
     </div>
   );
 }

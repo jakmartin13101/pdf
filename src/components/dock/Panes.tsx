@@ -6,10 +6,11 @@
 // that allow pop-ups) a detached pane is a real window that can go to another monitor; otherwise it
 // floats inside the main window.
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, FileText, PanelTopClose, Plus, X } from 'lucide-react';
 import { docTitle, findSheet, getState, isDirty, paneDoc, useStore, type Pane } from '../../store/store';
+import { syncTree, type PaneNode } from '../../store/paneTree';
 import { Viewer } from '../viewer/Viewer';
 import { sheetDisplayName } from '../../core/columns';
 import { FULL_NAME } from '../../brand';
@@ -304,18 +305,34 @@ function PaneView({ pane, index, style, onDragStart }: { pane: Pane; index: numb
   );
 }
 
-function PaneDivider({ dir, container }: { dir: 'v' | 'h'; container: React.RefObject<HTMLDivElement> }) {
-  // Ratio-based: the split follows the pointer position within the container.
+/**
+ * The divider between two panes (or groups) of a split: dragging it shares their space, each kept at least
+ * MIN_PANE px.
+ */
+const MIN_PANE = 90;
+function PaneDivider({ dir, path, a, container }: { dir: 'row' | 'col'; path: number[]; a: number; container: React.RefObject<HTMLDivElement> }) {
   return (
     <div
-      className={`splitter-${dir} pane-divider`}
+      className={`splitter-${dir === 'row' ? 'v' : 'h'} pane-divider`}
       onPointerDown={(e) => {
         e.preventDefault();
-        const rect = container.current?.getBoundingClientRect();
-        if (!rect) return;
+        const el = container.current;
+        if (!el) return;
+        let last = dir === 'row' ? e.clientX : e.clientY;
         const move = (ev: PointerEvent) => {
-          const r = dir === 'v' ? (ev.clientX - rect.left) / rect.width : (ev.clientY - rect.top) / rect.height;
-          st().setPaneSplit(dir === 'v' ? { x: Math.min(0.85, Math.max(0.15, r)) } : { y: Math.min(0.85, Math.max(0.15, r)) });
+          const node = nodeAt(st().paneTree, path);
+          if (!node || 'pane' in node) return;
+          const cur = dir === 'row' ? ev.clientX : ev.clientY;
+          const total = Math.max(1, dir === 'row' ? el.clientWidth : el.clientHeight);
+          const W = node.sizes.reduce((x, y) => x + y, 0);
+          const dw = ((cur - last) * W) / total;
+          const min = (MIN_PANE * W) / total;
+          const sizes = [...node.sizes];
+          if (sizes[a] + dw < min || sizes[a + 1] - dw < min) return;
+          sizes[a] += dw;
+          sizes[a + 1] -= dw;
+          last = cur;
+          st().setPaneSizes(path, sizes);
         };
         const up = () => {
           window.removeEventListener('pointermove', move);
@@ -324,54 +341,49 @@ function PaneDivider({ dir, container }: { dir: 'v' | 'h'; container: React.RefO
         window.addEventListener('pointermove', move);
         window.addEventListener('pointerup', up);
       }}
+      data-testid="pane-divider"
     />
   );
 }
 
-/** Panes in the main window: one, a side-by-side or stacked pair, three (two over one) or four. */
-export function PaneArea() {
+function nodeAt(tree: PaneNode, path: number[]): PaneNode | null {
+  let n: PaneNode = tree;
+  for (const i of path) {
+    if ('pane' in n) return null;
+    n = n.children[i];
+    if (!n) return null;
+  }
+  return n;
+}
+
+/** A pane, or a split of panes side by side or one above the other (each of which may be split again). */
+function PaneNodeView({ node, path, style }: { node: PaneNode; path: number[]; style?: CSSProperties }) {
   const panes = useStore((s) => s.panes);
-  const layout = useStore((s) => s.paneLayout);
-  const split = useStore((s) => s.paneSplit);
   const ref = useRef<HTMLDivElement>(null);
-  const rowRef = useRef<HTMLDivElement>(null);
-  const row2Ref = useRef<HTMLDivElement>(null);
-  const attached = panes.filter((p) => !p.detached);
-  const num = (p: Pane) => panes.indexOf(p);
-  if (attached.length <= 1) {
-    return (
-      <div className="pane-area" ref={ref}>
-        {attached[0] && <PaneView pane={attached[0]} index={num(attached[0])} style={{ flex: 1 }} />}
-      </div>
-    );
+  if ('pane' in node) {
+    const pane = panes.find((p) => p.id === node.pane);
+    return pane ? <PaneView pane={pane} index={panes.indexOf(pane)} style={style} /> : null;
   }
-  if (attached.length === 2) {
-    const vertical = layout !== 'horizontal';
-    const r = vertical ? split.x : split.y;
-    return (
-      <div className={`pane-area ${vertical ? 'row' : 'col'}`} ref={ref}>
-        <PaneView pane={attached[0]} index={num(attached[0])} style={{ flex: r }} />
-        <PaneDivider dir={vertical ? 'v' : 'h'} container={ref} />
-        <PaneView pane={attached[1]} index={num(attached[1])} style={{ flex: 1 - r }} />
-      </div>
-    );
-  }
-  const [a, b, c, d] = attached;
   return (
-    <div className="pane-area col" ref={ref}>
-      <div className="pane-row" ref={rowRef} style={{ flex: split.y }}>
-        <PaneView pane={a} index={num(a)} style={{ flex: split.x }} />
-        <PaneDivider dir="v" container={rowRef} />
-        <PaneView pane={b} index={num(b)} style={{ flex: 1 - split.x }} />
-      </div>
-      <PaneDivider dir="h" container={ref} />
-      <div className="pane-row" ref={row2Ref} style={{ flex: 1 - split.y }}>
-        <PaneView pane={c} index={num(c)} style={{ flex: d ? split.x : 1 }} />
-        {d && <PaneDivider dir="v" container={row2Ref} />}
-        {d && <PaneView pane={d} index={num(d)} style={{ flex: 1 - split.x }} />}
-      </div>
+    <div className={`pane-split ${node.dir}`} ref={ref} style={style} data-testid="pane-split" data-dir={node.dir}>
+      {node.children.map((c, i) => (
+        <Fragment key={'pane' in c ? c.pane : `s${i}`}>
+          {i > 0 && <PaneDivider dir={node.dir} path={path} a={i - 1} container={ref} />}
+          <PaneNodeView node={c} path={[...path, i]} style={{ flex: `${node.sizes[i] ?? 1} 1 0` }} />
+        </Fragment>
+      ))}
     </div>
   );
+}
+
+/** Panes in the main window, split as often as wanted. */
+export function PaneArea() {
+  const panes = useStore((s) => s.panes);
+  const stored = useStore((s) => s.paneTree);
+  const attached = panes.filter((p) => !p.detached);
+  // The tree always holds exactly the attached panes.
+  const tree = syncTree(stored, attached.map((p) => p.id));
+  return <div className="pane-area">{tree && <PaneNodeView node={tree} path={[]} style={{ flex: 1 }} />}</div>;
 }
 
 // ---------------------------------------------------------------------------

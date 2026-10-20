@@ -32,6 +32,7 @@ import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
+import { appendTo, leaf, setSizesAt, splitIn, syncTree, type PaneNode } from './paneTree';
 import { PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, upgradeLayout, type DockTarget } from './dockLayout';
 import { sizeText } from '../core/steelShapes';
 import { upgradeToolChest } from '../core/docUpgrade';
@@ -215,7 +216,6 @@ export interface DocSlot {
   autoTakeoff: AutoTakeoffState | null;
 }
 
-export type PaneLayout = 'single' | 'vertical' | 'horizontal' | 'grid';
 
 export interface Prefs {
   author: string;
@@ -325,7 +325,8 @@ export interface AppState {
   /** Panel or toolbar being dragged to a new dock position. */
   panelDrag: PanelDrag | null;
   panes: Pane[];
-  paneLayout: PaneLayout;
+  /** How the panes of the main window are split (detached panes are not in it). */
+  paneTree: PaneNode;
   activePaneId: string;
   /** Bumped whenever the active pane changes; a count never continues across a pane change. */
   activeEpoch: number;
@@ -333,7 +334,6 @@ export interface AppState {
   compareChanges: Record<string, CompareChanges>;
   /** Members found by the automatic takeoff, waiting to be reviewed and created (not saved). */
   autoTakeoff: AutoTakeoffState | null;
-  paneSplit: { x: number; y: number };
   prefs: Prefs;
   toolChest: ToolSet[];
   typeDefaults: Partial<Record<MarkupType, TypeDefault>>;
@@ -460,10 +460,14 @@ export interface AppState {
   resetLayout: () => void;
 
   // split view
-  setPaneLayout: (layout: PaneLayout) => void;
+  /** Split a pane (the active one) again: side by side, one above the other, or into four. */
+  splitPane: (how: 'row' | 'col' | 'grid', paneId?: string) => void;
+  /** Close every pane of the main window but the active one. */
+  singleView: () => void;
   setActivePane: (id: string) => void;
   setPaneSheet: (paneId: string, sheetId: string) => void;
-  setPaneSplit: (patch: Partial<{ x: number; y: number }>) => void;
+  /** Sizes of the panes in one split (the path of child indices to it). */
+  setPaneSizes: (path: number[], sizes: number[]) => void;
   closePane: (id: string) => void;
   detachPane: (id: string, mode?: PaneWindow['mode']) => void;
   attachPane: (id: string) => void;
@@ -686,10 +690,7 @@ export function newDocState(prefs: Prefs): DocState {
   };
 }
 
-const PANE_COUNT: Record<PaneLayout, number> = { single: 1, vertical: 2, horizontal: 2, grid: 4 };
 const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
-/** Layout for the panes left in the main window (three attached panes use the grid: two over one). */
-const layoutFor = (n: number, prev: PaneLayout): PaneLayout => (n <= 1 ? 'single' : n === 2 ? (prev === 'horizontal' ? 'horizontal' : 'vertical') : 'grid');
 
 const defaultPrefs = (): Prefs => ({
   author: 'Estimator',
@@ -842,6 +843,13 @@ export const useStore = create<AppState>()((set, get, api) => {
     set({ layout });
   };
 
+  /** The split tree for these panes: the attached ones, where they were (new ones at the end). */
+  const treeOf = (panes: Pane[], tree: PaneNode = get().paneTree): PaneNode => {
+    const ids = attachedPanes(panes).map((p) => p.id);
+    const t = syncTree(tree, ids) ?? leaf(ids[0] ?? panes[0]?.id ?? 'pane-1');
+    return JSON.stringify(t) === JSON.stringify(tree) ? tree : t;
+  };
+
   /** State change for a new active pane: its sheet becomes the current sheet, and counts start over. */
   const activeChange = (id: string, panes: Pane[]) =>
     id === get().activePaneId
@@ -902,7 +910,6 @@ export const useStore = create<AppState>()((set, get, api) => {
       return showIn({ ...p, tabs }, docId, has(docId, want) ? want : tabs.find((t) => t.docId === docId)!.sheetId);
     });
     // Panes without documents: detached and split panes close; the main window keeps one pane.
-    let layout = s.paneLayout;
     const empty = panes.filter((p) => !p.docId);
     if (empty.length) {
       let attachedLeft = attachedPanes(panes).filter((p) => p.docId).length;
@@ -910,13 +917,13 @@ export const useStore = create<AppState>()((set, get, api) => {
         if (p.detached || attachedLeft > 0) panes = panes.filter((x) => x !== p);
         else attachedLeft++; // the last pane of the main window stays
       }
-      layout = layoutFor(attachedPanes(panes).length, layout);
       const fallback = s.docs[0].id;
       panes = panes.map((p) => (p.docId ? p : showIn(p, fallback, (p.tabs.find((t) => t.docId === fallback)?.sheetId ?? first(fallback)))));
     }
     const activePaneId = panes.some((p) => p.id === s.activePaneId) ? s.activePaneId : attachedPanes(panes)[0]?.id ?? panes[0].id;
     const same = panes.length === s.panes.length && panes.every((p, i) => p === s.panes[i] || JSON.stringify(p) === JSON.stringify(s.panes[i]));
-    if (!same || layout !== s.paneLayout || activePaneId !== s.activePaneId) set({ panes, paneLayout: layout, ...activeChange(activePaneId, panes) });
+    const paneTree = treeOf(panes, s.paneTree);
+    if (!same || paneTree !== s.paneTree || activePaneId !== s.activePaneId) set({ panes, paneTree, ...activeChange(activePaneId, panes) });
     const act = get().panes.find((p) => p.id === get().activePaneId);
     if (act?.docId === get().activeDocId && act?.sheetId !== get().currentSheetId) set({ currentSheetId: act?.sheetId ?? null });
   };
@@ -959,12 +966,11 @@ export const useStore = create<AppState>()((set, get, api) => {
     layout: loadLayout(),
     panelDrag: null,
     panes: [newPane('pane-1')],
-    paneLayout: 'single',
+    paneTree: leaf('pane-1'),
     activePaneId: 'pane-1',
     activeEpoch: 0,
     compareChanges: {},
     autoTakeoff: null,
-    paneSplit: { x: 0.5, y: 0.5 },
     prefs: (() => {
       const p = loadPrefs();
       setUserUnits(p.units);
@@ -1024,7 +1030,7 @@ export const useStore = create<AppState>()((set, get, api) => {
           currentSheetId: null,
           projectName: '',
           panes: [newPane('pane-1')],
-          paneLayout: 'single',
+          paneTree: leaf('pane-1'),
           activePaneId: 'pane-1',
           tool: { kind: 'select' },
           editingTextId: null,
@@ -1434,18 +1440,36 @@ export const useStore = create<AppState>()((set, get, api) => {
       set({ layout: d });
     },
 
-    setPaneLayout: (paneLayout) => {
+    splitPane: (how, paneId) => {
       const { panes, activePaneId, currentSheetId, activeDocId } = get();
-      // The layout arranges the panes in the main window; detached windows stay as they are.
       const attached = attachedPanes(panes);
-      const n = PANE_COUNT[paneLayout];
-      let keep = attached.slice(0, n);
-      const act = attached.find((p) => p.id === activePaneId);
-      if (act && !keep.includes(act)) keep = [...keep.slice(0, n - 1), act];
-      while (keep.length < n) keep.push(showIn(newPane(uid('pane')), activeDocId, currentSheetId));
-      const next = [...keep, ...panes.filter((p) => p.detached)];
-      const active = next.some((p) => p.id === activePaneId) ? activePaneId : keep[0].id;
-      set({ paneLayout, panes: next, editingTextId: null, ...activeChange(active, next) });
+      // A detached pane splits into the main window: the new pane goes beside the active attached one.
+      const target = attached.find((p) => p.id === (paneId ?? activePaneId)) ?? attached[0];
+      if (!target) return;
+      // New panes show what the split pane shows.
+      const make = () => showIn(newPane(uid('pane')), target.docId ?? activeDocId, target.sheetId ?? currentSheetId);
+      let tree = treeOf(panes);
+      const added: Pane[] = [];
+      if (how === 'grid') {
+        const [right, below, belowRight] = [make(), make(), make()];
+        tree = splitIn(tree, target.id, right.id, 'row');
+        tree = splitIn(tree, target.id, below.id, 'col');
+        tree = splitIn(tree, right.id, belowRight.id, 'col');
+        added.push(right, below, belowRight);
+      } else {
+        const p = make();
+        tree = splitIn(tree, target.id, p.id, how);
+        added.push(p);
+      }
+      const next = [...attached, ...added, ...panes.filter((p) => p.detached)];
+      // The new pane (beside or below) is the one to work in.
+      set({ panes: next, paneTree: tree, editingTextId: null, ...activeChange(added[0].id, next) });
+    },
+    singleView: () => {
+      const { panes, activePaneId } = get();
+      const attached = attachedPanes(panes);
+      const keep = attached.find((p) => p.id === activePaneId) ?? attached[0];
+      for (const p of attached) if (p.id !== keep.id) get().closePane(p.id);
     },
     setActivePane: (id) => {
       if (!get().panes.some((x) => x.id === id) || id === get().activePaneId) return;
@@ -1459,23 +1483,22 @@ export const useStore = create<AppState>()((set, get, api) => {
         ...(paneId === s.activePaneId ? { currentSheetId: sheetId, editingTextId: null } : {}),
       }));
     },
-    setPaneSplit: (patch) => set((s) => ({ paneSplit: { ...s.paneSplit, ...patch } })),
+    setPaneSizes: (path, sizes) => set((s) => ({ paneTree: setSizesAt(s.paneTree, path, sizes) })),
     closePane: (id) => {
-      const { panes, activePaneId, paneLayout } = get();
+      const { panes, activePaneId } = get();
       const target = panes.find((p) => p.id === id);
       // The main window always keeps at least one pane.
       if (!target || (!target.detached && attachedPanes(panes).length <= 1)) return;
       const rest = panes.filter((p) => p.id !== id);
-      const layout = target.detached ? paneLayout : layoutFor(attachedPanes(rest).length, paneLayout);
       const active = rest.some((p) => p.id === activePaneId) ? activePaneId : attachedPanes(rest)[0].id;
-      set({ panes: rest, paneLayout: layout, editingTextId: null, ...activeChange(active, rest) });
+      set({ panes: rest, paneTree: treeOf(rest), editingTextId: null, ...activeChange(active, rest) });
       // Documents shown only in that pane stay open: they get a tab in the active pane.
       const shown = new Set(rest.flatMap((p) => p.tabs.map((t) => t.docId)));
       const orphans = target.tabs.filter((t) => !shown.has(t.docId));
       if (orphans.length) set((s) => ({ panes: s.panes.map((p) => (p.id === active ? { ...p, tabs: [...p.tabs, ...orphans] } : p)) }));
     },
     detachPane: (id, mode = 'window') => {
-      const { panes, paneLayout } = get();
+      const { panes } = get();
       const target = panes.find((p) => p.id === id);
       if (!target || target.detached) return;
       if (attachedPanes(panes).length <= 1) {
@@ -1487,19 +1510,18 @@ export const useStore = create<AppState>()((set, get, api) => {
       const h = Math.min(600, Math.round(window.innerHeight * 0.6));
       const geom: PaneWindow = { mode, x: Math.max(20, Math.round(window.innerWidth - w) / 2 + 30 * k), y: 90 + 30 * k, w, h };
       const next = panes.map((p) => (p.id === id ? { ...p, detached: geom } : p));
-      set({ panes: next, paneLayout: layoutFor(attachedPanes(next).length, paneLayout) });
+      set({ panes: next, paneTree: treeOf(next) });
     },
     attachPane: (id) => {
-      const { panes, paneLayout } = get();
+      const { panes, activePaneId } = get();
       const target = panes.find((p) => p.id === id);
       if (!target?.detached) return;
-      if (attachedPanes(panes).length >= 4) {
-        get().toast('The main window already shows four panes. Close one first.', 'error');
-        return;
-      }
       const attached = [...attachedPanes(panes), { ...target, detached: undefined }];
       const next = [...attached, ...panes.filter((p) => p.detached && p.id !== id)];
-      set({ panes: next, paneLayout: layoutFor(attached.length, paneLayout) });
+      // Back beside the active pane of the main window.
+      const tree = treeOf(panes);
+      const beside = attachedPanes(panes).find((p) => p.id === activePaneId) ?? attachedPanes(panes)[0];
+      set({ panes: next, paneTree: beside ? splitIn(tree, beside.id, id, 'row') : treeOf(next) });
     },
     setPaneWindow: (id, patch) =>
       set((s) => ({ panes: s.panes.map((p) => (p.id === id && p.detached ? { ...p, detached: { ...p.detached, ...patch } } : p)) })),
@@ -1572,16 +1594,14 @@ export const useStore = create<AppState>()((set, get, api) => {
       if (get().currentSheetId !== shown) set({ currentSheetId: shown });
     },
     tabToNewPane: (paneId, docId) => {
-      const { panes, paneLayout } = get();
+      const { panes } = get();
       const from = panes.find((p) => p.id === paneId);
       if (!from?.tabs.some((t) => t.docId === docId)) return;
-      if (attachedPanes(panes).length >= 4) {
-        get().toast('The main window already shows four panes. Drag the tab onto one of them instead.', 'error');
-        return;
-      }
       const pane = newPane(uid('pane'));
       const attached = [...attachedPanes(panes), pane];
-      set({ panes: [...attached, ...panes.filter((p) => p.detached)], paneLayout: layoutFor(attached.length, paneLayout) });
+      // Beside the pane it comes from (at the end when that one is detached).
+      const tree = treeOf(panes);
+      set({ panes: [...attached, ...panes.filter((p) => p.detached)], paneTree: from.detached ? appendTo(tree, pane.id) : splitIn(tree, from.id, pane.id, 'row') });
       // Moving the only tab out of a pane would close it again: keep it there and open it in the new one too.
       get().moveTab(docId, paneId, pane.id, { copy: from.tabs.length === 1 });
     },

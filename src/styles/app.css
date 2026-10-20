@@ -2511,10 +2511,18 @@ kbd {
   flex-direction: column;
 }
 
-.pane-row {
+.pane-split {
   display: flex;
   min-height: 0;
   min-width: 0;
+}
+
+.pane-split.row {
+  flex-direction: row;
+}
+
+.pane-split.col {
+  flex-direction: column;
 }
 
 .pane {
@@ -2523,6 +2531,9 @@ kbd {
   min-width: 0;
   min-height: 0;
   position: relative;
+  overflow: hidden;
+  /* Narrow panes (split many times) drop the sheet picker from their header. */
+  container-type: inline-size;
 }
 
 .pane > .viewer {
@@ -2547,9 +2558,21 @@ kbd {
 
 .pane-head select {
   flex: 0 3 180px;
-  min-width: 84px;
+  min-width: 0;
   max-width: 200px;
   padding: 1px 4px;
+}
+
+/* The pane number and the buttons always show; the tabs and the sheet picker give way. */
+.pane-head > .icon-btn,
+.pane-head > .pane-num {
+  flex: none;
+}
+
+@container (max-width: 260px) {
+  .pane-head select {
+    display: none;
+  }
 }
 
 /* document tabs */

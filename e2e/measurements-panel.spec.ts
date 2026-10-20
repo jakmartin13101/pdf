@@ -77,14 +77,22 @@ test('thumbnail size slider, split view keys and side panels resized at any wind
   await page.getByTestId('thumb-size').fill('400');
   expect((await box(1)).y).toBeGreaterThan((await box(0)).y + 50);
 
-  // Split view from the keyboard (Settings → Keyboard can change the keys); again goes back.
+  // Split view from the keyboard (Settings → Keyboard can change the keys): every press splits again;
+  // panes are closed by hand.
+  const panes = page.getByTestId('pane');
   await page.locator('.viewer').first().click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('Control+Shift+2');
-  await expect(page.getByTestId('split-vertical')).toHaveClass(/active/);
+  await expect(panes).toHaveCount(2);
+  await page.keyboard.press('Control+Shift+2');
+  await expect(panes).toHaveCount(3);
   await page.keyboard.press('Control+Shift+3');
-  await expect(page.getByTestId('split-horizontal')).toHaveClass(/active/);
+  await expect(panes).toHaveCount(4);
   await page.keyboard.press('Control+Shift+3');
-  await expect(page.getByTestId('split-single')).toHaveClass(/active/);
+  await expect(panes).toHaveCount(5);
+  await page.getByTestId('pane-close').first().click();
+  await expect(panes).toHaveCount(4);
+  await page.getByTestId('split-single').click();
+  await expect(panes).toHaveCount(1);
   await page.locator('.menu-btn', { hasText: 'Window' }).click();
   await expect(page.locator('.menu-item', { hasText: 'Split Vertical' })).toContainText('Ctrl+Shift+2');
   await page.keyboard.press('Escape');
