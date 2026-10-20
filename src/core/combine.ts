@@ -5,6 +5,9 @@
 // … 60'). Each bar keeps an allowance for the machine (about 1'-0"), and every cut a saw kerf. The plan
 // uses as little ordered length as it can find: an exact search for small sizes, the best of several
 // packing heuristics for larger ones.
+//
+// A piece as long as a stock length is that bar, whole: no cut, no kerf, no allowance. A piece longer than
+// the longest stock is spliced from whole bars and one cut piece, which is nested with the others.
 
 import type { DocState } from '../types';
 import { customColId, type Row } from './columns';
@@ -59,6 +62,8 @@ export interface Piece {
   sheet: string;
   /** Material added by a standard detail, e.g. "Clip Angle". */
   detail?: string;
+  /** Part of a spliced piece: the length of the whole piece (inches). */
+  splice?: number;
 }
 
 export interface Bar {
@@ -67,6 +72,12 @@ export interface Bar {
   pieces: Piece[];
   /** Left over after the pieces, kerfs and the machine allowance: inches. */
   drop: number;
+  /**
+   * One piece on its own bar: `full` – the piece is the stock length (no cut); `trim` – the piece is a
+   * little shorter than the bar but too long to keep the machine allowance: one cut, no allowance.
+   * Otherwise pieces are nested on the bar with the allowance.
+   */
+  kind?: 'full' | 'trim';
 }
 
 export interface SizePlan {
@@ -78,6 +89,8 @@ export interface SizePlan {
   order: { stock: number; count: number }[];
   /** Pieces longer than the longest stock: they need a splice (planned as several bars). */
   tooLong: Piece[];
+  /** Bars ordered whole for pieces as long as them: no cut. */
+  full: number;
   /** No stock lengths for this shape: nothing planned. */
   noStock: boolean;
   /** Inches. */
@@ -256,42 +269,118 @@ export function collectPieces(rows: Row[], doc: DocState): Map<string, { size: s
   return out;
 }
 
+/** A piece within this of a stock length is that length: the bar is used whole. */
+export const FULL_TOL = 1 / 16;
+
+/** The stock length a piece is (to 1/16"), if any. */
+function stockMatch(length: number, stock: number[]): number | undefined {
+  return stock.find((s) => Math.abs(s - length) <= FULL_TOL);
+}
+
+/** How a length of material comes off the stock: whole, nested (with others) or trimmed from the longest. */
+type Take = { how: 'full'; stock: number } | { how: 'nest' } | { how: 'trim'; stock: number } | null;
+
+function take(length: number, stock: number[], allowance: number, kerf: number): Take {
+  const longest = stock[stock.length - 1];
+  const s = stockMatch(length, stock);
+  if (s != null) return { how: 'full', stock: s };
+  if (need([length], allowance, kerf) <= longest + EPS) return { how: 'nest' };
+  // Within the allowance of the longest: one cut off its end.
+  if (length <= longest + EPS) return { how: 'trim', stock: longest };
+  return null;
+}
+
+/** What a length costs on its own (ordered inches), to compare ways of splicing. */
+function takeCost(t: Take, length: number, stock: number[], allowance: number, kerf: number): number {
+  if (!t) return Infinity;
+  if (t.how === 'nest') return shortestFit(need([length], allowance, kerf), stock) ?? Infinity;
+  return t.stock;
+}
+
+/**
+ * A piece longer than the longest stock: the whole bars to splice it from and the rest (cut, or a bar
+ * too). The least ordered length, then the fewest bars, then the longest whole bars.
+ */
+export function splicePlan(length: number, stockLengths: number[], allowance: number, kerf: number): { whole: number[]; rest: number } {
+  const stock = [...new Set(stockLengths.filter((x) => x > 0))].sort((a, b) => a - b);
+  const longest = stock[stock.length - 1];
+  const desc = [...stock].reverse();
+  // Very long pieces: whole longest bars first, the last few chosen with care.
+  const lead: number[] = [];
+  let left = length;
+  while (left > longest * 4) {
+    lead.push(longest);
+    left -= longest;
+  }
+  let best: { whole: number[]; rest: number; cost: number } | null = null;
+  const consider = (whole: number[], rest: number) => {
+    const t = take(rest, stock, allowance, kerf);
+    const cost = whole.reduce((a, b) => a + b, 0) + takeCost(t, rest, stock, allowance, kerf);
+    if (cost === Infinity) return;
+    if (
+      !best ||
+      cost < best.cost - EPS ||
+      (Math.abs(cost - best.cost) <= EPS && (whole.length < best.whole.length || (whole.length === best.whole.length && whole.join() > best.whole.join())))
+    )
+      best = { whole, rest, cost };
+  };
+  // Whole bars longest first (each multiset once), while more than a stock length is left.
+  const walk = (from: number, whole: number[], rest: number) => {
+    if (whole.length) consider(whole, rest);
+    if (rest <= longest + FULL_TOL) return;
+    for (let i = from; i < desc.length; i++) if (desc[i] < rest - FULL_TOL) walk(i, [...whole, desc[i]], rest - desc[i]);
+  };
+  walk(0, [], left);
+  if (!best) return { whole: [...lead, ...Array(Math.ceil(left / longest) - 1).fill(longest)], rest: left - (Math.ceil(left / longest) - 1) * longest };
+  const b = best as { whole: number[]; rest: number };
+  return { whole: [...lead, ...b.whole], rest: b.rest };
+}
+
 /** The plan for every size: what to order and how to cut it. */
 export function combinePlan(rows: Row[], doc: DocState, settings: CombineSettings): SizePlan[] {
   const shapes = [...settings.stock.map((s) => s.shape)];
+  const { allowance, kerf } = settings;
   const plans: SizePlan[] = [];
   for (const { size, pieces } of collectPieces(rows, doc).values()) {
     const shape = subjectForSize(size, shapes) ?? '';
-    const stock = [...stockFor(settings, shape)].sort((a, b) => a - b);
-    const longest = stock[stock.length - 1] ?? 0;
-    const fits = (p: Piece) => longest > 0 && need([p.length], settings.allowance, settings.kerf) <= longest + EPS;
-    const normal = pieces.filter(fits);
-    const tooLong = longest > 0 ? pieces.filter((p) => !fits(p)) : [];
+    const stock = [...new Set(stockFor(settings, shape).filter((x) => x > 0))].sort((a, b) => a - b);
     const bars: Bar[] = [];
+    const tooLong: Piece[] = [];
+    // Pieces (and the cut rest of spliced ones) nested together.
+    const nest: Piece[] = [];
+    const place = (p: Piece, length: number) => {
+      const t = take(length, stock, allowance, kerf);
+      const piece = { ...p, length };
+      if (t?.how === 'full') bars.push({ stock: t.stock, pieces: [piece], drop: Math.max(0, t.stock - length), kind: 'full' });
+      else if (t?.how === 'trim') bars.push({ stock: t.stock, pieces: [piece], drop: Math.max(0, t.stock - length - kerf), kind: 'trim' });
+      else nest.push(piece);
+    };
     if (stock.length) {
+      for (const p of pieces) {
+        if (take(p.length, stock, allowance, kerf)) {
+          place(p, p.length);
+          continue;
+        }
+        // Longer than any stock: whole bars spliced, and the rest.
+        tooLong.push(p);
+        const sp = splicePlan(p.length, stock, allowance, kerf);
+        for (const w of sp.whole) bars.push({ stock: w, pieces: [{ ...p, length: w, splice: p.length }], drop: 0, kind: 'full' });
+        place({ ...p, splice: p.length }, sp.rest);
+      }
       const packed = packPieces(
-        normal.map((p) => p.length),
+        nest.map((p) => p.length),
         stock,
-        settings.allowance,
-        settings.kerf,
+        allowance,
+        kerf,
       );
       for (const b of packed.bars) {
-        const ps = b.items.map((i) => normal[i]).sort((a, c) => c.length - a.length);
-        bars.push({ stock: b.stock, pieces: ps, drop: b.stock - need(ps.map((p) => p.length), settings.allowance, settings.kerf) });
-      }
-      // Longer than any stock: whole bars of the longest, spliced, and the rest on the shortest that holds it.
-      for (const p of tooLong) {
-        const usable = longest - settings.allowance - settings.kerf;
-        let left = p.length;
-        while (left > usable + EPS) {
-          bars.push({ stock: longest, pieces: [{ ...p, length: usable }], drop: 0 });
-          left -= usable;
-        }
-        const s = shortestFit(need([left], settings.allowance, settings.kerf), stock) ?? longest;
-        bars.push({ stock: s, pieces: [{ ...p, length: left }], drop: s - need([left], settings.allowance, settings.kerf) });
+        const ps = b.items.map((i) => nest[i]).sort((a, c) => c.length - a.length);
+        bars.push({ stock: b.stock, pieces: ps, drop: b.stock - need(ps.map((p) => p.length), allowance, kerf) });
       }
     }
-    bars.sort((a, b) => b.stock - a.stock || a.drop - b.drop);
+    // Longest bars first; whole bars before cut ones; least drop first.
+    const rank = (b: Bar) => (b.kind === 'full' ? 0 : 1);
+    bars.sort((a, b) => b.stock - a.stock || rank(a) - rank(b) || a.drop - b.drop);
     const counts = new Map<number, number>();
     for (const b of bars) counts.set(b.stock, (counts.get(b.stock) ?? 0) + 1);
     const pieceLength = pieces.reduce((s, p) => s + p.length, 0);
@@ -303,6 +392,7 @@ export function combinePlan(rows: Row[], doc: DocState, settings: CombineSetting
       bars,
       order: [...counts].map(([stock, count]) => ({ stock, count })).sort((a, b) => b.stock - a.stock),
       tooLong,
+      full: bars.filter((b) => b.kind === 'full').length,
       noStock: !stock.length,
       pieceLength,
       stockLength,

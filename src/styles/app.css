@@ -3860,6 +3860,15 @@ button.linkish {
 .cmb-piece.detail {
   background: rgba(60, 207, 122, 0.22);
 }
+.cmb-bar.full .cmb-piece {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  border-right: none;
+}
+.cmb-piece.splice {
+  background-image: repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(0, 0, 0, 0.08) 6px, rgba(0, 0, 0, 0.08) 7px);
+}
 .cmb-machine {
   flex: none;
   background: rgba(245, 177, 61, 0.55);

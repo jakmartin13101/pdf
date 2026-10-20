@@ -31,19 +31,26 @@ export function LengthSetting({ value, unit, onChange, testId, metric }: { value
 
 /** One bar of the cutting plan, drawn to scale: the pieces, the machine allowance and the drop. */
 function BarPlan({ bar, allowance, metric }: { bar: SizePlan['bars'][number]; allowance: number; metric: boolean }) {
-  const pct = (n: number) => `${Math.max(0.6, (n / bar.stock) * 100)}%`;
+  const pct = (n: number) => `${Math.max(0.6, Math.min(100, (n / bar.stock) * 100))}%`;
+  const full = bar.kind === 'full';
   return (
-    <div className="cmb-bar" data-testid="combine-bar">
+    <div className={`cmb-bar${bar.kind ? ` ${bar.kind}` : ''}`} data-testid="combine-bar" data-kind={bar.kind ?? 'cut'}>
       <b className="cmb-stock">{lenText(bar.stock, metric)}</b>
-      <div className="cmb-track" title={`Drop ${lenText(Math.max(0, bar.drop), metric)}`}>
+      <div className="cmb-track" title={full ? 'Used whole: no cut' : `Drop ${lenText(Math.max(0, bar.drop), metric)}`}>
         {bar.pieces.map((p, i) => (
-          <span key={i} className={`cmb-piece${p.detail ? ' detail' : ''}`} style={{ width: pct(p.length) }} title={`${lenText(p.length, metric)}${p.detail ? ` · ${p.detail}` : ''} · ${p.sheet}`}>
+          <span
+            key={i}
+            className={`cmb-piece${p.detail ? ' detail' : ''}${p.splice ? ' splice' : ''}`}
+            style={{ width: full ? '100%' : pct(p.length) }}
+            title={`${lenText(p.length, metric)}${p.splice ? ` · part of a ${lenText(p.splice, metric)} piece, spliced` : ''}${p.detail ? ` · ${p.detail}` : ''} · ${p.sheet}`}
+          >
             {lenText(p.length, metric)}
+            {p.splice ? ' ⧉' : ''}
           </span>
         ))}
-        <span className="cmb-machine" style={{ width: pct(allowance) }} title={`Machine allowance ${lenText(allowance, metric)}`} />
+        {!bar.kind && <span className="cmb-machine" style={{ width: pct(allowance) }} title={`Machine allowance ${lenText(allowance, metric)}`} />}
       </div>
-      <span className="cmb-drop">drop {lenText(Math.max(0, bar.drop), metric)}</span>
+      <span className="cmb-drop">{full ? 'full length – no cut' : `${bar.kind === 'trim' ? 'trim · ' : ''}drop ${lenText(Math.max(0, bar.drop), metric)}`}</span>
     </div>
   );
 }
@@ -176,8 +183,13 @@ export function CombineDialog() {
                       ) : (
                         <b>{orderText(p, metric)}</b>
                       )}
+                      {p.full > 0 && (
+                        <div className="hint" title="Pieces as long as a stock length are ordered whole: no cut, no kerf, no allowance" data-testid="combine-full">
+                          {p.full} full length – no cut
+                        </div>
+                      )}
                       {p.tooLong.length > 0 && (
-                        <div className="warn-text" title="Longer than the longest stock length">
+                        <div className="warn-text" title="Longer than the longest stock length: spliced from whole bars and a cut piece">
                           {p.tooLong.length} too long – splice
                         </div>
                       )}

@@ -7,10 +7,10 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.13.0**: **your units** – measure in feet-inches (`1'-1"`, the default), decimal feet, inches, m, cm or
-> mm (*Settings → Units & Totals*); lengths you type are rewritten in them (`0-28` → `2'-4"`), and **Height is a
-> length** (1.12.0: capital X sizes, the new Properties panel, selection totals, Galv; 1.11.0: maximum lengths by
-> shape) – see the [changelog](CHANGELOG.md).
+> **Version 1.14.0**: the **Combine report orders stock-length pieces whole** (a 40'-0" angle is a 40' bar: no cut)
+> and **nests the rests of spliced pieces together** instead of a bar each (1.13.0: your units – feet-inches by
+> default, `0-28` → `2'-4"`, Height is a length; 1.12.0: capital X sizes, the Properties panel, selection totals) –
+> see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -392,8 +392,17 @@ material as it can:
   scale with its pieces, the machine allowance and the drop; *Select These Markups* finds them on the drawing.
 * Quantities count: a markup with Qty 3 is three pieces. Material added by **standard details** (clip angles,
   posts…) is included (untick *Standard detail material* to leave it out). *Current Sheet* plans one sheet only.
-* A piece longer than the longest stock length is **spliced**: it takes as many bars of the longest length as it
-  needs, the rest going on the shortest length that holds it; the report flags it.
+* A piece **as long as a stock length** (to 1/16") is ordered **whole**: it is that bar, so nothing is cut and no kerf
+  or allowance is taken. Five 40'-0" angles with L in 20' and 40' are five 40' bars, *full length – no cut*, drawn solid
+  in the cutting plan.
+* A piece longer than the longest stock length is **spliced** from whole bars and one cut piece – the combination that
+  orders the least (63'-0" of W: 40' whole + 23' cut from a 25', not 60' + 3'). The cut pieces of spliced members
+  (marked ⧉) are **nested with the other pieces**, so two 42'-0" angles take two whole 40' bars and their two 2'-0"
+  rests share one 20' bar. The report flags spliced pieces.
+* A piece just shorter than the longest stock but too long to keep the machine allowance on it is **trimmed** from
+  that bar (one cut, no allowance) rather than spliced.
+
+![Combine report: whole 40' bars and the rests of two spliced angles on one bar](docs/screenshot-combine-full.png)
 * Exports: **CSV** (the order list and the cutting plan) and **Print / PDF** (a printable page with the bars drawn).
 
 <img src="docs/screenshot-combine-stock.png" width="640" alt="Settings: stock lengths to order for each shape">

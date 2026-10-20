@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.14.0 – 2026-10-20
+
+### Combine report
+- A piece as long as a stock length (to 1/16") is ordered whole: that bar, with no cut, kerf or machine allowance.
+  Such bars are drawn solid and marked *full length – no cut*; the order shows how many. Before, a 40'-0" piece on 40'
+  stock was too long by the kerf and was spliced.
+- Pieces longer than the longest stock are spliced from whole bars and one cut piece, choosing the bars that order the
+  least (63'-0" of W: 40' + 23' cut from a 25', not 60' + 3'). The cut pieces (marked ⧉) are nested with the other
+  pieces of the size instead of taking a bar each.
+- A piece just shorter than the longest stock but too long to keep the machine allowance is trimmed from that bar
+  rather than spliced.
+- The CSV's cutting plan has a Note column (full length, trim) and marks spliced pieces; the printout shows the same.
+
 ## 1.13.0 – 2026-10-15
 
 ### Your units

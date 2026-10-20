@@ -70,14 +70,29 @@ export function combineCsv(plans: SizePlan[], metric = false): string {
       p.bars.length,
       p.plf ? fmtNumber(p.plf, 2) : '',
       p.plf ? Math.round((p.stockLength / 12) * p.plf) : '',
-      p.noStock ? 'No stock lengths for this shape' : p.tooLong.length ? `${p.tooLong.length} piece(s) longer than the longest stock: spliced` : '',
+      [
+        p.noStock ? 'No stock lengths for this shape' : '',
+        p.full ? `${p.full} full length – no cut` : '',
+        p.tooLong.length ? `${p.tooLong.length} piece(s) longer than the longest stock: spliced` : '',
+      ]
+        .filter(Boolean)
+        .join('; '),
     ]);
   }
   lines.push([]);
   lines.push(['Cutting plan']);
-  lines.push(['Size', 'Bar', `Stock (${unit})`, 'Pieces', `Drop (${unit})`]);
+  lines.push(['Size', 'Bar', `Stock (${unit})`, 'Pieces', `Drop (${unit})`, 'Note']);
   for (const p of plans)
-    p.bars.forEach((b, i) => lines.push([p.size, i + 1, len(b.stock), b.pieces.map((x) => lenText(x.length, metric)).join(' + '), len(Math.max(0, b.drop))]));
+    p.bars.forEach((b, i) =>
+      lines.push([
+        p.size,
+        i + 1,
+        len(b.stock),
+        b.pieces.map((x) => lenText(x.length, metric) + (x.splice ? ` (splice of ${lenText(x.splice, metric)})` : '')).join(' + '),
+        len(Math.max(0, b.drop)),
+        b.kind === 'full' ? 'Full length – no cut' : b.kind === 'trim' ? 'Trim' : '',
+      ]),
+    );
   return lines.map((l) => l.map(csvCell).join(',')).join('\r\n');
 }
 
@@ -102,12 +117,16 @@ export function combineReportHtml(title: string, plans: SizePlan[], settings: Co
         .map((b) => {
           const pct = (n: number) => `${Math.max(0.5, (n / b.stock) * 100).toFixed(2)}%`;
           const segs = b.pieces
-            .map((x) => `<span class="pc" style="width:${pct(x.length)}" title="${L(x.length)}">${L(x.length)}</span>`)
+            .map((x) => `<span class="pc" style="width:${b.kind === 'full' ? '100%' : pct(x.length)}" title="${L(x.length)}">${L(x.length)}${x.splice ? ' ⧉' : ''}</span>`)
             .join('');
-          return `<div class="bar"><div class="bl">${L(b.stock)}</div><div class="bt">${segs}<span class="mc" style="width:${pct(settings.allowance)}"></span></div><div class="bd">drop ${L(Math.max(0, b.drop))}</div></div>`;
+          const mc = b.kind ? '' : `<span class="mc" style="width:${pct(settings.allowance)}"></span>`;
+          const note = b.kind === 'full' ? 'full length – no cut' : `${b.kind === 'trim' ? 'trim · ' : ''}drop ${L(Math.max(0, b.drop))}`;
+          return `<div class="bar"><div class="bl">${L(b.stock)}</div><div class="bt">${segs}${mc}</div><div class="bd">${note}</div></div>`;
         })
         .join('');
-      const warn = p.tooLong.length ? `<div class="w">${p.tooLong.length} piece${p.tooLong.length === 1 ? ' is' : 's are'} longer than the longest stock length and need a splice.</div>` : '';
+      const warn = p.tooLong.length
+        ? `<div class="w">${p.tooLong.length} piece${p.tooLong.length === 1 ? ' is' : 's are'} longer than the longest stock length: spliced from whole bars and a cut piece (⧉).</div>`
+        : '';
       return `<h3>${esc(p.size)} <span class="s">${esc(orderText(p, metric))}</span></h3>${warn}${bars}`;
     })
     .join('');
