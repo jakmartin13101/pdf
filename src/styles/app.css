@@ -1238,9 +1238,55 @@ input[type='range'] {
 
 .thumbs {
   padding: 8px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* As many thumbnails across as fit at the chosen size (Sheets panel slider). */
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--thumb-w, 240px), 100%), 1fr));
+  align-items: start;
   gap: 8px;
+}
+
+.thumbs.list-view {
+  grid-template-columns: 1fr;
+}
+
+.thumbs.small .thumb {
+  padding: 4px;
+}
+
+.thumbs.small .thumb-meta {
+  flex-direction: column;
+  gap: 0;
+  margin-top: 3px;
+}
+
+.thumbs.small .thumb-title {
+  width: 100%;
+  font-size: 10.5px;
+}
+
+.thumbs.small .thumb-badges {
+  top: 6px;
+  right: 6px;
+}
+
+.thumbs.small .badge.scale,
+.thumbs.small .badge.noscale {
+  display: none;
+}
+
+.thumb-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  flex: none;
+}
+
+.thumb-size input {
+  flex: 1;
+  min-width: 0;
 }
 
 .thumb {
@@ -2181,7 +2227,7 @@ kbd {
     top: 0;
     bottom: 0;
     z-index: 40;
-    width: min(320px, calc(100vw - 84px)) !important;
+    width: min(var(--side-w, 320px), calc(100vw - 84px)) !important;
     box-shadow: var(--shadow);
   }
 
@@ -2191,6 +2237,11 @@ kbd {
 
   .side-panel.right {
     right: 34px;
+  }
+
+  /* Over the drawing, the panel is resized by a grip on its inner edge. */
+  .side-panel > .splitter-v.side-grip {
+    display: block;
   }
 
   .workspace > .splitter-v,
@@ -2253,6 +2304,25 @@ kbd {
   flex-direction: column;
   min-width: 0;
   flex: none;
+  position: relative;
+}
+
+/* The edge grip: only on small screens (see above); elsewhere the splitter beside the dock resizes it. */
+.side-panel > .side-grip {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 2;
+}
+
+.side-panel.left > .side-grip {
+  right: -3px;
+}
+
+.side-panel.right > .side-grip {
+  left: -3px;
 }
 
 .panel-header.draggable {
@@ -4145,4 +4215,90 @@ button.linkish {
 .icon-btn.on {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- measurements panel */
+
+.meas-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+.meas-tools .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.meas-tools .icon-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.meas-tools-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.meas-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.meas-body .prop-sec-body > .form {
+  padding: 0;
+}
+
+.meas-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+
+.meas-props .field-row > input {
+  flex: 1;
+  min-width: 0;
+}
+
+.meas-unit {
+  width: 84px;
+  flex: none;
+}
+
+.meas-result {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+}
+
+.meas-result > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.meas-result span {
+  color: var(--text-dim);
+}
+
+.meas-empty {
+  padding: 2px 0;
 }

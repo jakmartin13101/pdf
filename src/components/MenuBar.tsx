@@ -214,10 +214,10 @@ export function MenuBar() {
     Window: [
       ...docTabItems(),
       { sep: true },
-      { label: 'Single View', checked: paneLayout === 'single', disabled: !loaded, onClick: () => st().setPaneLayout('single') },
-      { label: 'Split Vertical', checked: paneLayout === 'vertical', disabled: !loaded, onClick: () => st().setPaneLayout('vertical') },
-      { label: 'Split Horizontal', checked: paneLayout === 'horizontal', disabled: !loaded, onClick: () => st().setPaneLayout('horizontal') },
-      { label: 'Split Four Ways', checked: paneLayout === 'grid', disabled: !loaded, onClick: () => st().setPaneLayout('grid') },
+      { label: 'Single View', shortcut: sc('view.single'), checked: paneLayout === 'single', disabled: !loaded, onClick: () => st().setPaneLayout('single') },
+      { label: 'Split Vertical', shortcut: sc('view.splitV'), checked: paneLayout === 'vertical', disabled: !loaded, onClick: () => st().setPaneLayout('vertical') },
+      { label: 'Split Horizontal', shortcut: sc('view.splitH'), checked: paneLayout === 'horizontal', disabled: !loaded, onClick: () => st().setPaneLayout('horizontal') },
+      { label: 'Split Four Ways', shortcut: sc('view.split4'), checked: paneLayout === 'grid', disabled: !loaded, onClick: () => st().setPaneLayout('grid') },
       {
         label: 'Detach Active Pane',
         disabled: !loaded || panes.filter((p) => !p.detached).length < 2 || !!panes.find((p) => p.id === activePaneId)?.detached,

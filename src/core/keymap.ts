@@ -67,6 +67,11 @@ export const COMMANDS: CommandDef[] = [
   { id: 'tab.close', label: 'Close Document Tab', group: 'View', keys: ['Ctrl+F4'] },
   { id: 'report.combine', label: 'Combine Report…', group: 'Takeoff', keys: [] },
   { id: 'tab.newPane', label: 'Move Document Tab to a New Pane', group: 'View', keys: [] },
+  // Split view: pressing the keys of the split already showing goes back to a single view.
+  { id: 'view.single', label: 'Single View', group: 'View', keys: ['Ctrl+Shift+1'] },
+  { id: 'view.splitV', label: 'Split Vertical (side by side)', group: 'View', keys: ['Ctrl+Shift+2'] },
+  { id: 'view.splitH', label: 'Split Horizontal (one above the other)', group: 'View', keys: ['Ctrl+Shift+3'] },
+  { id: 'view.split4', label: 'Split Four Ways', group: 'View', keys: ['Ctrl+Shift+4'] },
 
   { id: 'tool.select', label: 'Select', group: 'Tools', keys: ['V'] },
   { id: 'tool.zoomrect', label: 'Zoom Rectangle', group: 'Tools', keys: ['Z'] },

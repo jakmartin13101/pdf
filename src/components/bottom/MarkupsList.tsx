@@ -20,6 +20,7 @@ import { exportMarkupsCsv } from '../MenuBar';
 import { bareUnit, fmtLen, formatLength, parseLength } from '../../core/units';
 import { applyToolToSelection } from '../panels/ToolChestPanel';
 import { detailMenuItems } from '../detailMenu';
+import { dimText, takesDepth, takesWidth } from '../../core/measure';
 
 const ROW_H = 25;
 
@@ -137,9 +138,14 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
   const m = row.markup;
   const st = getState();
   const ids = st.selection.includes(m.id) ? st.selection : [m.id];
+  const dim = col.id === 'width' ? m.width : m.depth;
   const initial =
     col.editor === 'length'
-      ? formatLength(m.depth ?? 0, row.scale.unit === 'ft' ? 'ft-in' : row.scale.unit, 8)
+      ? col.id === 'depth' && m.type === 'volume'
+        ? formatLength(m.depth ?? 0, row.scale.unit === 'ft' ? 'ft-in' : row.scale.unit, 8)
+        : dim
+          ? dimText(m, dim)
+          : ''
       : col.editor === 'count'
         ? String(m.countOverride ?? m.points.length)
         : col.custom?.kind === 'length'
@@ -181,8 +187,17 @@ function CellEditor({ col, row, onDone }: { col: ColumnSpec; row: Row; onDone: (
       return;
     }
     if (col.editor === 'length') {
-      const d = parseLength(val, row.scale.unit === 'ft-in' || row.scale.unit === 'ft' ? 'in' : row.scale.unit);
-      if (d != null) st.updateMarkups(ids.filter((id) => st.doc.markups.find((x) => x.id === id)?.type === 'volume'), (x) => ({ ...x, depth: d }));
+      // Depth (volumes, and counts/lengths/areas) and Width (counts and lengths); bare numbers are inches.
+      const field = col.id === 'width' ? 'width' : 'depth';
+      const fits = (t: Markup['type']) => (field === 'width' ? takesWidth(t) : takesDepth(t));
+      const which = ids.filter((id) => {
+        const x = st.doc.markups.find((y) => y.id === id);
+        return !!x && fits(x.type);
+      });
+      if (!val.trim()) return st.updateMarkups(which, (x) => ({ ...x, [field]: field === 'depth' && x.type === 'volume' ? 0 : undefined }));
+      const d = parseLength(val, row.scale.unit === 'ft-in' || row.scale.unit === 'ft' ? bareUnit('in') : row.scale.unit);
+      if (d != null && d >= 0) st.updateMarkups(which, (x) => ({ ...x, [field]: d }));
+      else st.toast(`“${val}” is not a length`, 'error');
       return;
     }
     // A label that is a size is written the standard way (w8*10 → W8X10).

@@ -160,3 +160,40 @@ export function setSectionSizesIn(l: LayoutState, side: DockSide, sizes: number[
   if (sizes.length !== sectionCount(l, side)) return l;
   return { ...l, split: { ...l.split, [side]: sizes.map((w) => Math.max(0.05, w)) } };
 }
+
+/** Changes made once to saved layouts as panels got their own sections. */
+export function upgradeLayout(l: LayoutState): LayoutState {
+  const p = l.propsOwn ? l : { ...propertiesOwnSection(l), propsOwn: true };
+  return p.measOwn ? p : { ...measurementsOwnSection(p), measOwn: true };
+}
+
+/**
+ * Once: Properties sharing its dock section with other panels gets a section of its own below them (closed
+ * unless it was showing), so opening it on a selection doesn't hide the Tool Chest.
+ */
+export function propertiesOwnSection(l: LayoutState): LayoutState {
+  const p = l.panels.properties;
+  if (p.dock === 'float') return l;
+  const sec = sectionOf(l, 'properties');
+  if (sectionPanels(l, p.dock, sec).length < 2 || sectionCount(l, p.dock) >= MAX_SECTIONS) return l;
+  const wasOpen = isPanelOpen(l, 'properties');
+  const others = sectionPanels(l, p.dock, sec).filter((x) => x !== 'properties');
+  const next = dockPanelIn(l, 'properties', p.dock, undefined, { section: sec + 1, split: true });
+  const act = [...next.active[p.dock]];
+  act[sec] = wasOpen ? others[0] : l.active[p.dock][sec];
+  act[sec + 1] = wasOpen ? 'properties' : null;
+  return { ...next, active: { ...next.active, [p.dock]: act } };
+}
+
+
+/**
+ * Once: Measurements sharing its dock section with other panels (the Tool Chest) gets a section of its
+ * own, open, just below it – above Properties – so the three show stacked.
+ */
+export function measurementsOwnSection(l: LayoutState): LayoutState {
+  const p = l.panels.measurements;
+  if (p.dock === 'float') return l;
+  const sec = sectionOf(l, 'measurements');
+  if (sectionPanels(l, p.dock, sec).length < 2 || sectionCount(l, p.dock) >= MAX_SECTIONS) return l;
+  return dockPanelIn(l, 'measurements', p.dock, undefined, { section: sec + 1, split: true });
+}

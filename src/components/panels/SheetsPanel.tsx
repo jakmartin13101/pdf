@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Files, GitCompareArrows, LayoutGrid, List, Search, Tags } from 'lucide-react';
+import { Files, GitCompareArrows, Image, LayoutGrid, List, Search, Tags } from 'lucide-react';
 import { PanelHeader } from '../dock/PanelHeader';
 import type { Sheet } from '../../types';
 import { getState, useStore } from '../../store/store';
@@ -159,6 +159,7 @@ export function SheetsPanel() {
   const sheets = useStore((s) => s.doc.sheets);
   const markups = useStore((s) => s.doc.markups);
   const currentId = useStore((s) => s.currentSheetId);
+  const thumbSize = useStore((s) => s.prefs.thumbSize);
   const [q, setQ] = useState('');
   const [listView, setListView] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -230,7 +231,12 @@ export function SheetsPanel() {
         <input placeholder="Find sheet (e.g. S1.02, framing)" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="panel-body">
-        <div className={`thumbs${listView ? ' list-view' : ''}`} onDragEnd={() => setDropIndex(null)}>
+        <div
+          className={`thumbs${listView ? ' list-view' : ''}${thumbSize < 140 ? ' small' : ''}`}
+          style={{ ['--thumb-w' as string]: `${thumbSize}px` }}
+          onDragEnd={() => setDropIndex(null)}
+          data-testid="thumbs"
+        >
           {filtered.map((s) => {
             const i = sheets.indexOf(s);
             return (
@@ -259,7 +265,27 @@ export function SheetsPanel() {
           {!filtered.length && <div className="empty-note">No sheets match “{q}”.</div>}
         </div>
       </div>
+      {!listView && (
+        <div className="thumb-size" title="Thumbnail size">
+          <Image size={11} />
+          <input
+            type="range"
+            min={THUMB_MIN}
+            max={THUMB_MAX}
+            step={10}
+            value={thumbSize}
+            onChange={(e) => getState().setPrefs({ thumbSize: Number(e.target.value) })}
+            aria-label="Thumbnail size"
+            data-testid="thumb-size"
+          />
+          <Image size={17} />
+        </div>
+      )}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   );
 }
+
+/** Thumbnail widths the slider goes between (px); wider than the panel is the panel's width. */
+export const THUMB_MIN = 70;
+export const THUMB_MAX = 420;

@@ -202,6 +202,16 @@ export function runCommand(id: string) {
       if (t) cmdCloseTab(t.paneId, t.docId);
       return;
     }
+    case 'view.single':
+      if (st.loaded) st.setPaneLayout('single');
+      return;
+    case 'view.splitV':
+    case 'view.splitH':
+    case 'view.split4': {
+      if (!st.loaded) return;
+      const layout = id === 'view.splitV' ? 'vertical' : id === 'view.splitH' ? 'horizontal' : 'grid';
+      return st.setPaneLayout(st.paneLayout === layout ? 'single' : layout);
+    }
     case 'tab.newPane': {
       const t = activeTab();
       if (t) st.tabToNewPane(t.paneId, t.docId);

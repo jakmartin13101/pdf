@@ -588,8 +588,24 @@ export function PropertiesPanel() {
 const SECTION_KEY = 'ts.propSections';
 
 /** A section of the Properties panel that folds open and shut (Style, Properties…). */
-function PropSection({ id, title, hint, extra, forceOpen, children }: { id: string; title: string; hint?: string; extra?: ReactNode; forceOpen?: boolean; children: ReactNode }) {
-  const [open, setOpen] = useState<boolean>(() => !!lsGet<Record<string, boolean>>(SECTION_KEY, {})[id]);
+export function PropSection({
+  id,
+  title,
+  hint,
+  extra,
+  forceOpen,
+  defaultOpen,
+  children,
+}: {
+  id: string;
+  title: string;
+  hint?: string;
+  extra?: ReactNode;
+  forceOpen?: boolean;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState<boolean>(() => lsGet<Record<string, boolean>>(SECTION_KEY, {})[id] ?? !!defaultOpen);
   const shown = open || !!forceOpen;
   const toggle = () => {
     const next = !shown;

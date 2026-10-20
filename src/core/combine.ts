@@ -233,8 +233,9 @@ export function stockFor(settings: CombineSettings, shape: string): number[] {
 }
 
 /**
- * Pieces of the takeoff by size: length and polylength measurements (one piece each, times Qty) and
- * the lengths standard details add. The size is the Member Size, else the label.
+ * Pieces of the takeoff by size: length and polylength measurements (one piece each, times Qty), counts
+ * with a Height (a piece that long for each one counted) and the lengths standard details add. The size
+ * is the Member Size, else the label.
  */
 export function collectPieces(rows: Row[], doc: DocState): Map<string, { size: string; pieces: Piece[] }> {
   const byNorm = new Map(doc.columns.map((c) => [normName(c.name), c]));
@@ -253,6 +254,14 @@ export function collectPieces(rows: Row[], doc: DocState): Map<string, { size: s
       if (pieces <= 0 || total <= 0) continue;
       length = total / pieces;
       count = pieces;
+    } else if (m.type === 'count') {
+      // Counted pieces with a Height (columns, plates): that many pieces that long, times Qty.
+      const n = r.measure.count ?? 0;
+      const total = r.measure.length ?? 0;
+      if (n <= 0 || total <= 0) continue;
+      length = total / n;
+      const qty = qtyCol ? Number(r.values[customColId(qtyCol)]) : 1;
+      count = Math.ceil(n * (Number.isFinite(qty) && qty > 0 ? qty : 1));
     } else {
       if (m.type !== 'length' && m.type !== 'polylength') continue;
       length = r.measure.length ?? 0;

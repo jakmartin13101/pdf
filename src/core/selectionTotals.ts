@@ -29,12 +29,14 @@ export function selectionTotals(doc: DocState, ids: string[]): SelectionTotals {
   for (const r of rows) {
     const m = r.markup;
     if (LENGTH_TYPES.has(m.type)) t.length += r.measure.length ?? r.measure.perimeter ?? 0;
-    if (m.type === 'count') t.count += r.measure.count ?? 0;
-    if (m.type === 'area') t.area += r.measure.area ?? 0;
-    if (m.type === 'volume') {
-      t.area += r.measure.area ?? 0;
-      t.volume += r.measure.volume ?? 0;
+    if (m.type === 'count') {
+      t.count += r.measure.count ?? 0;
+      // Counted pieces with a Height come to a length.
+      t.length += r.measure.length ?? 0;
     }
+    // Areas, and the area of counts and lengths with a Width; volumes.
+    t.area += r.measure.area ?? 0;
+    t.volume += r.measure.volume ?? 0;
   }
   for (const r of detailRows(doc, rows)) {
     if (r.detail?.warning) continue;

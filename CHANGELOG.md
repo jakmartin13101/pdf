@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.15.0 – 2026-10-20
+
+### Measurements panel
+- Rebuilt: the measuring tools in a row (Calibrate, Length, Polylength, Area, Perimeter, Volume, Count, Angle), then
+  *Page Scale* (the sheet's scale and viewports), *<Type> Measurement Properties* and *Totals & Display*, each folding
+  open and shut.
+- Measurement Properties of the selection: Subject, Label, **Depth** (with the unit its dimensions are written in),
+  **Width**, a count's **Height**, and the **Length / Area / Volume** units the measurement is written in. A length
+  has no Height.
+- **A count with a Height takes off a length** – each piece counted that long (3 × 1'-2" = 3'-6") – in the Length
+  column, labels, totals, selection totals, weight formulas and the Combine report. Width × Height gives its area,
+  × Depth its volume. A length with a Width is a strip with an area (and a volume with a Depth); an area with a Depth a
+  volume.
+- A measurement's own units show on the drawing and in the Markups List; totals stay in the project's units. Tools
+  made from a markup keep its Depth, Width and units.
+- The Markups List has a Width column; Depth can be typed for counts and lengths too. Depth and Width aren't added up.
+
+### Workspace
+- The right dock stacks the Tool Chest, Measurements and Properties, each sized by the splitter between them. Saved
+  layouts get Measurements in its own section below the Tool Chest once.
+- Side panels resize at every window size: in a narrow window, where a panel lies over the drawing, by a grip on its
+  edge. Docks can be made narrower (160 px) and wider (up to the window less 260 px).
+- Sheets panel: a **slider for the thumbnail size**; small thumbnails sit side by side.
+
+### Keyboard
+- Split view from the keyboard: Ctrl+Shift+2 split vertical, Ctrl+Shift+3 split horizontal, Ctrl+Shift+4 four ways,
+  Ctrl+Shift+1 single view (pressing a split's keys again goes back to one view). Changed in *Settings → Keyboard*;
+  shown in the Window menu and on the status bar buttons.
+
 ## 1.14.0 – 2026-10-20
 
 ### Combine report

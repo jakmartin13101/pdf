@@ -150,8 +150,15 @@ export interface Markup {
   checked: boolean;
   layer: string;
   style: MarkupStyle;
-  /** Volume depth in real inches. */
+  /**
+   * Depth in real inches: of a volume; on counts, lengths and areas, with Width (and a count's Height) it
+   * gives their area and volume (Measurements panel).
+   */
   depth?: number;
+  /** Width in real inches: a count's pieces (with Height: area), a length's strip (length × width). */
+  width?: number;
+  /** How this measurement is written instead of your units (Measurements panel). */
+  units?: MarkupUnits;
   /** Count markups: a manually entered quantity that replaces the number of symbols. */
   countOverride?: number;
   custom: Record<string, CustomValue>;
@@ -206,6 +213,14 @@ export interface Layer {
 export type ReportLengthUnit = 'ft' | 'in' | 'm';
 export type ReportAreaUnit = 'sf' | 'sy' | 'm2';
 export type ReportVolumeUnit = 'cy' | 'cf' | 'm3';
+
+/** A measurement's own units: its length, area and volume, and its dimensions (Depth, Width, Height). */
+export interface MarkupUnits {
+  length?: LengthUnit;
+  area?: ReportAreaUnit;
+  volume?: ReportVolumeUnit;
+  dim?: LengthUnit;
+}
 
 export interface ProjectSettings {
   lengthUnit: ReportLengthUnit;
@@ -323,6 +338,8 @@ export interface ChestTool {
   text?: string;
   style: MarkupStyle;
   depth?: number;
+  width?: number;
+  units?: MarkupUnits;
   layer?: string;
   /** Custom column values keyed by column NAME so tools survive across projects. */
   custom: Record<string, CustomValue>;

@@ -32,7 +32,7 @@ import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
-import { MAX_SECTIONS, PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, sectionCount, sectionOf, sectionPanels, setSectionSizesIn, showPanelIn, togglePanelIn, type DockTarget } from './dockLayout';
+import { PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, upgradeLayout, type DockTarget } from './dockLayout';
 import { sizeText } from '../core/steelShapes';
 import { upgradeToolChest } from '../core/docUpgrade';
 import { defaultMaxLengths, splitMarkupAtMax, type MaxLengthPrefs } from '../core/maxLength';
@@ -154,6 +154,8 @@ export interface LayoutState {
   locked: boolean;
   /** Properties has had a section of its own (so opening it on a selection leaves the Tool Chest showing). */
   propsOwn?: boolean;
+  /** Measurements was given a section of its own (between the Tool Chest and Properties). */
+  measOwn?: boolean;
 }
 
 export interface PanelDrag {
@@ -253,6 +255,8 @@ export interface Prefs {
   propHidden: string[];
   /** Show the Properties panel when a markup is drawn or selected. */
   autoProperties: boolean;
+  /** Width of sheet thumbnails in the Sheets panel (px; its slider). */
+  thumbSize: number;
   /** How lengths are shown and typed: ft-in (1'-1"), inches, decimal feet or metric (Settings → Units & Totals). */
   units: UserUnits;
 }
@@ -559,9 +563,10 @@ export function defaultLayout(): LayoutState {
     panels: {
       sheets: place('left', 0),
       toolchest: place('right', 1),
-      // Properties in its own section below the Tool Chest: it opens when a markup is drawn or selected.
-      properties: { ...place('right', 2), section: 1 },
-      measurements: place('right', 3),
+      // Measurements in its own section below the Tool Chest, then Properties (it opens when a markup is
+      // drawn or selected): stacked, each resized by the splitter between them.
+      properties: { ...place('right', 2), section: 2 },
+      measurements: { ...place('right', 3), section: 1 },
       layers: place('right', 4),
       compare: place('right', 5),
       autotakeoff: place('right', 6),
@@ -569,9 +574,10 @@ export function defaultLayout(): LayoutState {
       summary: { ...place('bottom', 8), float: { x: 190, y: 250, w: 760, h: 360 } },
     },
     // Small screens start with the drawing visible; side panels open as overlays on demand.
-    active: { left: [narrow ? null : 'sheets'], right: [narrow ? null : 'toolchest', null], top: [null], bottom: ['markups'] },
-    split: { left: [1], right: [1.3, 1], top: [1], bottom: [1] },
+    active: { left: [narrow ? null : 'sheets'], right: [narrow ? null : 'toolchest', narrow ? null : 'measurements', null], top: [null], bottom: ['markups'] },
+    split: { left: [1], right: [1.3, 1, 1.2], top: [1], bottom: [1] },
     propsOwn: true,
+    measOwn: true,
     size: { left: 250, right: 310, top: 220, bottom: narrow ? 200 : 250 },
     floatOrder: [],
     toolbar: { dock: 'top', x: 200, y: 120 },
@@ -596,25 +602,7 @@ function loadLayout(): LayoutState {
     toolbar: { ...d.toolbar, ...saved.toolbar },
     floatOrder: (saved.floatOrder ?? []).filter((id) => PANEL_IDS.includes(id)),
   });
-  return l.propsOwn ? l : { ...propertiesOwnSection(l), propsOwn: true };
-}
-
-/**
- * Once: Properties sharing its dock section with other panels gets a section of its own below them (closed
- * unless it was showing), so opening it on a selection doesn't hide the Tool Chest.
- */
-function propertiesOwnSection(l: LayoutState): LayoutState {
-  const p = l.panels.properties;
-  if (p.dock === 'float') return l;
-  const sec = sectionOf(l, 'properties');
-  if (sectionPanels(l, p.dock, sec).length < 2 || sectionCount(l, p.dock) >= MAX_SECTIONS) return l;
-  const wasOpen = isPanelOpen(l, 'properties');
-  const others = sectionPanels(l, p.dock, sec).filter((x) => x !== 'properties');
-  const next = dockPanelIn(l, 'properties', p.dock, undefined, { section: sec + 1, split: true });
-  const act = [...next.active[p.dock]];
-  act[sec] = wasOpen ? others[0] : l.active[p.dock][sec];
-  act[sec + 1] = wasOpen ? 'properties' : null;
-  return { ...next, active: { ...next.active, [p.dock]: act } };
+  return upgradeLayout(l);
 }
 
 /** A pane showing a sheet of a document, that document's tab active (opened at the end if needed). */
@@ -726,6 +714,7 @@ const defaultPrefs = (): Prefs => ({
   maxLengths: defaultMaxLengths(),
   propHidden: [],
   autoProperties: true,
+  thumbSize: 240,
   units: { ...DEFAULT_USER_UNITS },
 });
 
@@ -831,7 +820,9 @@ export const useStore = create<AppState>()((set, get, api) => {
       custom,
       toolId: chestTool?.id,
       text: chestTool?.text ?? (type === 'stamp' ? 'APPROVED' : undefined),
-      depth: type === 'volume' ? chestTool?.depth ?? 4 : undefined,
+      depth: type === 'volume' ? chestTool?.depth ?? 4 : chestTool?.depth,
+      width: chestTool?.width,
+      units: chestTool?.units ? { ...chestTool.units } : undefined,
       ...extra,
     };
     return m;
@@ -1668,6 +1659,8 @@ export const useStore = create<AppState>()((set, get, api) => {
         text: m.type === 'stamp' ? m.text : undefined,
         style: { ...m.style },
         depth: m.depth,
+        width: m.width,
+        units: m.units ? { ...m.units } : undefined,
         layer: m.layer || undefined,
         custom,
       };

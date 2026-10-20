@@ -7,10 +7,12 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.14.0**: the **Combine report orders stock-length pieces whole** (a 40'-0" angle is a 40' bar: no cut)
-> and **nests the rests of spliced pieces together** instead of a bar each (1.13.0: your units – feet-inches by
-> default, `0-28` → `2'-4"`, Height is a length; 1.12.0: capital X sizes, the Properties panel, selection totals) –
-> see the [changelog](CHANGELOG.md).
+> **Version 1.15.0**: a new **Measurements panel** – the measuring tools in a row, *Page Scale*, and *Count / Length
+> Measurement Properties* with **Depth, Width and Height** (a count with a Height takes off a length: 3 plates ×
+> 1'-2" = 3'-6") and the units each measurement is written in; Tool Chest, Measurements and Properties **stacked
+> down the right side**, every side panel **resizable** at any window size; a **thumbnail size slider**; and
+> **keyboard shortcuts for split view** (1.14.0: Combine report orders stock-length pieces whole; 1.13.0: your units)
+> – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -71,11 +73,11 @@ A five-minute tour with the sample set:
 
 | Workflow step | Where it lives |
 | --- | --- |
-| **1. Sheet labeling & organization** | Sheets panel: thumbnails/list, search, drag to reorder, double-click to rename. *Document → Page Labels*: auto-detect from title blocks, **box the number and/or title once on any page** and read the same spot on all or the ticked pages, sequential numbering, or edit in a table. Each PDF is its own document, in its own **document tab**. |
+| **1. Sheet labeling & organization** | Sheets panel: thumbnails/list (a **slider** under the thumbnails sizes them – small ones sit side by side), search, drag to reorder, double-click to rename. *Document → Page Labels*: auto-detect from title blocks, **box the number and/or title once on any page** and read the same spot on all or the ticked pages, sequential numbering, or edit in a table. Each PDF is its own document, in its own **document tab**. |
 | **2. Scale calibration** | *Calibrate* (two points + known distance such as `20'-0"`, `20-6`, `6.1 m`), *Set Scale* (architectural, engineering and metric presets or custom), apply to one / all / unscaled sheets. **Viewports** give a rectangular area of a sheet its own scale (details drawn at 1½" = 1'-0" next to a 1/4" section). Units: ft-in, decimal ft, in, m, cm, mm with selectable precision. |
 | **3. Linear measurements** | Length and Polylength tools; results are persistent markup objects you can select, move, reshape by dragging vertices, restyle and inspect. Snaps to PDF line work (endpoints, midpoints, intersections, lines), to markup vertices, and Shift/ORTHO constrain angles. |
 | **4. Area & perimeter** | Area (with perimeter shown), Perimeter, Volume (area × depth, CY/CF/m³), Angle; area **cutouts** for openings. |
-| **5. Count** | Count tool: every click adds a symbol to the same count markup (circle, square, triangle, diamond, star, check, cross). |
+| **5. Count** | Count tool: every click adds a symbol to the same count markup (circle, square, triangle, diamond, star, check, cross). A **Height** makes the count a length (each piece that long), a Width an area – see [Measurements panel](#measurements-panel). |
 | **6. Custom markup tools** | **Tool Chest** with default sets (Structural Steel, Joists/Deck/Connections, Misc Metals, Concrete, Architectural & MEP, Review). Each tool stores type, subject, appearance, layer, depth and **column values** (Member Size, Grade, Category, Qty…). Create tools from scratch or from any markup, edit, duplicate, move between sets, import/export JSON. *Apply Tool Properties* restyles existing markups. |
 | **7. Editable Markup List** | Bottom panel. Double-click cells to edit Subject (a shape from your list), Label, Comments, Status, Layer, Color, Author, Depth and every custom column; checkmark toggles. Multi-select edits apply to all selected rows. Undo/redo everything. |
 | **8. Custom columns & data fields** | *Manage Columns*: Text, Number, Choice and **Formula** columns, ships with a structural-steel template (Piece Mark, Member Size, Material, Grade, Qty, Weight, Level, Grid, Detail, Connection, Labor Category, Notes, Category). Show/hide and reorder any column, resize by dragging headers. |
@@ -156,6 +158,33 @@ Feet**, **Inches**, **Meters**, **Centimeters** or **Millimeters**, and the prec
 The document's units for **totals** (LF, SF, CY…) are set below, under *This project*.
 
 ![Height typed as 0-28 shows 2'-4"](docs/screenshot-units.png)
+
+### Measurements panel
+
+The **Measurements** panel sits between the Tool Chest and Properties on the right (each resized by the splitter
+between them):
+
+* **The measuring tools** in a row – Calibrate, Length, Polylength, Area, Perimeter, Volume, Count, Angle – the one in
+  use highlighted (click it again to stop).
+* **Page Scale** ▸ – the sheet's scale: Calibrate, Set Scale, a standard scale, its units and precision, *Apply to All
+  Sheets*, and the sheet's viewports.
+* **Count / Length / Area… Measurement Properties** ▸ – for the measurements selected:
+  * **Subject** and **Label** (sizes written the standard way: `pl 1/2*7` → `PL 1/2X7`).
+  * **Depth** with the unit its dimensions are written in (`ft' in"`, in, ft, m, cm, mm), **Width**, and for counts
+    **Height**. Typed any way (`0-14` → `1'-2"`); bare numbers are inches for Depth and Width, feet for Height.
+  * **A count with a Height takes off a length**: each piece counted is that long – 3 plates PL 1/2X7 with a Height of
+    1'-2" are 3'-6" in the Length column, the totals, the weight (Length × PLF) and the Combine report. With a Width
+    as well, the area (7" × 1'-2" × 3 = 2.04 sf); with a Depth, the volume.
+  * A **length** has no Height: its **Width** makes it a strip with an area (a 2'-0" wide footing), and a Depth a
+    volume. An **area** with a Depth has a volume.
+  * **Length**, **Area** (and **Volume**) – the units this measurement is written in on the drawing and in the
+    Markups List, instead of your units and the project's (totals stay in the project's units).
+  * What it comes to: count, length, area and volume.
+* **Totals & Display** ▸ – the project's units for totals.
+
+The Markups List has a **Width** column (and Depth for counts and lengths too); Height is in the list for new files.
+
+![The Measurements panel: a count of PL 1/2X7 plates with a Height of 1'-2" taking off 3'-6"](docs/screenshot-measurements.png)
 
 ### Selection totals
 
@@ -485,9 +514,11 @@ columns.
 
 ### Split view and workspace layout
 
-* **Split the document**: *Window → Split Vertical / Split Horizontal / Four Ways* or the status-bar
-  buttons. Each pane has its own document tabs, sheet selector, zoom and pan; the active pane is outlined and receives
-  tools. Drag the divider to resize; close a pane with its ×.
+* **Split the document**: *Window → Split Vertical / Split Horizontal / Four Ways*, the status-bar buttons, or the
+  keys – **Ctrl+Shift+2** split vertical (side by side), **Ctrl+Shift+3** split horizontal, **Ctrl+Shift+4** four ways,
+  **Ctrl+Shift+1** single view (the keys of the split showing go back to one view). Change the keys in *Settings →
+  Keyboard*. Each pane has its own document tabs, sheet selector, zoom and pan; the active pane is outlined and
+  receives tools. Drag the divider to resize; close a pane with its ×.
 * **Detach a pane** with the ↗ button in its header (or *Window → Detach Active Pane*). In the desktop app it becomes
   its own window you can move to another monitor and resize; in a browser that blocks pop-ups it floats inside the
   app (drag its header to move, the corner to resize). A detached pane uses the main window's toolbar, menus and
@@ -507,6 +538,10 @@ columns.
   Drag the splitter between sections to size them (heights down a side, widths across the top or bottom), and the
   dock's edge for its width or height. A section emptied of panels closes up; each section collapses and opens on its
   own from its tabs. The side tab strips group the tabs by section.
+* **Side panels are always resizable**: drag the dock's edge for its width, the splitters between sections for their
+  heights. In a narrow window, where a side panel lies over the drawing, drag the grip on the panel's edge.
+* The right dock starts with the **Tool Chest, Measurements and Properties stacked**; layouts from before get
+  Measurements in its own section below the Tool Chest once.
 * *Window → Lock Workspace Layout* stops accidental moves; *Reset Workspace Layout* restores the default. The layout is
   remembered between sessions.
 

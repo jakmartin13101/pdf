@@ -1,31 +1,12 @@
 import type { CustomColumn, DocState, Layer, Markup, MeasureValues, Scale, Sheet } from '../types';
 import { evaluate, normName, toNum, type FValue } from './formula';
 import { TYPE_INFO } from './markupTypes';
-import { computeMeasure, measurementText, scaleForMarkup } from './measure';
-import {
-  AREA_SUFFIX,
-  LENGTH_SUFFIX,
-  VOLUME_SUFFIX,
-  areaToReport,
-  bareUnit,
-  fmtLen,
-  fmtNumber,
-  parseLength,
-  formatArea,
-  formatLength,
-  formatVolume,
-  lengthToReport,
-  volumeToReport,
-} from './units';
+import { areaText, computeMeasure, dimText, measurementText, scaleForMarkup, volumeText } from './measure';
+import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, areaToReport, fmtNumber, formatLength, lengthToReport, lengthValue, volumeToReport } from './units';
 
 export type ColumnEditor = 'text' | 'number' | 'choice' | 'status' | 'check' | 'color' | 'layer' | 'length' | 'count' | 'customLength' | 'none';
 
-/** A length column's value in real inches: numbers as they are, text (from before, or typed) parsed. */
-export function lengthValue(raw: unknown): number | null {
-  if (raw === '' || raw == null) return null;
-  if (typeof raw === 'number') return isFinite(raw) ? raw : null;
-  return parseLength(String(raw), bareUnit());
-}
+export { lengthValue };
 
 export interface ColumnSpec {
   id: string;
@@ -53,6 +34,7 @@ export const BUILTIN_COLUMNS: ColumnSpec[] = [
   { id: 'volume', name: 'Volume', builtin: true, editor: 'none', numeric: true, align: 'right', width: 95 },
   { id: 'count', name: 'Count', builtin: true, editor: 'count', numeric: true, align: 'right', width: 72 },
   { id: 'depth', name: 'Depth', builtin: true, editor: 'length', numeric: true, align: 'right', width: 75 },
+  { id: 'width', name: 'Width', builtin: true, editor: 'length', numeric: true, align: 'right', width: 75 },
   { id: 'scale', name: 'Scale', builtin: true, editor: 'none', numeric: false, align: 'left', width: 110 },
   { id: 'layer', name: 'Layer', builtin: true, editor: 'layer', numeric: false, align: 'left', width: 100 },
   { id: 'status', name: 'Status', builtin: true, editor: 'status', numeric: false, align: 'left', width: 90 },
@@ -181,12 +163,13 @@ export function rowBuilder(doc: DocState): (m: Markup, o?: RowOverrides) => Row 
     set('sheetTitle', sheet?.title ?? '');
     set('measurement', o ? o.measurement : info.measure ? measurementText(m, measure, scale, s) : '');
     set('length', lengthR, measure.length != null ? formatLength(measure.length, scale.unit, scale.precision) : '');
-    set('area', areaR, measure.area != null ? formatArea(measure.area, scale.unit, s) : '');
+    set('area', areaR, measure.area != null ? areaText(m, measure.area, scale, s) : '');
     set('perimeter', perimR, measure.perimeter != null ? formatLength(measure.perimeter, scale.unit, scale.precision) : '');
-    set('volume', volR, measure.volume != null ? formatVolume(measure.volume, scale.unit, s) : '');
+    set('volume', volR, measure.volume != null ? volumeText(m, measure.volume, scale, s) : '');
     // An asterisk marks a count that was typed in rather than counted on the drawing.
     set('count', count, fmtNumber(count, 0) + (!o && m.type === 'count' && m.countOverride != null ? '*' : ''));
-    set('depth', depthR, m.type === 'volume' ? formatLength(m.depth ?? 0, scale.unit, scale.precision) : '');
+    set('depth', depthR, m.type === 'volume' ? formatLength(m.depth ?? 0, scale.unit, scale.precision) : m.depth ? dimText(m, m.depth) : '');
+    set('width', m.width ? lengthToReport(m.width, s) : 0, m.width ? dimText(m, m.width) : '');
     set('scale', info.measure ? scale.label : '');
     set('layer', layerById.get(m.layer)?.name ?? '');
     set('status', m.status);
@@ -211,7 +194,7 @@ export function rowBuilder(doc: DocState): (m: Markup, o?: RowOverrides) => Row 
       } else if (c.kind === 'length') {
         // Real inches (older text values are read as lengths); in formulas, the report unit like Length.
         const inches = lengthValue(raw);
-        set(id, inches == null ? 0 : lengthToReport(inches, s), inches == null ? String(raw) : fmtLen(inches));
+        set(id, inches == null ? 0 : lengthToReport(inches, s), inches == null ? String(raw) : dimText(m, inches));
       } else set(id, String(raw));
     }
 
@@ -290,5 +273,5 @@ export function formatTotal(colId: string, v: number, doc: DocState): string {
 export function isSummable(spec: ColumnSpec): boolean {
   if (!spec.numeric) return false;
   // Heights and other length columns sort by length but aren't added up.
-  return spec.id !== 'depth' && spec.custom?.kind !== 'length';
+  return spec.id !== 'depth' && spec.id !== 'width' && spec.custom?.kind !== 'length';
 }

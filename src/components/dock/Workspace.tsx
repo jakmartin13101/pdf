@@ -64,11 +64,11 @@ export function PanelHost({ id, dock }: { id: PanelId; dock: DockSide | 'float' 
   );
 }
 
-export function Splitter({ dir, onDrag, onEnd }: { dir: 'v' | 'h'; onDrag: (delta: number) => void; onEnd?: () => void }) {
+export function Splitter({ dir, onDrag, onEnd, className }: { dir: 'v' | 'h'; onDrag: (delta: number) => void; onEnd?: () => void; className?: string }) {
   const [dragging, setDragging] = useState(false);
   return (
     <div
-      className={`splitter-${dir}${dragging ? ' dragging' : ''}`}
+      className={`splitter-${dir}${dragging ? ' dragging' : ''}${className ? ` ${className}` : ''}`}
       onPointerDown={(e) => {
         e.preventDefault();
         let last = dir === 'v' ? e.clientX : e.clientY;
@@ -171,13 +171,20 @@ export function SideDock({ side }: { side: 'left' | 'right' }) {
       ))}
     </div>
   );
+  // The dock's width: dragged at its inner edge (on small screens, where the panel lies over the drawing,
+  // by the grip on the panel's edge).
+  const resizeWidth = (d: number) => {
+    const max = Math.max(320, window.innerWidth - 260);
+    st().setDockSize(side, Math.max(160, Math.min(max, st().layout.size[side] + (side === 'left' ? d : -d))));
+  };
   const content = open.length > 0 && (
     <>
-      {side === 'right' && <Splitter dir="v" onDrag={(d) => st().setDockSize('right', Math.max(220, Math.min(760, st().layout.size.right - d)))} />}
-      <div className={`side-panel ${side}`} style={{ width: layout.size[side] }}>
+      {side === 'right' && <Splitter dir="v" onDrag={resizeWidth} />}
+      <div className={`side-panel ${side}`} style={{ width: layout.size[side], ['--side-w' as string]: `${layout.size[side]}px` }}>
         <SectionStack side={side} dir="column" sections={open.map((x) => ({ index: x.s, node: <PanelHost id={x.id} dock={side} /> }))} />
+        <Splitter dir="v" className="side-grip" onDrag={resizeWidth} />
       </div>
-      {side === 'left' && <Splitter dir="v" onDrag={(d) => st().setDockSize('left', Math.max(170, Math.min(760, st().layout.size.left + d)))} />}
+      {side === 'left' && <Splitter dir="v" onDrag={resizeWidth} />}
     </>
   );
   return side === 'left' ? (

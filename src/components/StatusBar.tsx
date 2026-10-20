@@ -6,6 +6,7 @@ import { scaleAt } from '../core/measure';
 import { formatLength } from '../core/units';
 import { sheetDisplayName } from '../core/columns';
 import { view } from '../store/commands';
+import { useShortcuts } from './useShortcuts';
 
 function prompt(tool: ReturnType<typeof getState>['tool']): string {
   switch (tool.kind) {
@@ -143,18 +144,19 @@ export function StatusBar() {
 
 function SplitButtons() {
   const layout = useStore((s) => s.paneLayout);
+  const sc = useShortcuts();
   const st = getState();
-  const btn = (id: typeof layout, Icon: typeof Square, title: string) => (
-    <button className={`icon-btn${layout === id ? ' active' : ''}`} title={title} onClick={() => st.setPaneLayout(id)} data-testid={`split-${id}`}>
+  const btn = (id: typeof layout, Icon: typeof Square, title: string, cmd: string) => (
+    <button className={`icon-btn${layout === id ? ' active' : ''}`} title={sc(cmd) ? `${title} (${sc(cmd)})` : title} onClick={() => st.setPaneLayout(id)} data-testid={`split-${id}`}>
       <Icon size={13} />
     </button>
   );
   return (
     <div className="sb-nav" title="Split the view to work on several sheets at once">
-      {btn('single', Square, 'Single view')}
-      {btn('vertical', Columns2, 'Split vertical (side by side)')}
-      {btn('horizontal', Rows2, 'Split horizontal (stacked)')}
-      {btn('grid', Grid2x2, 'Split four ways')}
+      {btn('single', Square, 'Single view', 'view.single')}
+      {btn('vertical', Columns2, 'Split vertical (side by side)', 'view.splitV')}
+      {btn('horizontal', Rows2, 'Split horizontal (stacked)', 'view.splitH')}
+      {btn('grid', Grid2x2, 'Split four ways', 'view.split4')}
     </div>
   );
 }

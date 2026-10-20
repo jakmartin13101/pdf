@@ -309,6 +309,18 @@ export function fmtLen(inches: number): string {
   return formatLength(inches, current.unit, current.precision);
 }
 
+/** The precision lengths in a unit are written to: yours for your unit, else the unit's start. */
+export function unitPrecision(unit: LengthUnit): number {
+  return unit === current.unit ? current.precision : userPrecisionFor(unit);
+}
+
+/** A length value kept in a column or field, in real inches: numbers as they are, text (typed, older files) parsed. */
+export function lengthValue(raw: unknown): number | null {
+  if (raw === '' || raw == null) return null;
+  if (typeof raw === 'number') return isFinite(raw) ? raw : null;
+  return parseLength(String(raw), bareUnit());
+}
+
 /**
  * What a bare number typed for a length is in: inches or the metric unit when those are the user's
  * units; otherwise `imperial` (feet unless the field says inches).
@@ -386,6 +398,20 @@ export function volumeToReport(cuIn: number, s: ProjectSettings): number {
 export const LENGTH_SUFFIX: Record<ProjectSettings['lengthUnit'], string> = { ft: 'LF', in: 'in', m: 'm' };
 export const AREA_SUFFIX: Record<ProjectSettings['areaUnit'], string> = { sf: 'SF', sy: 'SY', m2: 'm²' };
 export const VOLUME_SUFFIX: Record<ProjectSettings['volumeUnit'], string> = { cy: 'CY', cf: 'CF', m3: 'm³' };
+
+/** Square inches in a chosen area unit: "12.50 sf", "1.39 sy", "1.16 m²". */
+export function formatAreaAs(sqIn: number, unit: ProjectSettings['areaUnit'], decimals: number): string {
+  if (unit === 'm2') return `${fmtNumber(sqIn / (IN_PER_M * IN_PER_M), decimals)} m²`;
+  if (unit === 'sy') return `${fmtNumber(sqIn / 1296, decimals)} sy`;
+  return `${fmtNumber(sqIn / 144, decimals)} sf`;
+}
+
+/** Cubic inches in a chosen volume unit: "0.46 cy", "12.50 cf", "0.35 m³". */
+export function formatVolumeAs(cuIn: number, unit: ProjectSettings['volumeUnit'], decimals: number): string {
+  if (unit === 'm3') return `${fmtNumber(cuIn / (IN_PER_M * IN_PER_M * IN_PER_M), decimals)} m³`;
+  if (unit === 'cf') return `${fmtNumber(cuIn / 1728, decimals)} cf`;
+  return `${fmtNumber(cuIn / 46656, decimals)} cy`;
+}
 
 /** Area/volume units used for on-drawing labels follow the sheet's length unit family. */
 export function formatArea(sqIn: number, unit: LengthUnit, s: ProjectSettings): string {
