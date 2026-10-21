@@ -671,6 +671,8 @@ length × width × thickness × 0.2836 lb/in³ (steel, 490 lb/ft³) for a 12" le
 * The size can be in the Member Size or just the label (`bp 3*3*1/4` is written `BP 3X3X1/4`); either weighs.
 * BP is bent plate: the *Base Plate* tool takes subject PL (Tool Chests from before are changed to match).
 
+![23'-0" of BP3X3X1/4 weighs 117 lb; three PL1/2X7 plates 1'-2" long weigh 42 lb](docs/screenshot-plate-weights.png)
+
 Report units (LF/in/m, SF/SY/m², CY/CF/m³) and decimals are set in the **Measurements** panel.
 
 ### Keyboard
