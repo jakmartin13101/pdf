@@ -6,6 +6,8 @@
 import { _electron as electron } from '@playwright/test';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { webcrypto } from 'node:crypto';
 import os from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +16,25 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const shots = process.argv[2];
 const samplePdf = join(root, 'public', 'samples', 'Sample-Structural-Set.pdf');
 const addendumPdf = join(root, 'public', 'samples', 'Sample-S1.02-Addendum-2.pdf');
+
+/**
+ * A short-lived Pro license for the Pro checks, when the signing key is here (license/ on a developer's
+ * computer, the LICENSE_PRIVATE_KEY secret in CI); released builds trust no other key.
+ */
+function proLicense() {
+  if (!process.env.LICENSE_PRIVATE_KEY && !existsSync(join(root, 'license', 'private-key.jwk.json'))) return null;
+  const tomorrow = new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10);
+  return execFileSync(process.execPath, [join(root, 'scripts', 'license.mjs'), 'issue', '--tier', 'pro', '--name', 'Desktop smoke test', '--expires', tomorrow], { encoding: 'utf8' }).trim();
+}
+
+/** A well-formed Pro license signed by a key nobody trusts: the program must refuse it. */
+async function forgedLicense() {
+  const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const b64 = (b) => Buffer.from(b).toString('base64url');
+  const payload = new TextEncoder().encode(JSON.stringify({ v: 1, product: 'takeoff-studio', tier: 'pro', name: 'Forged', issued: '2026-01-01', id: 'x' }));
+  const sig = await webcrypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, pair.privateKey, payload);
+  return `BSTS1.${b64(payload)}.${b64(new Uint8Array(sig))}`;
+}
 
 // Where the first run saves the sample set (with its takeoff inside); later runs open it again.
 const savedPdf = join(mkdtempSync(join(os.tmpdir(), 'takeoff-saved-')), 'Saved Set.pdf');
@@ -63,6 +84,27 @@ async function launch(extraArgs = []) {
   check(opened, 'sample drawing set opened (PDF worker running)');
   if (shots) await win.screenshot({ path: join(shots, 'desktop-main.png') });
 
+  // License: Basic without one; a forged key is refused (the signature check runs on app://).
+  check((await win.getByTestId('license-badge').textContent()) === 'Basic', 'starts with the Basic features');
+  await win.getByTestId('license-badge').click();
+  await win.getByTestId('license-key').fill(await forgedLicense());
+  await win.getByTestId('license-activate').click();
+  const refused = await win
+    .getByTestId('license-error')
+    .filter({ hasText: 'not genuine' })
+    .waitFor({ timeout: 10000 })
+    .then(() => true)
+    .catch(() => false);
+  check(refused, 'a forged license key is refused');
+  const pro = proLicense();
+  if (pro) {
+    await win.getByTestId('license-key').fill(pro);
+    await win.getByTestId('license-activate').click();
+    await win.getByTestId('license-name').waitFor({ timeout: 10000 }).catch(() => undefined);
+    check((await win.getByTestId('license-badge').textContent()) === 'Pro', 'a Pro license key activates Pro');
+  } else console.log('SKIP  Pro checks: no license signing key (license/private-key.jwk.json or LICENSE_PRIVATE_KEY)');
+  await win.keyboard.press('Escape');
+
   await win.getByText('Help', { exact: true }).click();
   await win.getByText('Terms of Service', { exact: true }).click();
   await win.getByTestId('terms').waitFor();
@@ -108,18 +150,23 @@ async function launch(extraArgs = []) {
   if (shots) await win.screenshot({ path: join(shots, 'desktop-overlay.png') });
   await win.getByTestId('compare-remove').click();
 
-  // Automatic takeoff: the labelled beams and tubing on S1.02 are found from the PDF's line work.
+  // Automatic takeoff (Pro): the labelled beams and tubing on S1.02 are found from the PDF's line work.
   await win.getByTestId('tb-auto').click();
-  await win.getByTestId('auto-find').click();
-  const found = await win
-    .getByTestId('auto-status')
-    .filter({ hasText: '50 members in 5 sizes' })
-    .waitFor({ timeout: 30000 })
-    .then(() => true)
-    .catch(() => false);
-  check(found && (await win.getByTestId('auto-member').count()) === 50, 'automatic takeoff finds the labelled beams and tubing');
-  if (shots) await win.screenshot({ path: join(shots, 'desktop-auto-takeoff.png') });
-  await win.getByTestId('auto-clear').click();
+  if (pro) {
+    await win.getByTestId('auto-find').click();
+    const found = await win
+      .getByTestId('auto-status')
+      .filter({ hasText: '50 members in 5 sizes' })
+      .waitFor({ timeout: 30000 })
+      .then(() => true)
+      .catch(() => false);
+    check(found && (await win.getByTestId('auto-member').count()) === 50, 'automatic takeoff finds the labelled beams and tubing');
+    if (shots) await win.screenshot({ path: join(shots, 'desktop-auto-takeoff.png') });
+    await win.getByTestId('auto-clear').click();
+  } else {
+    check(await win.getByTestId('license-upsell').isVisible(), 'without Pro, Auto opens the license window');
+    await win.keyboard.press('Escape');
+  }
 
   // Settings & Preferences from the Settings menu.
   await win.locator('.menu-btn', { hasText: /^Settings$/ }).click();

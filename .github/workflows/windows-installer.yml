@@ -48,6 +48,9 @@ jobs:
         run: npm run dist:win
 
       - name: Desktop smoke test
+        # With the license signing key (a repository secret) the Pro features are checked too.
+        env:
+          LICENSE_PRIVATE_KEY: ${{ secrets.LICENSE_PRIVATE_KEY }}
         run: node scripts/desktop-smoke.mjs
 
       - name: Upload installer
