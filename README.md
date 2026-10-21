@@ -7,10 +7,10 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.16.0**: **split the view as many times as you want** – every split (Ctrl+Shift+2 side by side,
-> Ctrl+Shift+3 one above the other) splits the active pane again, and panes close with their × (1.15.0: the new
-> Measurements panel with Depth, Width and a count's Height, stacked resizable side panels, the thumbnail slider; 1.14.0:
-> Combine report orders stock-length pieces whole) – see the [changelog](CHANGELOG.md).
+> **Version 1.17.0**: **Create Report** in the Combine Report – a simple **Order List** (size, length and quantity, one
+> line each: `L3X3X1/4   40'-0"   6`) or **Cut List** (the bars of each size, what is cut from each and the drop) to
+> print, save as CSV or copy (1.16.0: split the view as many times as you want; 1.15.0: the Measurements panel with
+> Depth, Width and a count's Height) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -135,9 +135,9 @@ this off in *Settings → General*) and shows only the main fields:
 Other markups (text, callouts, clouds, shapes) keep the full list of fields. Properties has its own section below the
 Tool Chest on the right, so opening it leaves the Tool Chest showing; layouts from before are changed once to match.
 
-### Your units
+### Measuring units
 
-*Settings → Units & Totals → Your units* sets how you measure: **Feet-Inches** (`1'-1"`, the default), **Decimal
+*Settings → Units & Totals → Measuring units* sets how you measure: **Feet-Inches** (`1'-1"`, the default), **Decimal
 Feet**, **Inches**, **Meters**, **Centimeters** or **Millimeters**, and the precision (1/16" for feet-inches).
 
 <img src="docs/screenshot-units-settings.png" width="620" alt="Settings: your units">
@@ -348,7 +348,7 @@ switches for snapping, ortho, reuse, labels, theme and the workspace layout:
 
 * **General** – author name for new markups, theme, mouse wheel (zoom or scroll), measurement labels on the drawing,
   keep tools active, show the Properties panel when a markup is drawn or selected, show hidden Tool Chest tools.
-* **Units & Totals** – your units for measuring and typing lengths (see [Your units](#your-units)); the document's
+* **Units & Totals** – the units you measure and type lengths in (see [Measuring units](#measuring-units)); the document's
   units for totals (LF/in/m, SF/SY/m², CY/CF/m³), decimals and perimeter on area labels, saved with the document.
 * **Length Measurements** – the maximum length of each shape (see [Maximum lengths](#maximum-lengths)).
 * **Drawing & Editing** – snapping to the drawing and to markups, ortho; what the arrow keys move a selection by (screen
@@ -431,6 +431,16 @@ material as it can:
 
 ![Combine report: whole 40' bars and the rests of two spliced angles on one bar](docs/screenshot-combine-full.png)
 * Exports: **CSV** (the order list and the cutting plan) and **Print / PDF** (a printable page with the bars drawn).
+* **Create Report** makes a simple list from the same plan (its sheets, detail material and stock lengths). Choose:
+  * **Order List** – the material to order, one line each: the size, the length and how many (`L3X3X1/4   40'-0"   6`,
+    then `L3X3X1/4   20'-0"   1`). Sizes whose shape has no stock lengths list their lengths as cut (marked *).
+  * **Cut List** – each size with its bars, bars cut the same way together: how many, the stock length, what is cut
+    from each (`2 × 11'-6", 15'-0"`) and the drop; whole bars read *full length – no cut*, pieces of spliced members ⧉.
+
+  Then **Print / PDF** (a plain page), **CSV**, or **Copy** – the list as text in lined-up columns (spaces, no dashes) to
+  paste into an e-mail or a purchase order.
+
+<img src="docs/screenshot-report-order.png" width="460" alt="Create Report: the Order List"> <img src="docs/screenshot-report-cut.png" width="460" alt="Create Report: the Cut List">
 
 <img src="docs/screenshot-combine-stock.png" width="640" alt="Settings: stock lengths to order for each shape">
 

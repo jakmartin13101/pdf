@@ -121,4 +121,34 @@ test('a piece as long as a stock length is ordered whole, and splice rests are n
   await expect(rests).toHaveCount(1);
   await expect(rests.locator('.cmb-piece.splice')).toHaveCount(2);
   await page.getByTestId('modal').screenshot({ path: 'test-results/combine-full.png' });
+
+  // Create Report: an order list (size, length, quantity – one line each) or a cut list.
+  await page.getByTestId('combine-create-report').click();
+  const report = page.locator('.modal', { has: page.getByTestId('report-pick-order') });
+  await expect(report).toBeVisible();
+  await report.getByTestId('report-pick-order').click();
+  const lines = report.getByTestId('order-line');
+  await expect(lines).toHaveCount(2);
+  await expect(lines.nth(0).locator('td')).toHaveText(['L3X3X1/4', `40'-0"`, '5']);
+  await expect(lines.nth(1).locator('td')).toHaveText(['L3X3X1/4', `20'-0"`, '1']);
+  await report.screenshot({ path: 'test-results/report-order.png' });
+  await report.getByTestId('report-pick-cut').click();
+  await expect(report.getByTestId('cut-size')).toHaveText(['L3X3X1/4']);
+  const cuts = report.getByTestId('cut-line');
+  // Whole bars (those of the spliced angles marked), then the bar the two 2'-0" rests are cut from.
+  await expect(cuts).toHaveCount(3);
+  await expect(cuts.nth(0)).toContainText(`3 ×40'-0"`);
+  await expect(cuts.nth(0)).toContainText('full length – no cut');
+  await expect(cuts.nth(1)).toContainText(`2 ×40'-0"`);
+  await expect(cuts.nth(1)).toContainText('full length – no cut (spliced ⧉)');
+  await expect(cuts.nth(2)).toContainText(`1 ×20'-0"`);
+  await expect(cuts.nth(2)).toContainText(`2 × 2'-0" ⧉`);
+  await report.screenshot({ path: 'test-results/report-cut.png' });
+  // CSV of the list.
+  const [download] = await Promise.all([page.waitForEvent('download'), report.getByTestId('report-csv').click()]);
+  expect(download.suggestedFilename()).toMatch(/_cut_list\.csv$/);
+  // Escape closes the report window only.
+  await page.keyboard.press('Escape');
+  await expect(report).toHaveCount(0);
+  await expect(page.getByTestId('combine-create-report')).toBeVisible();
 });

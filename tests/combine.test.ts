@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { combinePlan, packPieces, defaultCombineSettings, splicePlan } from '../src/core/combine';
+import { cutLines, cutListText, cutsText, dropText, orderLines, orderListCsv, orderListText } from '../src/core/combineReport';
 import { buildRows } from '../src/core/columns';
 import { defaultColumns, defaultLayers } from '../src/core/defaults';
 import { defaultStyle } from '../src/core/markupTypes';
@@ -121,6 +122,42 @@ describe('combine: whole stock lengths and splices', () => {
     const two = splicePlan(ftIn(80), w, 12, 0.125);
     expect(two.whole.reduce((a, b) => a + b, 0) + two.rest).toBe(ftIn(80));
     expect([...two.whole, two.rest].every((x) => w.includes(x))).toBe(true);
+  });
+
+  it('makes an order list (size, length, quantity) and a cut list (bars, cuts, drop)', () => {
+    const p = plan('L3X3X1/4', [...Array(5).fill(ftIn(40)), ftIn(39, 10.25), ftIn(18, 13 / 16)], { allowance: 0 });
+    // Order list: one line per size and stock length.
+    expect(orderLines([p])).toEqual([
+      { size: 'L3X3X1/4', length: ftIn(40), qty: 6 },
+      { size: 'L3X3X1/4', length: ftIn(20), qty: 1 },
+    ]);
+    const text = orderListText([p]).split('\n');
+    expect(text[0]).toMatch(/^SIZE\s+LENGTH\s+QTY$/);
+    expect(text[1]).toMatch(/^L3X3X1\/4\s+40'-0"\s+6$/);
+    expect(text[2]).toMatch(/^L3X3X1\/4\s+20'-0"\s+1$/);
+    expect(orderListCsv([p]).split('\r\n')[1]).toBe('L3X3X1/4,"40\'-0""",6,');
+    // Cut list: bars cut the same way together.
+    const cuts = cutLines([p]);
+    expect(cuts.map((l) => [l.count, l.stock / FT, cutsText(l), dropText(l)])).toEqual([
+      [5, 40, `40'-0"`, 'full length – no cut'],
+      [1, 40, `39'-10 1/4"`, `drop 0'-1 5/8"`],
+      [1, 20, `18'-0 13/16"`, `drop 1'-11 1/16"`],
+    ]);
+    const cutText = cutListText([p]);
+    expect(cutText.split('\n')[0]).toBe('L3X3X1/4');
+    expect(cutText).toMatch(/5 ×\s+40'-0"\s+full length – no cut/);
+    expect(cutText).toMatch(/1 ×\s+40'-0"\s+cut 39'-10 1\/4"\s+drop 0'-1 5\/8"/);
+  });
+
+  it('a size without stock lengths lists its pieces as cut', () => {
+    const p = plan('PL1/2X7', [14, 14, 20]);
+    expect(p.noStock).toBe(true);
+    expect(orderLines([p])).toEqual([
+      { size: 'PL1/2X7', length: 20, qty: 1, unplanned: true },
+      { size: 'PL1/2X7', length: 14, qty: 2, unplanned: true },
+    ]);
+    expect(orderListText([p])).toContain('* no stock lengths');
+    expect(cutsText(cutLines([p])[0])).toBe(`1'-8", 2 × 1'-2"`);
   });
 
   it('trims a piece just under the longest stock from that bar rather than splicing it', () => {

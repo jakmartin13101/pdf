@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.17.0 – 2026-10-21
+
+### Combine report: Create Report
+- **Create Report** opens a window to choose a report made from the plan as set up (sheets, detail material, stock
+  lengths):
+  - **Order List** – each size and stock length to order with its quantity, one line each (`L3X3X1/4  40'-0"  6`).
+    Sizes without stock lengths list their lengths as cut, marked *.
+  - **Cut List** – each size's bars, those cut the same way together: how many, the stock, what is cut from each and
+    the drop; whole bars *full length – no cut* (spliced ones marked ⧉).
+- Print / PDF, CSV, or Copy as text in columns lined up with spaces.
+
+### Units
+- Unit choices for feet-inches no longer say "(your units)" (Measurements panel, Manage Columns); the Settings heading
+  is *Measuring units*.
+- Escape closes only the window on top when one window opens another.
+
 ## 1.16.0 – 2026-10-20
 
 ### Split view

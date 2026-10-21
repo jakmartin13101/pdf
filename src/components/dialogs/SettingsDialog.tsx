@@ -100,7 +100,7 @@ function YourUnits() {
   const set = (patch: Partial<UserUnits>) => st.setPrefs({ units: { ...u, ...patch } });
   return (
     <>
-      <h4 className="set-h">Your units</h4>
+      <h4 className="set-h">Measuring units</h4>
       <div className="field">
         <label>Measure in</label>
         <select

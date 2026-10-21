@@ -13,7 +13,7 @@ import { defaultColumns } from '../../core/defaults';
 const KINDS: { id: ColumnKind; label: string }[] = [
   { id: 'text', label: 'Text' },
   { id: 'number', label: 'Number' },
-  { id: 'length', label: 'Length (ft-in, typed in your units)' },
+  { id: 'length', label: 'Length (ft-in)' },
   { id: 'choice', label: 'Choice (list)' },
   { id: 'formula', label: 'Formula' },
 ];

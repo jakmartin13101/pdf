@@ -153,3 +153,176 @@ tr.total td{font-weight:800;border-top:2px solid #111;background:#f1f4f8}
 <h2>Cutting plan</h2>${plansHtml}
 </body></html>`;
 }
+
+// ---------------------------------------------------------------------------
+// Reports made from the plan (Combine Report → Create Report): a cut list and an order list.
+
+/** One line of the order list: a size, a stock length and how many to order. */
+export interface OrderLine {
+  size: string;
+  /** Inches. */
+  length: number;
+  qty: number;
+  /** No stock lengths for the shape: the pieces as cut (not planned on stock). */
+  unplanned?: boolean;
+}
+
+/** Every size's stock lengths to order, one line each (longest first); sizes without stock lengths list their pieces. */
+export function orderLines(plans: SizePlan[]): OrderLine[] {
+  const out: OrderLine[] = [];
+  for (const p of plans) {
+    if (!p.noStock) {
+      for (const o of p.order) out.push({ size: p.size, length: o.stock, qty: o.count });
+      continue;
+    }
+    const byLen = new Map<number, number>();
+    for (const x of p.pieces) {
+      const k = Math.round(x.length * 64) / 64;
+      byLen.set(k, (byLen.get(k) ?? 0) + 1);
+    }
+    for (const [length, qty] of [...byLen].sort((a, b) => b[0] - a[0])) out.push({ size: p.size, length, qty, unplanned: true });
+  }
+  return out;
+}
+
+/** Bars cut the same way, together: how many, the stock, what is cut from each (same lengths together) and the drop. */
+export interface CutLine {
+  size: string;
+  count: number;
+  stock: number;
+  cuts: { length: number; n: number; splice?: boolean }[];
+  /** Left over on each bar: inches. */
+  drop: number;
+  kind?: 'full' | 'trim';
+  /** No stock lengths for the shape: the pieces only. */
+  unplanned?: boolean;
+}
+
+const q = (n: number) => Math.round(n * 64) / 64;
+
+export function cutLines(plans: SizePlan[]): CutLine[] {
+  const out: CutLine[] = [];
+  for (const p of plans) {
+    if (p.noStock) {
+      const byLen = new Map<number, number>();
+      for (const x of p.pieces) byLen.set(q(x.length), (byLen.get(q(x.length)) ?? 0) + 1);
+      out.push({ size: p.size, count: 0, stock: 0, cuts: [...byLen].sort((a, b) => b[0] - a[0]).map(([length, n]) => ({ length, n })), drop: 0, unplanned: true });
+      continue;
+    }
+    const groups = new Map<string, CutLine>();
+    for (const b of p.bars) {
+      const cuts: CutLine['cuts'] = [];
+      for (const x of b.pieces) {
+        const c = cuts.find((y) => y.length === q(x.length) && !!y.splice === !!x.splice);
+        if (c) c.n++;
+        else cuts.push({ length: q(x.length), n: 1, splice: x.splice ? true : undefined });
+      }
+      const key = `${b.stock}|${b.kind ?? ''}|${q(b.drop)}|${cuts.map((c) => `${c.n}x${c.length}${c.splice ? 's' : ''}`).join(',')}`;
+      const g = groups.get(key);
+      if (g) g.count++;
+      else groups.set(key, { size: p.size, count: 1, stock: b.stock, cuts, drop: Math.max(0, b.drop), kind: b.kind });
+    }
+    out.push(...groups.values());
+  }
+  return out;
+}
+
+/** "2 × 11'-6", 15'-0" ⧉" */
+export function cutsText(l: CutLine, metric = false): string {
+  return l.cuts.map((c) => `${c.n > 1 ? `${c.n} × ` : ''}${lenText(c.length, metric)}${c.splice ? ' ⧉' : ''}`).join(', ');
+}
+
+/** What is left of each bar: "drop 1'-5 3/4"", or "full length – no cut". */
+export function dropText(l: CutLine, metric = false): string {
+  if (l.unplanned) return 'no stock lengths set';
+  if (l.kind === 'full') return `full length – no cut${l.cuts.some((c) => c.splice) ? ' (spliced ⧉)' : ''}`;
+  return `${l.kind === 'trim' ? 'trim · ' : ''}drop ${lenText(l.drop, metric)}`;
+}
+
+/** Columns of text lined up with spaces (no dashes): for copying into an e-mail or a purchase order. */
+function columns(rows: string[][], right: boolean[]): string {
+  const w = rows[0].map((_, i) => Math.max(...rows.map((r) => (r[i] ?? '').length)));
+  return rows.map((r) => r.map((c, i) => (right[i] ? c.padStart(w[i]) : c.padEnd(w[i]))).join('    ').trimEnd()).join('\n');
+}
+
+export function orderListText(plans: SizePlan[], metric = false): string {
+  const lines = orderLines(plans);
+  return columns(
+    [['SIZE', 'LENGTH', 'QTY'], ...lines.map((l) => [l.size + (l.unplanned ? ' *' : ''), lenText(l.length, metric), String(l.qty)])],
+    [false, true, true],
+  ) + (lines.some((l) => l.unplanned) ? '\n\n* no stock lengths set for the shape: the lengths as cut' : '');
+}
+
+export function cutListText(plans: SizePlan[], metric = false): string {
+  const out: string[] = [];
+  let size = '';
+  const rows: string[][] = [];
+  for (const l of cutLines(plans)) {
+    if (l.size !== size) {
+      if (rows.length) out.push(columns(rows, [true, true, false, false]));
+      rows.length = 0;
+      out.push(`${out.length ? '\n' : ''}${l.size}`);
+      size = l.size;
+    }
+    rows.push(l.unplanned ? ['', '', cutsText(l, metric), dropText(l, metric)] : [`${l.count} ×`, lenText(l.stock, metric), l.kind === 'full' ? '' : `cut ${cutsText(l, metric)}`, dropText(l, metric)]);
+  }
+  if (rows.length) out.push(columns(rows, [true, true, false, false]));
+  return out.join('\n');
+}
+
+export function orderListCsv(plans: SizePlan[], metric = false): string {
+  return [['Size', 'Length', 'Qty', 'Note'], ...orderLines(plans).map((l) => [l.size, lenText(l.length, metric), l.qty, l.unplanned ? 'No stock lengths: length as cut' : ''])]
+    .map((r) => r.map(csvCell).join(','))
+    .join('\r\n');
+}
+
+export function cutListCsv(plans: SizePlan[], metric = false): string {
+  return [
+    ['Size', 'Bars', 'Stock', 'Cuts', 'Drop'],
+    ...cutLines(plans).map((l) => [l.size, l.unplanned ? '' : l.count, l.unplanned ? '' : lenText(l.stock, metric), cutsText(l, metric), dropText(l, metric)]),
+  ]
+    .map((r) => r.map(csvCell).join(','))
+    .join('\r\n');
+}
+
+/** A printable page of the cut list or the order list. */
+export function simpleReportHtml(title: string, kind: 'cut' | 'order', plans: SizePlan[], metric = false): string {
+  const L = (n: number) => esc(lenText(n, metric));
+  let body: string;
+  if (kind === 'order') {
+    const lines = orderLines(plans);
+    body = `<table><thead><tr><th>Size</th><th class="r">Length</th><th class="r">Qty</th></tr></thead><tbody>${lines
+      .map((l) => `<tr><td>${esc(l.size)}${l.unplanned ? ' *' : ''}</td><td class="r">${L(l.length)}</td><td class="r"><b>${l.qty}</b></td></tr>`)
+      .join('')}</tbody></table>${lines.some((l) => l.unplanned) ? '<p class="n">* no stock lengths set for the shape: the lengths as cut.</p>' : ''}`;
+  } else {
+    let size = '';
+    const rows = cutLines(plans)
+      .map((l) => {
+        const head = l.size !== size ? `<tr class="h"><td colspan="4">${esc(l.size)}</td></tr>` : '';
+        size = l.size;
+        const row = l.unplanned
+          ? `<tr><td></td><td></td><td>${esc(cutsText(l, metric))}</td><td>${esc(dropText(l, metric))}</td></tr>`
+          : `<tr><td class="r">${l.count} ×</td><td class="r">${L(l.stock)}</td><td>${l.kind === 'full' ? '' : esc(cutsText(l, metric))}</td><td>${esc(dropText(l, metric))}</td></tr>`;
+        return head + row;
+      })
+      .join('');
+    body = `<table><thead><tr><th class="r">Bars</th><th class="r">Stock</th><th>Cut from each</th><th>Drop</th></tr></thead><tbody>${rows}</tbody></table>${
+      plans.some((p) => p.tooLong.length) ? '<p class="n">⧉ part of a spliced piece.</p>' : ''
+    }`;
+  }
+  const name = kind === 'order' ? 'Order List' : 'Cut List';
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)} – ${name}</title>
+<style>
+body{font:13px/1.45 'Segoe UI',Arial,sans-serif;color:#111;margin:32px}
+h1{font-size:20px;margin:0}.meta{color:#555;margin:4px 0 16px}
+table{border-collapse:collapse;min-width:420px}th,td{border-bottom:1px solid #ddd;padding:5px 12px;text-align:left}
+th{background:#f1f4f8;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#333}.r{text-align:right}
+tr.h td{font-weight:800;padding-top:12px;border-bottom:2px solid #111}.n{color:#555;font-size:12px}
+@media print{body{margin:12mm}button{display:none}}
+</style></head><body>
+<button onclick="print()" style="float:right;padding:6px 14px">Print / Save as PDF</button>
+<h1>${esc(title)} – ${name}</h1>
+<div class="meta">${new Date().toLocaleString()}</div>
+${body}
+</body></html>`;
+}

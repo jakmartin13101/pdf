@@ -35,7 +35,10 @@ export function Modal({
   const [pos, setPos] = useState<{ x: number; y: number } | null>(() => placed.get(title) ?? null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Only the window on top (the last one opened) closes.
+      const all = document.querySelectorAll('.modal');
+      if (!ref.current || all[all.length - 1] === ref.current) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

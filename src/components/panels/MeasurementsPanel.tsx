@@ -211,7 +211,7 @@ function MeasurementProperties({ items }: { items: Markup[] }) {
           <label>Length</label>
           <select value={lengthUnit ?? ''} onChange={(e) => setUnits({ length: (e.target.value || undefined) as LengthUnit | undefined })} data-testid="meas-length-unit">
             {lengthUnit === undefined && <option value="">(multiple)</option>}
-            <option value="">{`${you} (your units)`}</option>
+            <option value="">{you}</option>
             {LENGTH_UNITS.filter((u) => u.id !== userUnits().unit).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.label}

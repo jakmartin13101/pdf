@@ -1,12 +1,29 @@
 // Combine report: the stock lengths to order for every size, with the pieces nested on them and the
 // cutting plan for each bar (Tools → Combine Report, or the Takeoff Summary).
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, Printer, Ruler, Scissors } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, ChevronRight, ClipboardCopy, ClipboardList, Download, FileText, Printer, Ruler, Scissors, ShoppingCart } from 'lucide-react';
 import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
 import { buildTakeoffRows } from '../../core/details';
 import { combinePlan, type CombineSettings, type SizePlan } from '../../core/combine';
-import { combineCsv, combineReportHtml, combineTotals, lenText, orderText, piecesText } from '../../core/combineReport';
+import {
+  combineCsv,
+  combineReportHtml,
+  combineTotals,
+  cutLines,
+  cutListCsv,
+  cutListText,
+  cutsText,
+  dropText,
+  lenText,
+  orderLines,
+  orderListCsv,
+  orderListText,
+  orderText,
+  piecesText,
+  simpleReportHtml,
+} from '../../core/combineReport';
 import { fmtNumber, parseLength } from '../../core/units';
 import { CommitInput } from '../fields';
 import { offerFile } from '../../store/files';
@@ -55,6 +72,144 @@ function BarPlan({ bar, allowance, metric }: { bar: SizePlan['bars'][number]; al
   );
 }
 
+type ReportKind = 'cut' | 'order';
+
+/**
+ * Create Report: pick a Cut List (each size's bars, what is cut from each and the drop) or an Order List
+ * (each size and stock length to order with its quantity, one line each), then print, save or copy it.
+ */
+function ReportWindow({ plans, title, metric, onClose }: { plans: SizePlan[]; title: string; metric: boolean; onClose: () => void }) {
+  const [kind, setKind] = useState<ReportKind | null>(null);
+  const st = getState();
+  const name = kind === 'order' ? 'Order List' : 'Cut List';
+  const choice = (k: ReportKind, Icon: typeof FileText, label: string, hint: string) => (
+    <button className={`report-choice${kind === k ? ' on' : ''}`} onClick={() => setKind(k)} data-testid={`report-pick-${k}`}>
+      <Icon size={22} />
+      <b>{label}</b>
+      <span>{hint}</span>
+    </button>
+  );
+  const copy = async () => {
+    if (!kind) return;
+    const text = kind === 'order' ? orderListText(plans, metric) : cutListText(plans, metric);
+    try {
+      await navigator.clipboard.writeText(text);
+      st.toast(`${name} copied`, 'success');
+    } catch {
+      st.toast('Copying isn’t available here: use CSV or Print', 'error');
+    }
+  };
+  const orders = kind === 'order' ? orderLines(plans) : [];
+  const cuts = kind === 'cut' ? cutLines(plans) : [];
+  let lastSize = '';
+  return createPortal(
+    <Modal
+      title="Create Report"
+      icon={<FileText size={16} />}
+      size="mid"
+      onClose={onClose}
+      footer={
+        <>
+          <div className="left hint">{kind ? `${name} · ${kind === 'order' ? `${orders.reduce((s, l) => s + l.qty, 0)} pieces to order` : `${plans.reduce((s, p) => s + p.bars.length, 0)} bars`}` : 'Choose the report to make.'}</div>
+          <button className="btn" disabled={!kind} onClick={() => void copy()} data-testid="report-copy">
+            <ClipboardCopy size={13} /> Copy
+          </button>
+          <button
+            className="btn"
+            disabled={!kind}
+            onClick={() =>
+              kind &&
+              void offerFile(new Blob([kind === 'order' ? orderListCsv(plans, metric) : cutListCsv(plans, metric)], { type: 'text/csv' }), `${safeName(title)}_${kind === 'order' ? 'order' : 'cut'}_list.csv`, name)
+            }
+            data-testid="report-csv"
+          >
+            <Download size={13} /> CSV
+          </button>
+          <button
+            className="btn"
+            disabled={!kind}
+            onClick={() => {
+              if (!kind) return;
+              const html = simpleReportHtml(title, kind, plans, metric);
+              if (!openReport(html)) void offerFile(new Blob([html], { type: 'text/html' }), `${safeName(title)}_${kind === 'order' ? 'order' : 'cut'}_list.html`, name);
+            }}
+            data-testid="report-print"
+          >
+            <Printer size={13} /> Print / PDF
+          </button>
+          <button className="btn primary" onClick={onClose}>
+            Close
+          </button>
+        </>
+      }
+    >
+      <div className="report-choices">
+        {choice('cut', Scissors, 'Cut List', 'Each size: the bars, what is cut from each, and the drop.')}
+        {choice('order', ShoppingCart, 'Order List', 'The material to order: size, length and quantity, one line each.')}
+      </div>
+      {kind === 'order' && (
+        <table className="report-table" data-testid="report-order">
+          <thead>
+            <tr>
+              <th>Size</th>
+              <th className="num">Length</th>
+              <th className="num">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((l, i) => (
+              <tr key={i} data-testid="order-line" className={l.unplanned ? 'unplanned' : ''} title={l.unplanned ? 'No stock lengths set for this shape: the length as cut' : undefined}>
+                <td>
+                  {l.size}
+                  {l.unplanned ? ' *' : ''}
+                </td>
+                <td className="num">{lenText(l.length, metric)}</td>
+                <td className="num">
+                  <b>{l.qty}</b>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {kind === 'order' && orders.some((l) => l.unplanned) && <div className="hint">* No stock lengths set for the shape (Settings → Combine): the lengths as cut.</div>}
+      {kind === 'cut' && (
+        <table className="report-table" data-testid="report-cut">
+          <thead>
+            <tr>
+              <th className="num">Bars</th>
+              <th className="num">Stock</th>
+              <th>Cut from each</th>
+              <th>Drop</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cuts.map((l, i) => {
+              const head = l.size !== lastSize;
+              lastSize = l.size;
+              return [
+                head && (
+                  <tr key={`h${i}`} className="report-size" data-testid="cut-size">
+                    <td colSpan={4}>{l.size}</td>
+                  </tr>
+                ),
+                <tr key={i} data-testid="cut-line" className={l.kind ? l.kind : ''}>
+                  <td className="num">{l.unplanned ? '' : `${l.count} ×`}</td>
+                  <td className="num">{l.unplanned ? '' : lenText(l.stock, metric)}</td>
+                  <td>{l.kind === 'full' ? '' : cutsText(l, metric)}</td>
+                  <td className="hint">{dropText(l, metric)}</td>
+                </tr>,
+              ];
+            })}
+          </tbody>
+        </table>
+      )}
+      {!kind && <div className="hint">The report uses the plan as it is set up in the Combine Report: its sheets, standard detail material and stock lengths.</div>}
+    </Modal>,
+    document.body,
+  );
+}
+
 export function CombineDialog() {
   const doc = useStore((s) => s.doc);
   const settings = useStore((s) => s.prefs.combine);
@@ -64,6 +219,7 @@ export function CombineDialog() {
   const [scope, setScope] = useState<'all' | 'sheet'>('all');
   const [withDetails, setWithDetails] = useState(true);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [reporting, setReporting] = useState(false);
   const metric = doc.settings.lengthUnit === 'm';
   const set = (patch: Partial<CombineSettings>) => st.setPrefs({ combine: { ...settings, ...patch } });
 
@@ -113,12 +269,16 @@ export function CombineDialog() {
           >
             <Printer size={13} /> Print / PDF
           </button>
+          <button className="btn" disabled={!plans.length} onClick={() => setReporting(true)} data-testid="combine-create-report">
+            <ClipboardList size={13} /> Create Report
+          </button>
           <button className="btn primary" onClick={close}>
             Close
           </button>
         </>
       }
     >
+      {reporting && <ReportWindow plans={plans} title={title} metric={metric} onClose={() => setReporting(false)} />}
       <div className="hint">
         The length measurements of each size (Member Size, else the label) nested on the stock lengths you can order, using as little material as it can. Each bar keeps
         the machine allowance; every cut loses the kerf.
