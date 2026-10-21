@@ -220,8 +220,8 @@ export const FUNCTIONS: Record<string, string> = {
   OR: 'OR(a, b, …)',
   NOT: 'NOT(a)',
   CONCAT: 'CONCAT(a, b, …)',
-  PLF: 'PLF(shape) – steel weight lb/ft, e.g. PLF("W18X35") = 35',
-  PSF: 'PSF(plate) – plate weight lb/sf, e.g. PSF("PL1/2") = 20.42',
+  PLF: 'PLF(shape, …) – steel weight lb/ft of the first size it knows, e.g. PLF("W18X35") = 35, PLF("BP3X3X1/4") = 5.1',
+  PSF: 'PSF(plate, …) – plate weight lb/sf of the first plate it knows, e.g. PSF("PL1/2") = 20.42',
 };
 
 export function evaluate(src: string, resolve: (name: string) => FValue | undefined): FValue {
@@ -318,10 +318,19 @@ export function evaluate(src: string, resolve: (name: string) => FValue | undefi
             return args[0] && truthy(ev(args[0])) ? 0 : 1;
           case 'CONCAT':
             return args.map((a) => toStr(ev(a))).join('');
+          // Several sizes (Member Size, then the Label): the first one with a weight.
           case 'PLF':
-            return plf(args[0] ? toStr(ev(args[0])) : '');
+            for (const a of args) {
+              const w = plf(toStr(ev(a)));
+              if (w) return w;
+            }
+            return 0;
           case 'PSF':
-            return psf(args[0] ? toStr(ev(args[0])) : '');
+            for (const a of args) {
+              const w = psf(toStr(ev(a)));
+              if (w) return w;
+            }
+            return 0;
         }
         throw new FormulaError(`Unknown function ${n.name}()`);
       }

@@ -3,7 +3,7 @@
 import type { CustomColumn, DocState, ToolSet } from '../types';
 import { normName } from './formula';
 import { sizeText } from './steelShapes';
-import { defaultColumns } from './defaults';
+import { OLD_WEIGHT_FORMULA, WEIGHT_FORMULA, defaultColumns } from './defaults';
 
 const isSizeColumn = (name: string) => ['membersize', 'size'].includes(normName(name));
 
@@ -18,7 +18,13 @@ export function withAddedColumns(columns: CustomColumn[]): CustomColumn[] {
   const have = new Set(columns.map((c) => normName(c.name)));
   const ids = new Set(columns.map((c) => c.id));
   const add = defaultColumns().filter((c) => ADDED_COLUMNS.includes(c.id) && !have.has(normName(c.name)) && !ids.has(c.id));
-  const fixed = columns.map((c) => (c.id === 'height' && normName(c.name) === 'height' && c.kind === 'text' ? { ...c, kind: 'length' as const } : c));
+  const fixed = columns.map((c) => {
+    if (c.id === 'height' && normName(c.name) === 'height' && c.kind === 'text') return { ...c, kind: 'length' as const };
+    // The Weight formula as it shipped before 1.20 (Member Size only) also reads the label: plate and bent
+    // plate sizes are often only there.
+    if (c.kind === 'formula' && c.formula?.replace(/\s+/g, '') === OLD_WEIGHT_FORMULA.replace(/\s+/g, '')) return { ...c, formula: WEIGHT_FORMULA };
+    return c;
+  });
   return add.length ? [...fixed, ...add] : fixed;
 }
 
@@ -62,6 +68,8 @@ export function upgradeToolChest(sets: ToolSet[]): ToolSet[] {
       for (const k of Object.keys(custom)) if (isSizeColumn(k) && typeof custom[k] === 'string') custom[k] = sizeText(custom[k] as string);
       return {
         ...t,
+        // BP is bent plate: the base plate tool takes plate (PL).
+        ...(t.name === 'Base Plate' && t.subject === 'BP' ? { subject: 'PL' } : {}),
         name: sizeText(t.name),
         custom,
         sizeTool: t.sizeTool ? { ...t.sizeTool, value: sizeText(t.sizeTool.value) } : t.sizeTool,

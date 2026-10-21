@@ -47,7 +47,9 @@ describe('subjects are shapes', () => {
     expect(by('W24X55')).toBe('W');
     expect(by('HSS6X6X3/8 Column')).toBe('HSS');
     expect(by('W10X33 Column')).toBe('W');
-    expect(by('Base Plate')).toBe('BP');
+    // BP is bent plate; a base plate is plate.
+    expect(by('Base Plate')).toBe('PL');
+    expect(by('BP3X3X1/4')).toBe('BP');
     expect(by('Metal Deck')).toBe('');
     for (const t of tools) expect(t.subject === '' || DEFAULT_SUBJECTS.includes(t.subject)).toBe(true);
   });

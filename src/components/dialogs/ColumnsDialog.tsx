@@ -289,7 +289,7 @@ export function ColumnsDialog() {
               <br />
               Formula columns turn the markup list into a takeoff database, e.g. steel weight:
               <br />
-              <code style={{ fontFamily: 'var(--mono)' }}>Qty * (Length * PLF([Member Size]) + Area * PSF([Member Size]))</code>
+              <code style={{ fontFamily: 'var(--mono)' }}>Qty * (Length * PLF([Member Size], Label) + Area * PSF([Member Size], Label))</code>
             </div>
           )}
         </div>

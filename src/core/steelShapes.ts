@@ -1,6 +1,7 @@
 // Nominal weights for common structural shapes, used by the PLF()/PSF() formula functions.
 // Rolled shapes carry their weight in the designation (W18X35 = 35 lb/ft). HSS, angles,
-// plates and bars are computed from their nominal dimensions (steel = 490 lb/ft³).
+// plates, bent plates and bars are computed from their nominal dimensions (steel = 490 lb/ft³,
+// 0.2836 lb/in³ – the usual plate weight calculator figure).
 
 const STEEL_LB_PER_IN2_FT = 490 / 144; // lb per linear foot per in² of section area
 
@@ -80,12 +81,20 @@ export function plf(shape: string): number {
     const t = parseDim(m[3]);
     if (a && b && t) return round2(t * (a + b - t) * STEEL_LB_PER_IN2_FT * (compact.startsWith('2L') ? 2 : 1));
   }
-  // Plates / flat bars with width: PL1/2X8, FB3/8X4
+  // Plates / flat bars with width: PL1/2X8, FB3/8X4 – a foot of plate that wide and thick.
   m = compact.match(/^(?:PL|FB|BAR)([\d./-]+)X([\d./-]+)$/);
   if (m) {
     const t = parseDim(m[1]);
     const w = parseDim(m[2]);
     if (t && w) return round2(t * w * STEEL_LB_PER_IN2_FT);
+  }
+  // Bent plate: BP3X3X1/4 – the legs, then the thickness. A foot of it is a foot of flat plate as wide as
+  // the legs added together (12" × 6" × 1/4" = 5.10 lb/ft); BP4X6X4X3/8 (more bends) the same way.
+  m = compact.match(/^BP((?:[\d./-]+X)+)([\d./-]+)$/);
+  if (m) {
+    const legs = m[1].split('X').filter(Boolean).map(parseDim);
+    const t = parseDim(m[2]);
+    if (t && legs.length && legs.every((x): x is number => !!x)) return round2(legs.reduce((a, b) => a + b, 0) * t * STEEL_LB_PER_IN2_FT);
   }
   // Round bar / rod: RB1, ROD3/4
   m = compact.match(/^(?:RB|ROD|RD)([\d./-]+)$/);
@@ -134,7 +143,7 @@ export const COMMON_SHAPES = [
   'W21X44', 'W21X50', 'W24X55', 'W24X68', 'W27X84', 'W30X90', 'W33X118', 'W36X135',
   'HSS4X4X1/4', 'HSS6X6X3/8', 'HSS8X8X1/2', 'HSS6X4X1/4', 'HSS6.625X.280',
   'L3X3X1/4', 'L4X4X3/8', 'L6X4X3/8', 'C8X11.5', 'C10X15.3', 'C12X20.7', 'MC12X31',
-  'PL3/8', 'PL1/2', 'PL3/4', 'PL1', 'Pipe 4 Std', 'Pipe 6 Std', '18K4', '24K6',
+  'PL3/8', 'PL1/2', 'PL3/4', 'PL1', 'PL1/2X7', 'PL3/4X12', 'BP3X3X1/4', 'BP4X4X3/8', 'BP6X4X3/8', 'Pipe 4 Std', 'Pipe 6 Std', '18K4', '24K6',
 ];
 
 export interface ShapeFamily {
@@ -154,6 +163,7 @@ export const SHAPE_FAMILIES: ShapeFamily[] = [
   { id: 'S', label: 'S – American standard beam', example: 'S12X31.8' },
   { id: 'HP', label: 'HP – Bearing pile', example: 'HP12X53' },
   { id: 'PL', label: 'PL – Plate / flat bar', example: 'PL1/2X8' },
+  { id: 'BP', label: 'BP – Bent plate (legs × thickness)', example: 'BP3X3X1/4' },
   { id: 'Pipe', label: 'Pipe', example: 'Pipe 6 Std' },
   { id: '', label: 'Joist (K-series)', example: '24K6' },
   { id: '', label: 'Other / free text', example: '' },

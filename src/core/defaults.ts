@@ -3,6 +3,11 @@ import { defaultStyle } from './markupTypes';
 import { uid } from './ids';
 import { DEFAULT_SUBJECTS, subjectFor, subjectForSize } from './subjects';
 
+/** Weight of a markup: by the length (lb/ft) or the area (lb/sf) of its size – the Member Size, else the label. */
+export const WEIGHT_FORMULA = 'Qty * (Length * PLF([Member Size], Label) + Area * PSF([Member Size], Label))';
+/** The Weight formula of documents from before 1.20 (Member Size only). */
+export const OLD_WEIGHT_FORMULA = 'Qty * (Length * PLF([Member Size]) + Area * PSF([Member Size]))';
+
 /** Structural-steel estimating column template (custom columns). */
 export function defaultColumns(): CustomColumn[] {
   return [
@@ -18,7 +23,7 @@ export function defaultColumns(): CustomColumn[] {
       id: 'weight',
       name: 'Weight',
       kind: 'formula',
-      formula: 'Qty * (Length * PLF([Member Size]) + Area * PSF([Member Size]))',
+      formula: WEIGHT_FORMULA,
       decimals: 0,
       suffix: 'lbs',
     },
@@ -116,6 +121,7 @@ export function defaultToolChest(): ToolSet[] {
         tool('L4X4X3/8', 'polylength', '#2a9d8f', steel('L4X4X3/8', { Grade: 'A36', Category: 'Misc Metals' }), { lineWidth: 2.5 }),
         tool('C10X15.3', 'length', '#6a4c93', steel('C10X15.3', { Grade: 'A36' }), { lineWidth: 2.5, lineStyle: 'dashed' }),
         tool('1/2" Plate', 'area', '#ff9f1c', steel('PL1/2', { Grade: 'A36', Category: 'Misc Metals' }), { fillOpacity: 0.3 }),
+        tool('BP3X3X1/4', 'length', '#c2410c', steel('BP3X3X1/4', { Grade: 'A36', Category: 'Misc Metals' }), { subject: 'BP', lineWidth: 2.5 }),
       ],
     },
     {
@@ -124,7 +130,7 @@ export function defaultToolChest(): ToolSet[] {
       tools: [
         tool('Joist 24K6', 'length', '#8338ec', steel('24K6', { Category: 'Joists & Deck', Grade: '' }), { subject: 'Joist 24K6', lineStyle: 'dashed', lineWidth: 2 }),
         tool('Metal Deck', 'area', '#3a86ff', { Category: 'Joists & Deck', Material: 'Galvanized Steel', Qty: 1, 'Member Size': '1.5B 20ga' }, { fillOpacity: 0.18 }),
-        tool('Base Plate', 'count', '#ef476f', steel('PL3/4X12', { Category: 'Structural Steel', Connection: 'Base Plate' }), { subject: 'BP', symbol: 'square', symbolSize: 8 }),
+        tool('Base Plate', 'count', '#ef476f', steel('PL3/4X12', { Category: 'Structural Steel', Connection: 'Base Plate' }), { subject: 'PL', symbol: 'square', symbolSize: 8 }),
         tool('Anchor Bolts', 'count', '#118ab2', { Category: 'Structural Steel', Material: 'Steel', Grade: 'F1554 Gr. 36', Qty: 4, 'Member Size': '3/4" AB' }, { symbol: 'cross', symbolSize: 8 }),
         tool('Clip Angle', 'count', '#06d6a0', steel('L4X4X3/8', { Connection: 'Clip Angle', Category: 'Misc Metals' }), { symbol: 'triangle', symbolSize: 8 }),
         tool('Embed Plate', 'count', '#9c6644', steel('PL1/2X8', { Connection: 'Embed Plate', Category: 'Misc Metals' }), { symbol: 'diamond', symbolSize: 8 }),

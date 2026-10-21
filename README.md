@@ -7,9 +7,10 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.19.0**: **Basic needs a license too** – a new install runs a **7-day Basic trial**, then asks for a
-> Basic or Pro license key (1.18.0: licensing with Basic and Pro tiers – Pro adds the Combine Report and the
-> Automatic Takeoff) – see the [changelog](CHANGELOG.md).
+> **Version 1.20.0**: **bent plate weights** – `BP3X3X1/4` weighs 5.10 lb/ft (12" × legs added together × thickness),
+> and plate and bent plate weigh from the Member Size or just the label (1.19.0: 7-day Basic trial, then a Basic or Pro
+> license; 1.18.0: licensing – Pro adds the Combine Report and the Automatic Takeoff) – see the
+> [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -640,13 +641,35 @@ Formulas reference columns by name – `Length` (LF), `Area` (SF), `Volume` (CY)
 or any custom column (`Qty`, `[Member Size]`) – with `+ - * / ^`, comparisons, `&` (text join) and
 `IF, ROUND, ROUNDUP, ROUNDDOWN, CEILING, FLOOR, MIN, MAX, ABS, SQRT, AND, OR, NOT, CONCAT`.
 
-Steel helpers: `PLF(shape)` returns lb/ft for W, M, S, HP, C, MC, WT shapes (from the designation), HSS (rectangular and
-round), angles, flat bar, rod, pipe and common K-series joists; `PSF(plate)` returns lb/ft² for plate (`PL1/2`,
-`1/2" Plate`). The default Weight column is
+Steel helpers: `PLF(shape, …)` returns lb/ft for W, M, S, HP, C, MC, WT shapes (from the designation), HSS (rectangular
+and round), angles, plate and flat bar, **bent plate**, rod, pipe and common K-series joists; `PSF(plate, …)` returns
+lb/ft² for plate (`PL1/2`, `1/2" Plate`). Given several sizes they use the first one they know – the Member Size, else
+the label. The default Weight column is
 
 ```
-Qty * (Length * PLF([Member Size]) + Area * PSF([Member Size]))
+Qty * (Length * PLF([Member Size], Label) + Area * PSF([Member Size], Label))
 ```
+
+(Documents with the Weight formula from before 1.20 – Member Size only – are changed to this when they open.)
+
+### Plate and bent plate weights
+
+Plate and bent plate weigh by the foot like other steel, worked out the way a plate weight calculator does it –
+length × width × thickness × 0.2836 lb/in³ (steel, 490 lb/ft³) for a 12" length:
+
+| Size | Width of a 12" piece | Thickness | lb/ft |
+| --- | --- | --- | --- |
+| `BP3X3X1/4` – bent plate, legs then thickness | 3" + 3" = 6" | 1/4" | 5.10 |
+| `BP6X4X3/8` | 6" + 4" = 10" | 3/8" | 12.76 |
+| `BP4X6X4X3/8` – more bends: every leg | 4" + 6" + 4" = 14" | 3/8" | 17.86 |
+| `PL1/2X7` – plate, thickness then width | 7" | 1/2" | 11.91 |
+
+* Take bent plate off as **lengths** (subject **BP**; a *BP3X3X1/4* tool is in the Tool Chest), or a size tool with
+  the **BP – Bent plate** family. Its weight is the length × lb/ft.
+* Plates (subject **PL**) as **lengths** with a width (`PL1/2X7`), as **counts** with a **Height** – the length of
+  each piece (3 × PL1/2X7 at 1'-2" = 3'-6" × 11.91 lb/ft) – or as **areas** of a plate thickness (`PL1/2`, lb/ft²).
+* The size can be in the Member Size or just the label (`bp 3*3*1/4` is written `BP 3X3X1/4`); either weighs.
+* BP is bent plate: the *Base Plate* tool takes subject PL (Tool Chests from before are changed to match).
 
 Report units (LF/in/m, SF/SY/m², CY/CF/m³) and decimals are set in the **Measurements** panel.
 

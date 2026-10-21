@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.20.0 – 2026-10-21
+
+### Plate and bent plate weights
+- **Bent plate** (BP) weighs by the foot: a 12" piece of flat plate as wide as the legs added together, times the
+  thickness (BP3X3X1/4: 12" × 6" × 1/4" × 0.2836 lb/in³ = 5.10 lb/ft). Any number of legs (BP4X6X4X3/8). In the
+  Weight column, the Combine Report and the takeoff summary like other steel.
+- `PLF()` and `PSF()` take several sizes and use the first they know. The default Weight column reads the Member Size,
+  else the label: `Qty * (Length * PLF([Member Size], Label) + Area * PSF([Member Size], Label))`. Documents with the
+  earlier default are changed when they open; formulas of your own are left alone.
+- A **BP3X3X1/4** tool in the Tool Chest, a **BP – Bent plate** family for size tools, and BP and PL sizes among the
+  suggestions.
+- BP is bent plate: the *Base Plate* tool's subject is PL (Tool Chests from before are changed to match).
+
 ## 1.19.0 – 2026-10-21
 
 ### License
