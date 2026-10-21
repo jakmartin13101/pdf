@@ -1,13 +1,13 @@
 // Settings & Preferences (Settings menu): personal preferences, the project's units, drawing and
 // editing behaviour, automatic takeoff line styles and the workspace.
 import { useEffect, useMemo, useState } from 'react';
-import { FEATURES, hasFeature, type Feature } from '../../core/license';
+import { FEATURES, type Feature } from '../../core/license';
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2, X } from 'lucide-react';
 import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolveBindings } from '../../core/keymap';
 import type { AutoStyleRule, CountSymbol, LengthUnit, LineStyle, ProjectSettings } from '../../types';
 import { COUNT_SYMBOLS, OTHER_SHAPES, defaultDetailStyles, lookStyle, newDetailStyle, type DetailShapeStyle } from '../../core/detailMarks';
 import { dashArray, symbolPath } from '../../core/shapes';
-import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab } from '../../store/store';
+import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab, featureOn } from '../../store/store';
 import { cmdConvertSubjects, cmdExportListStyle, cmdImportListStyle, cmdSaveDefaultListStyle } from '../../store/commands';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject } from '../../core/subjects';
 import { defaultCombineSettings, type CombineSettings } from '../../core/combine';
@@ -45,7 +45,7 @@ const LINE_STYLES: { id: LineStyle; label: string }[] = [
 
 /** On the settings of a Pro feature without Pro: they can be set up; the feature needs Pro. */
 function ProNote({ feature }: { feature: Feature }) {
-  const pro = useStore((s) => hasFeature(s.license, feature));
+  const pro = useStore((s) => featureOn(s, feature));
   if (pro) return null;
   return (
     <div className="pro-note" data-testid="pro-note">

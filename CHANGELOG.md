@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.19.0 – 2026-10-21
+
+### License
+- Basic needs a license too. A new install runs a **7-day Basic trial** from its first start; the menu bar badge shows
+  *Trial · Nd* (days left), and the License window the trial's days left.
+- When the trial is over without a license, the program waits behind the License window (no close button, Escape and
+  shortcuts do nothing) until a Basic or Pro key is entered; takeoffs are kept. An expired license counts as none.
+- The badge reads Trial, Basic, Pro or Unlicensed.
+
 ## 1.18.0 – 2026-10-21
 
 ### License: Basic and Pro

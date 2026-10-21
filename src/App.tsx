@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, FolderOpen, Files, FileJson, Ruler } from 'lucide-react';
-import { useStore, getState, currentSheet } from './store/store';
+import { useStore, getState, currentSheet, isLocked } from './store/store';
 import { MenuBar } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
 import { StatusBar } from './components/StatusBar';
@@ -19,7 +19,7 @@ import { TermsDialog } from './components/dialogs/TermsDialog';
 import { StandardDetailsDialog } from './components/dialogs/StandardDetailsDialog';
 import { CompareDialog } from './components/dialogs/CompareDialog';
 import { CombineDialog } from './components/dialogs/CombineDialog';
-import { LicenseDialog } from './components/dialogs/LicenseDialog';
+import { LicenseDialog, LicenseLock } from './components/dialogs/LicenseDialog';
 import { openFiles, restoreAutosave, startAutosave, type OpenFile } from './store/project';
 import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, handleAppShortcut } from './store/commands';
 import { sheetDisplayName } from './core/columns';
@@ -218,6 +218,7 @@ export function App() {
   const busy = useStore((s) => s.busy);
   const toasts = useStore((s) => s.toasts);
   const sheet = useStore(currentSheet);
+  const locked = useStore(isLocked);
   const [booting, setBooting] = useState(true);
   const [dragOver, setDragOver] = useState(false);
   const dragDepth = useRef(0);
@@ -238,6 +239,12 @@ export function App() {
   useEffect(() => {
     document.title = sheet ? `${sheetDisplayName(sheet)} · ${FULL_NAME}` : FULL_NAME;
   }, [sheet]);
+
+  // The trial runs out while the program is open too: the time the license is judged by moves on.
+  useEffect(() => {
+    const t = window.setInterval(() => useStore.setState({ clock: Date.now() }), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
 
   useEffect(() => {
     void downloadsCapability();
@@ -330,7 +337,7 @@ export function App() {
       <DetachedPanes />
       {tb === 'float' && <Toolbar placement="float" />}
       <DropOverlay />
-      <Dialogs />
+      {locked ? <LicenseLock /> : <Dialogs />}
       {dragOver && <div className="drop-hint">Drop PDF drawings to {loaded ? 'add them to the set' : 'open them'}</div>}
       {busy && (
         <div className="busy">

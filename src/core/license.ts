@@ -1,6 +1,7 @@
 // Licensing: what this copy of Takeoff Studio is licensed for. Two tiers – Basic and Pro – and a license
 // key that says which, signed by BuildSuite and checked offline (no account, no server). Pro adds the
-// Combine Report and the Automatic Takeoff. Kept on its own so a larger BuildSuite program can later supply
+// Combine Report and the Automatic Takeoff. A new install runs as a Basic trial for TRIAL_DAYS; after that
+// a license is needed to go on. Kept on its own so a larger BuildSuite program can later supply
 // the license instead.
 
 import { trustedKeys } from './licenseKeys';
@@ -18,8 +19,9 @@ export const FEATURES: Record<Feature, { name: string; what: string }> = {
   autoTakeoff: { name: 'Automatic Takeoff', what: 'Finds the labelled beams and tubing on a plan and measures them' },
 };
 
-/** Without a license the program runs with the Basic features. */
-export const UNLICENSED_TIER: Tier = 'basic';
+/** Days a new install runs as a Basic trial without a license. */
+export const TRIAL_DAYS = 7;
+const DAY = 864e5;
 
 export const LICENSE_PREFIX = 'BSTS1';
 const PRODUCT = 'takeoff-studio';
@@ -94,11 +96,42 @@ export async function verifyLicense(key: string, keys: JsonWebKey[] = trustedKey
   return { state: 'valid', info: read.info, key: k };
 }
 
-/** The tier a license gives (expired and invalid ones: unlicensed). */
-export function tierOf(s: LicenseStatus): Tier {
-  return s.state === 'valid' ? s.info.tier : UNLICENSED_TIER;
+/** The tier a license gives (none for expired and invalid ones). */
+export function licenseTier(s: LicenseStatus): Tier | null {
+  return s.state === 'valid' ? s.info.tier : null;
 }
 
-export function hasFeature(s: LicenseStatus, f: Feature): boolean {
-  return TIER_FEATURES[tierOf(s)].includes(f);
+/**
+ * Whole days left of the trial that started then (ISO time), counting today: 7 on the first day, 0 once
+ * it's over. A start in the future (the clock put back) counts as over.
+ */
+export function trialDaysLeft(started: string | null, now = new Date()): number {
+  const t = started ? Date.parse(started) : NaN;
+  if (!Number.isFinite(t) || t > now.getTime() + DAY) return 0;
+  return Math.max(0, Math.ceil((t + TRIAL_DAYS * DAY - now.getTime()) / DAY));
+}
+
+/** What can be used: the license's tier, else Basic during the trial, else nothing (a license is needed). */
+export interface Access {
+  tier: Tier | null;
+  /** Running on the trial (no license). */
+  trial: boolean;
+  /** Days left of the trial. */
+  daysLeft: number;
+}
+
+export function accessOf(license: LicenseStatus, trialStarted: string | null, now = new Date()): Access {
+  const tier = licenseTier(license);
+  if (tier) return { tier, trial: false, daysLeft: 0 };
+  const daysLeft = trialDaysLeft(trialStarted, now);
+  return daysLeft > 0 ? { tier: 'basic', trial: true, daysLeft } : { tier: null, trial: false, daysLeft: 0 };
+}
+
+export function hasFeature(a: Access, f: Feature): boolean {
+  return !!a.tier && TIER_FEATURES[a.tier].includes(f);
+}
+
+/** The name of what is in use: "Pro", "Basic", "Trial" or "Unlicensed". */
+export function accessName(a: Access): string {
+  return a.trial ? 'Trial' : a.tier ? TIER_NAMES[a.tier] : 'Unlicensed';
 }

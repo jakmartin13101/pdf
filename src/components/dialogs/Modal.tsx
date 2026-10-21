@@ -23,6 +23,7 @@ export function Modal({
   onClose,
   size,
   icon,
+  closable = true,
 }: {
   title: string;
   children: ReactNode;
@@ -30,6 +31,8 @@ export function Modal({
   onClose: () => void;
   size?: 'wide' | 'xwide' | 'mid';
   icon?: ReactNode;
+  /** False: no close button, Escape does nothing (the license window in front of a locked program). */
+  closable?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(() => placed.get(title) ?? null);
@@ -38,11 +41,11 @@ export function Modal({
       if (e.key !== 'Escape') return;
       // Only the window on top (the last one opened) closes.
       const all = document.querySelectorAll('.modal');
-      if (!ref.current || all[all.length - 1] === ref.current) onClose();
+      if (closable && (!ref.current || all[all.length - 1] === ref.current)) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, closable]);
   // A window moved earlier stays on the screen when the program window got smaller.
   useEffect(() => {
     if (!pos || !ref.current) return;
@@ -87,9 +90,11 @@ export function Modal({
         <div className="modal-head" onPointerDown={startMove} onDoubleClick={() => (placed.delete(title), setPos(null))} title="Drag to move · double-click to centre">
           {icon}
           <span className="title">{title}</span>
-          <button className="icon-btn" onClick={onClose} title="Close">
-            <X size={15} />
-          </button>
+          {closable && (
+            <button className="icon-btn" onClick={onClose} title="Close">
+              <X size={15} />
+            </button>
+          )}
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}

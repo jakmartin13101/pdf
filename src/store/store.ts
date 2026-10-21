@@ -33,7 +33,7 @@ import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
 import { appendTo, leaf, setSizesAt, splitIn, syncTree, type PaneNode } from './paneTree';
-import { hasFeature, verifyLicense, type Feature, type LicenseStatus } from '../core/license';
+import { accessOf, hasFeature, verifyLicense, type Feature, type LicenseStatus } from '../core/license';
 import { PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, upgradeLayout, type DockTarget } from './dockLayout';
 import { sizeText } from '../core/steelShapes';
 import { upgradeToolChest } from '../core/docUpgrade';
@@ -384,6 +384,12 @@ export interface AppState {
   setDialog: (d: DialogState | null) => void;
   /** What this copy is licensed for (checked on start and when a key is entered). */
   license: LicenseStatus;
+  /** False while a saved license key is still being checked on start. */
+  licenseChecked: boolean;
+  /** When this install's Basic trial started (ISO time; first start). */
+  trialStarted: string;
+  /** Now, as of the last minute: the trial runs out without anything else changing. */
+  clock: number;
   /** Check and keep a license key; the status it has. */
   activateLicense: (key: string) => Promise<LicenseStatus>;
   removeLicense: () => void;
@@ -701,6 +707,10 @@ export function newDocState(prefs: Prefs): DocState {
 }
 
 const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
+
+/** Where the license key is kept on this computer, and when the trial started. */
+const LICENSE_KEY = 'ts.license';
+const TRIAL_KEY = 'ts.trial';
 
 const defaultPrefs = (): Prefs => ({
   author: 'Estimator',
@@ -1141,6 +1151,15 @@ export const useStore = create<AppState>()((set, get, api) => {
     // Pro features asked for without Pro open the license window instead.
     setDialog: (dialog) => set({ dialog: dialog?.kind === 'combine' && !get().hasFeature('combine') ? { kind: 'license', feature: 'combine' } : dialog }),
     license: { state: 'none' },
+    licenseChecked: !lsGet<string>(LICENSE_KEY, ''),
+    trialStarted: (() => {
+      const saved = lsGet<string | null>(TRIAL_KEY, null);
+      if (saved) return saved;
+      const now = new Date().toISOString();
+      lsSet(TRIAL_KEY, now);
+      return now;
+    })(),
+    clock: Date.now(),
     activateLicense: async (key) => {
       const status = await verifyLicense(key);
       if (status.state === 'valid') {
@@ -1154,7 +1173,7 @@ export const useStore = create<AppState>()((set, get, api) => {
       set({ license: { state: 'none' } });
       if (isPanelOpen(get().layout, 'autotakeoff')) setLayout(togglePanelIn(get().layout, 'autotakeoff'));
     },
-    hasFeature: (f) => hasFeature(get().license, f),
+    hasFeature: (f) => featureOn(get(), f),
 
     updateSheet: (id, patch) => commit((d) => ({ ...d, sheets: d.sheets.map((s) => (s.id === id ? { ...s, ...patch } : s)) })),
     setSheetLabels: (labels) =>
@@ -1722,14 +1741,24 @@ export const useStore = create<AppState>()((set, get, api) => {
 
 export const getState = () => useStore.getState();
 
-/** Where the license key is kept on this computer. */
-const LICENSE_KEY = 'ts.license';
-
 // The saved license is checked once the program starts (the check is quick but not instant).
 {
   const saved = lsGet<string>(LICENSE_KEY, '');
-  if (saved) void verifyLicense(saved).then((license) => useStore.setState({ license }));
+  if (saved) void verifyLicense(saved).then((license) => useStore.setState({ license, licenseChecked: true }));
 }
+
+/** What can be used now: the license's tier, else Basic during the trial, else nothing. */
+export function useAccess() {
+  const license = useStore((s) => s.license);
+  const trialStarted = useStore((s) => s.trialStarted);
+  const clock = useStore((s) => s.clock);
+  return accessOf(license, trialStarted, new Date(clock));
+}
+
+export const accessNow = (s: Pick<AppState, 'license' | 'trialStarted' | 'clock'>) => accessOf(s.license, s.trialStarted, new Date(s.clock));
+export const featureOn = (s: Pick<AppState, 'license' | 'trialStarted' | 'clock'>, f: Feature) => hasFeature(accessNow(s), f);
+/** No license and the trial is over: the program waits for a license key. */
+export const isLocked = (s: AppState) => s.licenseChecked && accessNow(s).tier === null;
 
 export function currentSheet(s: AppState): Sheet | undefined {
   return s.doc.sheets.find((x) => x.id === s.currentSheetId);

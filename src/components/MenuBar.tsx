@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { TIER_NAMES, hasFeature, tierOf } from '../core/license';
+import { TIER_NAMES, accessName, hasFeature } from '../core/license';
 import { MenuList, type MenuItem } from './ContextMenu';
-import { getState, isDirty, listStyleOf, useStore, PANEL_IDS, PANEL_TITLES, type LayoutState, type PanelId } from '../store/store';
+import { getState, isDirty, listStyleOf, useStore, PANEL_IDS, PANEL_TITLES, type LayoutState, type PanelId, useAccess } from '../store/store';
 import { dockMenuItems } from './dock/PanelHeader';
 import { useShortcuts } from './useShortcuts';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from '../brand';
@@ -50,7 +50,8 @@ export function MenuBar() {
   const layout = useStore((s) => s.layout);
   const attachedCount = useStore((s) => s.panes.filter((p) => !p.detached).length);
   const license = useStore((s) => s.license);
-  const pro = hasFeature(license, 'combine');
+  const access = useAccess();
+  const pro = hasFeature(access, 'combine');
   const panes = useStore((s) => s.panes);
   const activePaneId = useStore((s) => s.activePaneId);
   const prefs = useStore((s) => s.prefs);
@@ -278,12 +279,19 @@ export function MenuBar() {
       ))}
       <div className="spacer" />
       <button
-        className={`tier-pill ${tierOf(license)}`}
-        title={license.state === 'valid' ? `${PRODUCT_NAME} ${TIER_NAMES[license.info.tier]} – licensed to ${license.info.name}` : 'Unlicensed: Basic features. Click to enter a license key.'}
+        className={`tier-pill ${access.tier ?? 'none'}${access.trial ? ' trial' : ''}`}
+        title={
+          license.state === 'valid'
+            ? `${PRODUCT_NAME} ${TIER_NAMES[license.info.tier]} – licensed to ${license.info.name}`
+            : access.trial
+              ? `Basic trial: ${access.daysLeft} day${access.daysLeft === 1 ? '' : 's'} left. Click to enter a license key.`
+              : 'No license. Click to enter a license key.'
+        }
         onClick={() => st().setDialog({ kind: 'license' })}
         data-testid="license-badge"
       >
-        {TIER_NAMES[tierOf(license)]}
+        {accessName(access)}
+        {access.trial && <span className="trial-days"> · {access.daysLeft}d</span>}
       </button>
       {loaded && (
         <>

@@ -4551,3 +4551,43 @@ button.linkish {
   background: linear-gradient(135deg, #1f6feb, #7c3aed);
   color: #fff;
 }
+
+/* The program waiting for a license (trial over): nothing behind the license window can be used. */
+.license-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  background: rgba(10, 14, 20, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.license-lock .modal-back {
+  pointer-events: auto;
+}
+
+.license-upsell.locked {
+  border-color: var(--warn);
+  background: rgba(200, 120, 20, 0.12);
+}
+
+.license-upsell.locked svg {
+  color: var(--warn);
+}
+
+.tier-pill.trial {
+  background: rgba(200, 120, 20, 0.14);
+  border-color: rgba(200, 120, 20, 0.6);
+  color: var(--warn);
+}
+
+.tier-pill.none {
+  background: rgba(200, 40, 40, 0.12);
+  border-color: rgba(200, 40, 40, 0.5);
+  color: #c62828;
+}
+
+.tier-pill .trial-days {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}

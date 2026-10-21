@@ -7,9 +7,9 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.18.0**: **licensing** with two tiers – **Basic** and **Pro**. Pro adds the **Combine Report** and the
-> **Automatic Takeoff**; enter a license key in *Help → License…* (1.17.0: Create Report – order list and cut list;
-> 1.16.0: split the view as many times as you want) – see the [changelog](CHANGELOG.md).
+> **Version 1.19.0**: **Basic needs a license too** – a new install runs a **7-day Basic trial**, then asks for a
+> Basic or Pro license key (1.18.0: licensing with Basic and Pro tiers – Pro adds the Combine Report and the
+> Automatic Takeoff) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -78,11 +78,16 @@ Takeoff Studio comes in two tiers:
 | **Combine Report** – stock to order, cut list and order list | – | ✓ |
 | **Automatic Takeoff** – labelled beams and tubing | – | ✓ |
 
-*Help → License…* (or the **Basic / Pro** badge at the right of the menu bar) shows what this copy is licensed for and
-takes a **license key**: paste it (it starts with `BSTS1.`) or *Load License File…* (`.bslicense`), then *Activate*.
-The key is kept on the computer and checked offline – no account or server. Without a license the program runs with
-the Basic features; Pro features are marked **PRO** and open the license window when asked for (after activating Pro,
-the feature opens). *Remove License* takes the key off the computer.
+Both tiers need a license. **A new install runs a 7-day Basic trial** (from its first start): the Basic features, with
+the days left on the **Trial · 7d** badge at the right of the menu bar. When the trial is over without a license, the
+program waits behind the license window – it can't be closed or got round – until a Basic or Pro license key is
+entered; the takeoffs are kept and open again once it is licensed.
+
+*Help → License…* (or the badge – **Trial**, **Basic**, **Pro** or **Unlicensed**) shows what this copy is licensed for
+and takes a **license key**: paste it (it starts with `BSTS1.`) or *Load License File…* (`.bslicense`), then *Activate*.
+The key is kept on the computer and checked offline – no account or server. Pro features are marked **PRO** and open
+the license window when asked for without Pro (after activating Pro, the feature opens). *Remove License* takes the
+key off the computer (back to the trial if it hasn't ended). An expired license counts as none.
 
 License keys are signed by BuildSuite: a key that has been edited, is for another program or has expired is refused.
 For now the license lives in this program; later a BuildSuite program can supply it instead (`src/core/license.ts`).

@@ -1,9 +1,10 @@
-// The license (Help → License…, the tier badge on the menu bar, or a Pro feature asked for without Pro):
-// what this copy is licensed for, the two tiers, and where to enter a license key.
+// The license (Help → License…, the badge on the menu bar, a Pro feature asked for without Pro, or – with
+// no license once the trial is over – in front of the whole program): what this copy is licensed for, the
+// two tiers, and where to enter a license key.
 import { useRef, useState } from 'react';
-import { Check, KeyRound, Lock, Minus, Upload } from 'lucide-react';
-import { getState, useStore } from '../../store/store';
-import { FEATURES, TIER_NAMES, tierOf, type Feature } from '../../core/license';
+import { Check, Clock, KeyRound, Lock, Minus, Upload } from 'lucide-react';
+import { getState, useAccess, useStore } from '../../store/store';
+import { FEATURES, TIER_NAMES, TRIAL_DAYS, type Feature } from '../../core/license';
 import { PRODUCT_NAME } from '../../brand';
 import { Modal } from './Modal';
 
@@ -16,15 +17,18 @@ const ROWS: { what: string; basic: boolean; pro: boolean }[] = [
   { what: `${FEATURES.autoTakeoff.name} – beams and tubing`, basic: false, pro: true },
 ];
 
-export function LicenseDialog({ feature }: { feature?: Feature }) {
+const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+
+export function LicenseDialog({ feature, locked }: { feature?: Feature; locked?: boolean }) {
   const license = useStore((s) => s.license);
+  const access = useAccess();
   const [key, setKey] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const st = getState();
-  const tier = tierOf(license);
-  const close = () => st.setDialog(null);
+  const tier = access.tier;
+  const close = () => !locked && st.setDialog(null);
 
   const activate = async (text = key) => {
     if (!text.trim()) return;
@@ -49,19 +53,45 @@ export function LicenseDialog({ feature }: { feature?: Feature }) {
 
   const info = license.state === 'valid' || license.state === 'expired' ? license.info : null;
   return (
-    <Modal title="License" icon={<KeyRound size={16} />} size="mid" onClose={close} footer={<button className="btn primary" onClick={close}>Close</button>}>
-      {feature && tier !== 'pro' && (
+    <Modal
+      title="License"
+      icon={<KeyRound size={16} />}
+      size="mid"
+      onClose={close}
+      closable={!locked}
+      footer={
+        locked ? (
+          <div className="left hint">Your takeoffs are kept: they open again once the program is licensed.</div>
+        ) : (
+          <button className="btn primary" onClick={close}>
+            Close
+          </button>
+        )
+      }
+    >
+      {locked && (
+        <div className="license-upsell locked" data-testid="license-locked">
+          <Lock size={16} />
+          <div>
+            <b>Your {TRIAL_DAYS}-day trial of {PRODUCT_NAME} has ended.</b>
+            <div className="hint">Enter a Basic or Pro license key to go on using the program.</div>
+          </div>
+        </div>
+      )}
+      {feature && !locked && tier !== 'pro' && (
         <div className="license-upsell" data-testid="license-upsell">
           <Lock size={16} />
           <div>
-            <b>{FEATURES[feature].name} is part of {PRODUCT_NAME} Pro.</b>
+            <b>
+              {FEATURES[feature].name} is part of {PRODUCT_NAME} Pro.
+            </b>
             <div className="hint">{FEATURES[feature].what}. Enter a Pro license key below to use it.</div>
           </div>
         </div>
       )}
       <div className="license-status" data-testid="license-status">
-        <span className={`tier-pill ${tier}`} data-testid="license-tier">
-          {TIER_NAMES[tier]}
+        <span className={`tier-pill ${tier ?? 'none'}${access.trial ? ' trial' : ''}`} data-testid="license-tier">
+          {access.trial ? 'Trial' : tier ? TIER_NAMES[tier] : 'None'}
         </span>
         <div className="grow">
           {info && license.state === 'valid' ? (
@@ -74,19 +104,26 @@ export function LicenseDialog({ feature }: { feature?: Feature }) {
                 {info.email ? `${info.email} · ` : ''}Issued {info.issued} · {info.expires ? `Expires ${info.expires}` : 'Does not expire'}
               </div>
             </>
-          ) : info && license.state === 'expired' ? (
-            <>
-              <b className="warn-text">The license for {info.name} expired on {info.expires}</b>
-              <div className="hint">The Basic features are available. Enter a new license key to go on with {TIER_NAMES[info.tier]}.</div>
-            </>
           ) : (
             <>
-              <b>Unlicensed</b>
-              <div className="hint">The Basic features are available. Enter a license key for {PRODUCT_NAME} Basic or Pro.</div>
+              {info && license.state === 'expired' && <b className="warn-text">The license for {info.name} expired on {info.expires}. </b>}
+              {access.trial ? (
+                <>
+                  <b data-testid="license-trial">
+                    <Clock size={13} style={{ verticalAlign: -2 }} /> Basic trial – {days(access.daysLeft)} left
+                  </b>
+                  <div className="hint">The Basic features for {days(TRIAL_DAYS)} from the first start. Enter a Basic or Pro license key to keep using them.</div>
+                </>
+              ) : (
+                <>
+                  <b>No license</b>
+                  <div className="hint">The trial is over. A Basic or Pro license key is needed.</div>
+                </>
+              )}
             </>
           )}
         </div>
-        {license.state !== 'none' && (
+        {license.state !== 'none' && !locked && (
           <button
             className="btn sm"
             onClick={() => {
@@ -130,6 +167,7 @@ export function LicenseDialog({ feature }: { feature?: Feature }) {
             setError('');
           }}
           spellCheck={false}
+          autoFocus={locked}
           data-testid="license-key"
         />
       </div>
@@ -162,5 +200,14 @@ export function LicenseDialog({ feature }: { feature?: Feature }) {
       </div>
       <div className="hint">The license is kept on this computer and checked without going online.</div>
     </Modal>
+  );
+}
+
+/** No license and the trial over: the License window in front of the program, which waits behind it. */
+export function LicenseLock() {
+  return (
+    <div className="license-lock" data-testid="license-lock">
+      <LicenseDialog locked />
+    </div>
   );
 }

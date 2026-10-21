@@ -3,13 +3,12 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Loader2, RotateCcw, ScanLine, Trash2, Wand2 } from 'lucide-react';
 import type { ChestTool, CustomValue, DocState, Markup, MarkupStyle, Scale, Sheet } from '../../types';
-import { autoIncluded, currentSheet, getState, useStore, type AutoMember, type AutoOptions, type AutoTakeoffState } from '../../store/store';
+import { autoIncluded, currentSheet, featureOn, getState, useStore, type AutoMember, type AutoOptions, type AutoTakeoffState } from '../../store/store';
 import { EndAdjuster, LineSample, endNames } from '../EndAdjuster';
 import { autoLook, autoSubject } from '../../core/autoStyles';
 import { extendSegment } from '../../core/geometry';
 import { PanelHeader } from '../dock/PanelHeader';
 import { ProLocked } from '../ProLocked';
-import { hasFeature } from '../../core/license';
 import { sheetLongName } from '../../core/columns';
 import { normName } from '../../core/formula';
 import { scaleAt, viewportAt } from '../../core/measure';
@@ -49,7 +48,7 @@ function markupFields(doc: DocState, tool: ChestTool | undefined, style: MarkupS
 
 /** Pro: without it, what the panel does and where to enter a license. */
 export function AutoTakeoffPanel() {
-  const pro = useStore((s) => hasFeature(s.license, 'autoTakeoff'));
+  const pro = useStore((s) => featureOn(s, 'autoTakeoff'));
   return pro ? <AutoTakeoff /> : <ProLocked feature="autoTakeoff" title="Automatic Takeoff" />;
 }
 

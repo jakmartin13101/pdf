@@ -1,11 +1,10 @@
 import { DraftingCompass, FileDown, FolderOpen, Frame, GitCompareArrows, GripVertical, Hand, Maximize, MousePointer2, Redo2, Save, Sigma, Table2, Undo2, Wand2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react';
-import { hasFeature } from '../core/license';
 import { isPanelOpen } from '../store/dockLayout';
 import { useRef } from 'react';
 import { beginDockDrag } from './dock/dragging';
 import { DockMenuButton } from './dock/PanelHeader';
 import type { MarkupType } from '../types';
-import { useStore, getState, type ToolMode, type PanelId } from '../store/store';
+import { useStore, getState, type ToolMode, type PanelId, featureOn } from '../store/store';
 import { TYPE_ICON } from './icons';
 import { TYPE_INFO } from '../core/markupTypes';
 import { cmdOpenPdf, cmdSave, view } from '../store/commands';
@@ -55,7 +54,7 @@ export function usePanelOpen(id: PanelId) {
 export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | 'float' }) {
   const tool = useStore((s) => s.tool);
   const loaded = useStore((s) => s.loaded);
-  const autoPro = useStore((s) => hasFeature(s.license, 'autoTakeoff'));
+  const autoPro = useStore((s) => featureOn(s, 'autoTakeoff'));
   const sc = useShortcuts();
   /** A tooltip with the command's (possibly customized) keys. */
   const keyed = (label: string, id: string) => (sc(id) ? `${label} (${sc(id)})` : label);

@@ -84,8 +84,8 @@ async function launch(extraArgs = []) {
   check(opened, 'sample drawing set opened (PDF worker running)');
   if (shots) await win.screenshot({ path: join(shots, 'desktop-main.png') });
 
-  // License: Basic without one; a forged key is refused (the signature check runs on app://).
-  check((await win.getByTestId('license-badge').textContent()) === 'Basic', 'starts with the Basic features');
+  // License: a new install is a week's Basic trial; a forged key is refused (the check runs on app://).
+  check((await win.getByTestId('license-badge').textContent()) === 'Trial · 7d', 'a new install starts a 7-day Basic trial');
   await win.getByTestId('license-badge').click();
   await win.getByTestId('license-key').fill(await forgedLicense());
   await win.getByTestId('license-activate').click();

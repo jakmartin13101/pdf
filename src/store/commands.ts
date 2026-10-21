@@ -1,6 +1,6 @@
 // UI commands shared by the menu bar, toolbar and context menus.
 import type { MarkupType } from '../types';
-import { defaultListStyle, getState, isDirty, listStyleOf, liveSlots, type ViewRequest } from './store';
+import { defaultListStyle, getState, isDirty, isLocked, listStyleOf, liveSlots, type ViewRequest } from './store';
 import { builtInListStyle, listStyleFile, parseListStyle, styleOfDoc } from '../core/listStyle';
 import { splitOldSubject } from '../core/subjects';
 import { normName } from '../core/formula';
@@ -122,6 +122,8 @@ const isTypingTarget = (t: EventTarget | null) => {
  * own keys first (Space to pan, Esc, Enter and Backspace while drawing, arrows to nudge).
  */
 export function handleAppShortcut(e: KeyboardEvent) {
+  // No license once the trial is over: nothing runs until a license key is entered.
+  if (isLocked(getState())) return;
   if (e.defaultPrevented || e.repeat) return;
   const chord = chordFromEvent(e);
   if (!chord) return;
