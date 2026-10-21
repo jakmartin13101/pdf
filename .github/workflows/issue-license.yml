@@ -1,0 +1,65 @@
+# Issue a Takeoff Studio license key from GitHub: Actions → "Issue license" → Run workflow.
+# Needs the repository secret LICENSE_PRIVATE_KEY (the signing key, private-key.jwk.json's contents).
+name: Issue license
+
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: Tier
+        type: choice
+        options: [pro, basic]
+        default: pro
+      name:
+        description: Licensed to (person)
+        required: true
+      company:
+        description: Company (optional)
+        required: false
+      email:
+        description: E-mail (optional)
+        required: false
+      expires:
+        description: Expires YYYY-MM-DD (blank – does not expire)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  issue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Issue the license key
+        env:
+          LICENSE_PRIVATE_KEY: ${{ secrets.LICENSE_PRIVATE_KEY }}
+          TIER: ${{ inputs.tier }}
+          NAME: ${{ inputs.name }}
+          COMPANY: ${{ inputs.company }}
+          EMAIL: ${{ inputs.email }}
+          EXPIRES: ${{ inputs.expires }}
+        run: |
+          if [ -z "$LICENSE_PRIVATE_KEY" ]; then echo "::error::Add the LICENSE_PRIVATE_KEY repository secret first."; exit 1; fi
+          set -- issue --tier "$TIER" --name "$NAME" --file takeoff-studio.bslicense
+          [ -n "$COMPANY" ] && set -- "$@" --company "$COMPANY"
+          [ -n "$EMAIL" ] && set -- "$@" --email "$EMAIL"
+          [ -n "$EXPIRES" ] && set -- "$@" --expires "$EXPIRES"
+          KEY=$(node scripts/license.mjs "$@")
+          {
+            echo "### Takeoff Studio ${TIER^} license for ${NAME}"
+            echo
+            echo "Paste this key in Help → License… (or send the attached .bslicense file):"
+            echo
+            echo '```'
+            echo "$KEY"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: license
+          path: takeoff-studio.bslicense
+          retention-days: 30

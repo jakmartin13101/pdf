@@ -7,10 +7,9 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.17.0**: **Create Report** in the Combine Report – a simple **Order List** (size, length and quantity, one
-> line each: `L3X3X1/4   40'-0"   6`) or **Cut List** (the bars of each size, what is cut from each and the drop) to
-> print, save as CSV or copy (1.16.0: split the view as many times as you want; 1.15.0: the Measurements panel with
-> Depth, Width and a count's Height) – see the [changelog](CHANGELOG.md).
+> **Version 1.18.0**: **licensing** with two tiers – **Basic** and **Pro**. Pro adds the **Combine Report** and the
+> **Automatic Takeoff**; enter a license key in *Help → License…* (1.17.0: Create Report – order list and cut list;
+> 1.16.0: split the view as many times as you want) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -66,6 +65,29 @@ A five-minute tour with the sample set:
    Member Size, Qty and a computed **Weight**. Click a row to jump to the markup; click a markup to find its row.
 5. Open **Takeoff Summary** for totals by category and size (e.g. `W24x55 — 24 EA · 552.00 LF`, `30,360 lbs`), then
    export CSV, a printable report, or a flattened PDF.
+
+## License: Basic and Pro
+
+Takeoff Studio comes in two tiers:
+
+| | Basic | Pro |
+| --- | :---: | :---: |
+| Measuring, counts and markups; scales and viewports | ✓ | ✓ |
+| Tool Chest, Markups List, Takeoff Summary and exports | ✓ | ✓ |
+| Standard details, maximum lengths, split view | ✓ | ✓ |
+| **Combine Report** – stock to order, cut list and order list | – | ✓ |
+| **Automatic Takeoff** – labelled beams and tubing | – | ✓ |
+
+*Help → License…* (or the **Basic / Pro** badge at the right of the menu bar) shows what this copy is licensed for and
+takes a **license key**: paste it (it starts with `BSTS1.`) or *Load License File…* (`.bslicense`), then *Activate*.
+The key is kept on the computer and checked offline – no account or server. Without a license the program runs with
+the Basic features; Pro features are marked **PRO** and open the license window when asked for (after activating Pro,
+the feature opens). *Remove License* takes the key off the computer.
+
+License keys are signed by BuildSuite: a key that has been edited, is for another program or has expired is refused.
+For now the license lives in this program; later a BuildSuite program can supply it instead (`src/core/license.ts`).
+
+![The license window: Basic and Pro](docs/screenshot-license.png)
 
 ## How the requested workflow maps to the app
 
@@ -715,6 +737,26 @@ branding/          BuildSuite Takeoff icon artwork
 Rendering uses a resolution-capped base canvas plus a high-resolution "detail" canvas for the visible region, so large
 sheets stay sharp at high zoom. Markups are SVG in PDF point space, so the drawing and the data are two views of one
 model: every list cell is computed from the same markup objects that are drawn.
+
+### Issuing license keys
+
+License keys are ECDSA P-256 signatures over the license details (tier, licensed to, company, e-mail, issue date,
+expiry), made with a private signing key and checked by the program with the public key in
+`src/core/licenseKeys.ts`. The private key is never in the repository.
+
+* **From GitHub** (no tools needed): add the signing key as the repository secret **`LICENSE_PRIVATE_KEY`** (*Settings →
+  Secrets and variables → Actions → New repository secret*, the whole contents of `private-key.jwk.json`). Then
+  *Actions → Issue license → Run workflow*: choose the tier and fill in who it's for (and an expiry date if any). The
+  run's summary shows the key, and the `.bslicense` file is attached to the run.
+* **On a computer** with Node: `npm run license -- issue --tier pro --name "Jane Smith" --company "Smith Steel"
+  [--email …] [--expires 2027-12-31] [--file jane.bslicense]` with the key in `license/private-key.jwk.json` (or
+  `--key <file>`, or the `LICENSE_PRIVATE_KEY` variable). `npm run license -- verify <key>` checks one.
+* **A new signing key**: `npm run license -- keygen` writes a new pair to `license/` (ignored by git); put its public key in
+  `src/core/licenseKeys.ts` (keep the old one listed for as long as keys signed with it should keep working) and
+  update the secret.
+
+Development builds also trust a test key (`e2e/fixtures/license-test`) so the browser tests can run with Pro; released
+builds don't.
 
 ### Building the Windows installer
 

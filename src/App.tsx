@@ -19,6 +19,7 @@ import { TermsDialog } from './components/dialogs/TermsDialog';
 import { StandardDetailsDialog } from './components/dialogs/StandardDetailsDialog';
 import { CompareDialog } from './components/dialogs/CompareDialog';
 import { CombineDialog } from './components/dialogs/CombineDialog';
+import { LicenseDialog } from './components/dialogs/LicenseDialog';
 import { openFiles, restoreAutosave, startAutosave, type OpenFile } from './store/project';
 import { cmdOpenExample, cmdOpenPdf, cmdOpenProject, cmdOpenSample, handleAppShortcut } from './store/commands';
 import { sheetDisplayName } from './core/columns';
@@ -175,7 +176,10 @@ function Dialogs() {
     case 'unsaved':
       return <UnsavedDialog docIds={d.docIds} then={d.then} />;
     case 'combine':
-      return <CombineDialog />;
+      // Pro: without it, the license window (setDialog sends there too).
+      return getState().hasFeature('combine') ? <CombineDialog /> : <LicenseDialog feature="combine" />;
+    case 'license':
+      return <LicenseDialog feature={d.feature} />;
   }
 }
 

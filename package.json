@@ -22,7 +22,8 @@
     "desktop": "npm run build && electron .",
     "legal": "node scripts/make-legal.mjs",
     "icons": "node scripts/build-icons.mjs",
-    "dist:win": "npm run build && node scripts/make-legal.mjs && electron-builder --win nsis --x64 --publish never"
+    "dist:win": "npm run build && node scripts/make-legal.mjs && electron-builder --win nsis --x64 --publish never",
+    "license": "node scripts/license.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

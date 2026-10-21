@@ -1,4 +1,5 @@
 import { DraftingCompass, FileDown, FolderOpen, Frame, GitCompareArrows, GripVertical, Hand, Maximize, MousePointer2, Redo2, Save, Sigma, Table2, Undo2, Wand2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react';
+import { hasFeature } from '../core/license';
 import { isPanelOpen } from '../store/dockLayout';
 import { useRef } from 'react';
 import { beginDockDrag } from './dock/dragging';
@@ -20,7 +21,7 @@ function sameTool(a: ToolMode, b: ToolMode) {
   return true;
 }
 
-function TB({ icon: Icon, label, onClick, active, disabled, title, small }: {
+function TB({ icon: Icon, label, onClick, active, disabled, title, small, locked }: {
   icon: LucideIcon;
   label?: string;
   onClick: () => void;
@@ -28,11 +29,20 @@ function TB({ icon: Icon, label, onClick, active, disabled, title, small }: {
   disabled?: boolean;
   title?: string;
   small?: boolean;
+  /** A Pro feature without Pro: marked, and clicking it shows the license window. */
+  locked?: boolean;
 }) {
   return (
-    <button className={`tb-btn${active ? ' active' : ''}${small ? ' small' : ''}`} onClick={onClick} disabled={disabled} title={title ?? label} data-testid={`tb-${(label ?? title ?? '').replace(/\s*\(.*$/, '').toLowerCase().replace(/\s+/g, '-')}`}>
+    <button
+      className={`tb-btn${active ? ' active' : ''}${small ? ' small' : ''}${locked ? ' locked' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+      title={locked ? `${title ?? label} – a Pro feature` : title ?? label}
+      data-testid={`tb-${(label ?? title ?? '').replace(/\s*\(.*$/, '').toLowerCase().replace(/\s+/g, '-')}`}
+    >
       <Icon size={19} strokeWidth={1.7} />
       {label && <span>{label}</span>}
+      {locked && <i className="tb-pro">PRO</i>}
     </button>
   );
 }
@@ -45,6 +55,7 @@ export function usePanelOpen(id: PanelId) {
 export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | 'float' }) {
   const tool = useStore((s) => s.tool);
   const loaded = useStore((s) => s.loaded);
+  const autoPro = useStore((s) => hasFeature(s.license, 'autoTakeoff'));
   const sc = useShortcuts();
   /** A tooltip with the command's (possibly customized) keys. */
   const keyed = (label: string, id: string) => (sc(id) ? `${label} (${sc(id)})` : label);
@@ -140,7 +151,7 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
           <TB icon={Table2} label="Markups" active={markupsOpen} onClick={() => st().togglePanel('markups')} title="Show or hide the Markups List" />
           <TB icon={Sigma} label="Summary" active={summaryOpen} onClick={() => st().togglePanel('summary')} title="Show or hide the Takeoff Summary" />
           <TB icon={GitCompareArrows} label="Compare" active={compareOpen} disabled={!loaded} onClick={() => st().togglePanel('compare')} title="Overlay and compare two sheets" />
-          <TB icon={Wand2} label="Auto" active={autoOpen} disabled={!loaded} onClick={() => st().togglePanel('autotakeoff')} title="Automatic takeoff: find labelled beams and tubing and measure them" />
+          <TB icon={Wand2} label="Auto" active={autoOpen} disabled={!loaded} locked={!autoPro} onClick={() => st().togglePanel('autotakeoff')} title="Automatic takeoff: find labelled beams and tubing and measure them" />
         </div>
         <div className="tb-caption">Data</div>
       </div>

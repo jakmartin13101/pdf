@@ -9,6 +9,8 @@ export default defineConfig({
     baseURL: 'http://localhost:5199',
     viewport: { width: 1600, height: 1000 },
     acceptDownloads: true,
+    // Tests run with a Pro license (signed with the test key); e2e/license.spec.ts starts without one.
+    storageState: 'e2e/fixtures/pro-license.state.json',
   },
   webServer: {
     command: 'npx vite --port 5199 --strictPort',

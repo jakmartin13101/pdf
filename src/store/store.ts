@@ -33,6 +33,7 @@ import { bbox, translate } from '../core/geometry';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
 import { appendTo, leaf, setSizesAt, splitIn, syncTree, type PaneNode } from './paneTree';
+import { hasFeature, verifyLicense, type Feature, type LicenseStatus } from '../core/license';
 import { PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, upgradeLayout, type DockTarget } from './dockLayout';
 import { sizeText } from '../core/steelShapes';
 import { upgradeToolChest } from '../core/docUpgrade';
@@ -86,7 +87,9 @@ export type DialogState =
   | { kind: 'confirm'; title: string; message: string; onConfirm: () => void }
   /** Documents about to close with unsaved changes: save them, close without saving, or cancel. */
   | { kind: 'unsaved'; docIds: string[]; then: () => void }
-  | { kind: 'combine' };
+  | { kind: 'combine' }
+  /** The license: its tier, entering a key; `feature` when a Pro feature was asked for without Pro. */
+  | { kind: 'license'; feature?: Feature };
 
 export type ViewRequest = (
   | { kind: 'fit' | 'fitWidth' | 'actual'; nonce: number }
@@ -379,6 +382,13 @@ export interface AppState {
   focusMarkup: (id: string, zoom?: boolean) => void;
   setEditingText: (id: string | null) => void;
   setDialog: (d: DialogState | null) => void;
+  /** What this copy is licensed for (checked on start and when a key is entered). */
+  license: LicenseStatus;
+  /** Check and keep a license key; the status it has. */
+  activateLicense: (key: string) => Promise<LicenseStatus>;
+  removeLicense: () => void;
+  /** Whether the license includes a feature (Pro: Combine Report, Automatic Takeoff). */
+  hasFeature: (f: Feature) => boolean;
 
   // sheets
   updateSheet: (id: string, patch: Partial<Sheet>) => void;
@@ -1128,7 +1138,23 @@ export const useStore = create<AppState>()((set, get, api) => {
       }
     },
     setEditingText: (editingTextId) => set({ editingTextId }),
-    setDialog: (dialog) => set({ dialog }),
+    // Pro features asked for without Pro open the license window instead.
+    setDialog: (dialog) => set({ dialog: dialog?.kind === 'combine' && !get().hasFeature('combine') ? { kind: 'license', feature: 'combine' } : dialog }),
+    license: { state: 'none' },
+    activateLicense: async (key) => {
+      const status = await verifyLicense(key);
+      if (status.state === 'valid') {
+        lsSet(LICENSE_KEY, status.key);
+        set({ license: status });
+      }
+      return status;
+    },
+    removeLicense: () => {
+      lsSet(LICENSE_KEY, '');
+      set({ license: { state: 'none' } });
+      if (isPanelOpen(get().layout, 'autotakeoff')) setLayout(togglePanelIn(get().layout, 'autotakeoff'));
+    },
+    hasFeature: (f) => hasFeature(get().license, f),
 
     updateSheet: (id, patch) => commit((d) => ({ ...d, sheets: d.sheets.map((s) => (s.id === id ? { ...s, ...patch } : s)) })),
     setSheetLabels: (labels) =>
@@ -1409,8 +1435,14 @@ export const useStore = create<AppState>()((set, get, api) => {
       set({ prefs });
     },
 
-    showPanel: (id) => setLayout(showPanelIn(get().layout, id)),
-    togglePanel: (id) => setLayout(togglePanelIn(get().layout, id)),
+    showPanel: (id) => {
+      if (id === 'autotakeoff' && !get().hasFeature('autoTakeoff')) return get().setDialog({ kind: 'license', feature: 'autoTakeoff' });
+      setLayout(showPanelIn(get().layout, id));
+    },
+    togglePanel: (id) => {
+      if (id === 'autotakeoff' && !get().hasFeature('autoTakeoff') && !isPanelOpen(get().layout, id)) return get().setDialog({ kind: 'license', feature: 'autoTakeoff' });
+      setLayout(togglePanelIn(get().layout, id));
+    },
     dockPanel: (id, dock, float, target) => {
       const l = get().layout;
       if (l.locked) return;
@@ -1689,6 +1721,15 @@ export const useStore = create<AppState>()((set, get, api) => {
 });
 
 export const getState = () => useStore.getState();
+
+/** Where the license key is kept on this computer. */
+const LICENSE_KEY = 'ts.license';
+
+// The saved license is checked once the program starts (the check is quick but not instant).
+{
+  const saved = lsGet<string>(LICENSE_KEY, '');
+  if (saved) void verifyLicense(saved).then((license) => useStore.setState({ license }));
+}
 
 export function currentSheet(s: AppState): Sheet | undefined {
   return s.doc.sheets.find((x) => x.id === s.currentSheetId);

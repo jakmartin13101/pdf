@@ -8,6 +8,8 @@ import { EndAdjuster, LineSample, endNames } from '../EndAdjuster';
 import { autoLook, autoSubject } from '../../core/autoStyles';
 import { extendSegment } from '../../core/geometry';
 import { PanelHeader } from '../dock/PanelHeader';
+import { ProLocked } from '../ProLocked';
+import { hasFeature } from '../../core/license';
 import { sheetLongName } from '../../core/columns';
 import { normName } from '../../core/formula';
 import { scaleAt, viewportAt } from '../../core/measure';
@@ -45,7 +47,13 @@ function markupFields(doc: DocState, tool: ChestTool | undefined, style: MarkupS
   };
 }
 
+/** Pro: without it, what the panel does and where to enter a license. */
 export function AutoTakeoffPanel() {
+  const pro = useStore((s) => hasFeature(s.license, 'autoTakeoff'));
+  return pro ? <AutoTakeoff /> : <ProLocked feature="autoTakeoff" title="Automatic Takeoff" />;
+}
+
+function AutoTakeoff() {
   const doc = useStore((s) => s.doc);
   const sheet = useStore(currentSheet);
   const result = useStore((s) => s.autoTakeoff);

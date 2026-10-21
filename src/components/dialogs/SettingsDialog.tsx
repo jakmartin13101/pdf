@@ -1,6 +1,7 @@
 // Settings & Preferences (Settings menu): personal preferences, the project's units, drawing and
 // editing behaviour, automatic takeoff line styles and the workspace.
 import { useEffect, useMemo, useState } from 'react';
+import { FEATURES, hasFeature, type Feature } from '../../core/license';
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Settings, Trash2, X } from 'lucide-react';
 import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolveBindings } from '../../core/keymap';
 import type { AutoStyleRule, CountSymbol, LengthUnit, LineStyle, ProjectSettings } from '../../types';
@@ -41,6 +42,20 @@ const LINE_STYLES: { id: LineStyle; label: string }[] = [
   { id: 'dashed', label: 'Dashed' },
   { id: 'dotted', label: 'Dotted' },
 ];
+
+/** On the settings of a Pro feature without Pro: they can be set up; the feature needs Pro. */
+function ProNote({ feature }: { feature: Feature }) {
+  const pro = useStore((s) => hasFeature(s.license, feature));
+  if (pro) return null;
+  return (
+    <div className="pro-note" data-testid="pro-note">
+      <b>PRO</b> {FEATURES[feature].name} is part of Takeoff Studio Pro.{' '}
+      <button className="linkish" onClick={() => getState().setDialog({ kind: 'license', feature })}>
+        Enter a license key…
+      </button>
+    </div>
+  );
+}
 
 function Check({ checked, onChange, children, testId }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; testId?: string }) {
   return (
@@ -1309,8 +1324,10 @@ export function SettingsDialog({ tab: initial }: { tab?: SettingsTab }) {
           {tab === 'lengths' && <MaxLengths />}
           {tab === 'subjects' && <Subjects />}
           {tab === 'details' && <DetailMarksSettings />}
+          {tab === 'combine' && <ProNote feature="combine" />}
           {tab === 'combine' && <CombineStock />}
           {tab === 'list' && <ListDefaults />}
+          {tab === 'auto' && <ProNote feature="autoTakeoff" />}
           {tab === 'auto' && <AutoTakeoff />}
           {tab === 'speed' && <Speed />}
           {tab === 'workspace' && <Workspace />}

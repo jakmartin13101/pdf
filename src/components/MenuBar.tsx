@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { TIER_NAMES, hasFeature, tierOf } from '../core/license';
 import { MenuList, type MenuItem } from './ContextMenu';
 import { getState, isDirty, listStyleOf, useStore, PANEL_IDS, PANEL_TITLES, type LayoutState, type PanelId } from '../store/store';
 import { dockMenuItems } from './dock/PanelHeader';
@@ -48,6 +49,8 @@ export function MenuBar() {
   const ui = useStore((s) => s.ui);
   const layout = useStore((s) => s.layout);
   const attachedCount = useStore((s) => s.panes.filter((p) => !p.detached).length);
+  const license = useStore((s) => s.license);
+  const pro = hasFeature(license, 'combine');
   const panes = useStore((s) => s.panes);
   const activePaneId = useStore((s) => s.activePaneId);
   const prefs = useStore((s) => s.prefs);
@@ -94,7 +97,7 @@ export function MenuBar() {
           { label: 'Markups List (CSV)', onClick: exportMarkupsCsv },
           { label: 'Takeoff Summary (CSV)', onClick: () => exportSummaryCsv() },
           { label: 'Takeoff Summary Report (Print / PDF)', onClick: () => printSummary() },
-          { label: 'Combine Report (Stock to Order)…', onClick: () => st().setDialog({ kind: 'combine' }) },
+          { label: `Combine Report (Stock to Order)…${pro ? '' : ' (Pro)'}`, onClick: () => st().setDialog({ kind: 'combine' }) },
         ],
       },
       { sep: true },
@@ -179,8 +182,8 @@ export function MenuBar() {
       { sep: true },
       { label: 'Manage Columns…', onClick: () => st().setDialog({ kind: 'columns' }) },
       { label: 'Standard Details…', onClick: () => st().setDialog({ kind: 'details' }) },
-      { label: 'Combine Report…', shortcut: sc('report.combine'), disabled: !loaded, onClick: () => st().setDialog({ kind: 'combine' }) },
-      { label: 'Automatic Takeoff (Beams & Tubing)…', disabled: !loaded, onClick: () => st().showPanel('autotakeoff') },
+      { label: `Combine Report…${pro ? '' : ' (Pro)'}`, shortcut: sc('report.combine'), disabled: !loaded, onClick: () => st().setDialog({ kind: 'combine' }) },
+      { label: `Automatic Takeoff (Beams & Tubing)…${pro ? '' : ' (Pro)'}`, disabled: !loaded, onClick: () => st().showPanel('autotakeoff') },
       { label: 'Tool Chest', onClick: () => st().showPanel('toolchest') },
       { label: 'New Steel Shape / Size Tool…', onClick: () => st().setDialog({ kind: 'shapeTool' }) },
     ],
@@ -238,6 +241,8 @@ export function MenuBar() {
       { label: 'Reset Workspace Layout', onClick: () => st().resetLayout() },
     ],
     Help: [
+      { label: 'License…', onClick: () => st().setDialog({ kind: 'license' }) },
+      { sep: true },
       { label: 'Keyboard Shortcuts', onClick: () => st().setDialog({ kind: 'shortcuts' }) },
       { label: 'Terms of Service', onClick: () => st().setDialog({ kind: 'terms' }) },
       { label: `About ${FULL_NAME}`, onClick: () => st().setDialog({ kind: 'about' }) },
@@ -272,6 +277,14 @@ export function MenuBar() {
         </div>
       ))}
       <div className="spacer" />
+      <button
+        className={`tier-pill ${tierOf(license)}`}
+        title={license.state === 'valid' ? `${PRODUCT_NAME} ${TIER_NAMES[license.info.tier]} – licensed to ${license.info.name}` : 'Unlicensed: Basic features. Click to enter a license key.'}
+        onClick={() => st().setDialog({ kind: 'license' })}
+        data-testid="license-badge"
+      >
+        {TIER_NAMES[tierOf(license)]}
+      </button>
       {loaded && (
         <>
           <span className="project-name" title={projectName}>

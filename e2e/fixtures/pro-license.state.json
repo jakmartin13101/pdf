@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:5199",
+      "localStorage": [
+        {
+          "name": "ts.license",
+          "value": "\"BSTS1.eyJ2IjoxLCJwcm9kdWN0IjoidGFrZW9mZi1zdHVkaW8iLCJ0aWVyIjoicHJvIiwibmFtZSI6IlRlc3QgRXN0aW1hdG9yIiwiY29tcGFueSI6IlRlc3QgU3RlZWwgQ28uIiwiaXNzdWVkIjoiMjAyNi0xMC0yMSIsImlkIjoid0M5WE4yaEUxZ0drIn0.etCudsDhk4ZjPeAvViBlMu5V3lqLrauH99hQqvaytvO6jTd-6UsNt6l9k8l1ts0jG6NCPgvBligwW3bUqt4new\""
+        }
+      ]
+    }
+  ]
+}

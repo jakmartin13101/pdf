@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.18.0 – 2026-10-21
+
+### License: Basic and Pro
+- Two tiers. **Pro** adds the **Combine Report** (with Create Report) and the **Automatic Takeoff**; **Basic** has
+  everything else. Without a license the program runs with the Basic features.
+- *Help → License…* and the tier badge on the menu bar: the license (tier, licensed to, issued, expiry), the two tiers
+  side by side, and the license key – pasted or loaded from a `.bslicense` file. *Remove License*.
+- License keys are signed and checked offline; edited, foreign and expired keys are refused (an expired license falls
+  back to Basic).
+- Pro features without Pro are marked PRO (menus, the Auto toolbar button, their Settings pages) and open the license
+  window; activating Pro there carries on to the feature.
+- `scripts/license.mjs` (`npm run license`) makes the signing key pair, issues and checks keys; the *Issue license*
+  GitHub workflow issues keys from the website using the `LICENSE_PRIVATE_KEY` secret.
+
 ## 1.17.0 – 2026-10-21
 
 ### Combine report: Create Report

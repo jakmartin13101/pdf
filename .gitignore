@@ -10,3 +10,7 @@ build/icons/
 release
 build/license.txt
 build/THIRD-PARTY-NOTICES.txt
+
+# License signing keys: never commit
+license/
+*.bslicense
