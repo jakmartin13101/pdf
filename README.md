@@ -94,6 +94,8 @@ For now the license lives in this program; later a BuildSuite program can supply
 
 ![The license window: Basic and Pro](docs/screenshot-license.png)
 
+![After the trial: the program waits for a license key](docs/screenshot-license-locked.png)
+
 ## How the requested workflow maps to the app
 
 | Workflow step | Where it lives |
