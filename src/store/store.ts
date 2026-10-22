@@ -11,6 +11,7 @@ import type {
   MarkupListStyle,
   MarkupStyle,
   MarkupType,
+  MarkupUnits,
   ProjectSettings,
   Pt,
   Rect,
@@ -30,13 +31,15 @@ import { defaultStyle } from '../core/markupTypes';
 import { uid } from '../core/ids';
 import { normName } from '../core/formula';
 import { bbox, translate } from '../core/geometry';
+import { pasteAnchor } from '../core/shapes';
 import { lsGet, lsSet } from '../core/persistence';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSize } from '../core/subjects';
 import { appendTo, leaf, setSizesAt, splitIn, syncTree, type PaneNode } from './paneTree';
 import { accessOf, hasFeature, verifyLicense, type Feature, type LicenseStatus } from '../core/license';
+import { thisComputer } from './computer';
 import { PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, upgradeLayout, type DockTarget } from './dockLayout';
 import { sizeText } from '../core/steelShapes';
-import { upgradeToolChest } from '../core/docUpgrade';
+import { addNewTools, upgradeToolChest } from '../core/docUpgrade';
 import { defaultMaxLengths, splitMarkupAtMax, type MaxLengthPrefs } from '../core/maxLength';
 import { defaultDetailMarkPrefs, defaultDetailStyles, type DetailMarkPrefs, type DetailShapeStyle } from '../core/detailMarks';
 import { defaultCombineSettings, type CombineSettings } from '../core/combine';
@@ -226,6 +229,10 @@ export interface Prefs {
   snapContent: boolean;
   snapMarkup: boolean;
   ortho: boolean;
+  /** Full-screen crosshairs at the pointer: never, with the drawing and measuring tools, or with every tool. */
+  crosshair: 'off' | 'draw' | 'always';
+  /** Move the view while drawing or dragging past (or up to) its edge. */
+  autoPan: boolean;
   wheelZoom: boolean;
   showLabels: boolean;
   /** Line style rules for automatic takeoff measurements, by subject (first match wins). */
@@ -287,9 +294,17 @@ export interface AutoOptions {
 
 export type SettingsTab = 'general' | 'units' | 'editing' | 'lengths' | 'keys' | 'subjects' | 'details' | 'combine' | 'list' | 'auto' | 'speed' | 'workspace';
 
-interface TypeDefault {
+/** What a tool without a Tool Chest tool draws with (set in the Properties panel while it is picked). */
+export interface TypeDefault {
   style: MarkupStyle;
   subject?: string;
+  label?: string;
+  /** Custom column values by column name, as Tool Chest tools keep them. */
+  custom?: Record<string, CustomValue>;
+  depth?: number;
+  width?: number;
+  units?: MarkupUnits;
+  layer?: string;
 }
 
 export interface Toast {
@@ -321,6 +336,8 @@ export interface AppState {
   flash: { id: string; nonce: number } | null;
   zoom: number;
   cursor: Pt | null;
+  /** The pane the pointer is over (where `cursor` is). */
+  cursorPaneId: string | null;
   editingTextId: string | null;
   list: ListState;
   ui: UIState;
@@ -374,7 +391,7 @@ export interface AppState {
   cycleTab: (dir: 1 | -1) => void;
   requestView: (r: Omit<ViewRequest, 'nonce'> & { kind: ViewRequest['kind'] }) => void;
   setZoom: (z: number) => void;
-  setCursor: (p: Pt | null) => void;
+  setCursor: (p: Pt | null, paneId?: string) => void;
 
   // tools & selection
   setTool: (t: ToolMode) => void;
@@ -386,6 +403,8 @@ export interface AppState {
   license: LicenseStatus;
   /** False while a saved license key is still being checked on start. */
   licenseChecked: boolean;
+  /** This computer's ID, for licenses tied to computers (null until known, just after the start). */
+  computerId: string | null;
   /** When this install's Basic trial started (ISO time; first start). */
   trialStarted: string;
   /** Now, as of the last minute: the trial runs out without anything else changing. */
@@ -423,10 +442,20 @@ export interface AppState {
   setCustomValue: (ids: string[], colId: string, value: CustomValue) => void;
   deleteMarkups: (ids: string[]) => void;
   copySelection: () => void;
-  paste: (at?: Pt) => void;
+  /**
+   * Paste the copied markups, their farthest-left (bottom-left) point at `at`; with no point given, at the
+   * pointer when it is over the active pane, else a little down and right of where they were copied from
+   * (`null`: always the latter).
+   */
+  paste: (at?: Pt | null) => void;
   duplicateSelection: () => void;
   addCutout: (id: string, pts: Pt[]) => void;
-  setTypeDefault: (type: MarkupType, d: TypeDefault) => void;
+  /** The defaults for a type's tool (null: back to the built-in ones). */
+  setTypeDefault: (type: MarkupType, d: TypeDefault | null) => void;
+  /** The markup the current tool draws next (no points yet): what the Properties panel shows before drawing. */
+  nextMarkup: () => Markup | null;
+  /** Change what the current tool draws: its Tool Chest tool, else the defaults for its type. */
+  editNextMarkup: (fn: (m: Markup) => Markup) => void;
 
   // columns / list
   addColumn: (c: Omit<CustomColumn, 'id'>) => string;
@@ -708,9 +737,14 @@ export function newDocState(prefs: Prefs): DocState {
 
 const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
 
+/** The id of the markup a tool draws next (shown in the Properties panel before drawing). */
+export const NEXT_MARKUP_ID = '__next';
+
 /** Where the license key is kept on this computer, and when the trial started. */
 const LICENSE_KEY = 'ts.license';
 const TRIAL_KEY = 'ts.trial';
+/** The built-in tools already added to a saved Tool Chest (see addNewTools). */
+const CHEST_ADDED_KEY = 'ts.chestAdded';
 
 const defaultPrefs = (): Prefs => ({
   author: 'Estimator',
@@ -718,6 +752,8 @@ const defaultPrefs = (): Prefs => ({
   snapContent: true,
   snapMarkup: true,
   ortho: false,
+  crosshair: 'off',
+  autoPan: true,
   wheelZoom: true,
   showLabels: true,
   autoStyles: defaultAutoStyles(),
@@ -771,8 +807,17 @@ const keepStyle = (d: DocState, cur: DocState): DocState => (d.listStyle === cur
 
 export const useStore = create<AppState>()((set, get, api) => {
   const savedChest = lsGet<ToolSet[] | null>('ts.toolchest', null);
-  // Saved before sizes were written with a capital X.
-  const toolChestFromStorage = savedChest ? upgradeToolChest(savedChest) : null;
+  // Saved before sizes were written with a capital X, and before the newer built-in tools.
+  const toolChestFromStorage = (() => {
+    if (!savedChest) return null;
+    const done = lsGet<string[]>(CHEST_ADDED_KEY, []);
+    const added = addNewTools(upgradeToolChest(savedChest), done);
+    if (added.done.length !== done.length) {
+      lsSet(CHEST_ADDED_KEY, added.done);
+      lsSet('ts.toolchest', added.sets);
+    }
+    return added.sets;
+  })();
 
   const commit = (fn: (d: DocState) => DocState) => {
     const { doc, past } = get();
@@ -799,15 +844,18 @@ export const useStore = create<AppState>()((set, get, api) => {
       tool.kind === 'markup' && tool.chestToolId ? toolChest.flatMap((s) => s.tools).find((t) => t.id === tool.chestToolId) : undefined;
     const td = typeDefaults[type];
     const custom: Record<string, CustomValue> = {};
-    if (chestTool) {
+    const own = chestTool ? chestTool.custom : td?.custom;
+    if (own) {
       const byName = new Map(doc.columns.map((c) => [normName(c.name), c.id]));
-      for (const [k, v] of Object.entries(chestTool.custom)) {
+      for (const [k, v] of Object.entries(own)) {
         const id = byName.get(normName(k));
         if (id) custom[id] = v;
       }
     }
     const layerIds = new Set(doc.layers.map((l) => l.id));
-    const layer = chestTool?.layer && layerIds.has(chestTool.layer) ? chestTool.layer : '';
+    const toolLayer = chestTool ? chestTool.layer : td?.layer;
+    const layer = toolLayer && layerIds.has(toolLayer) ? toolLayer : '';
+    const dims = chestTool ?? td;
     const now = Date.now();
     // Size tools stamp their current size on the markup (label, optionally subject and Member Size).
     const size = chestTool?.sizeTool?.value.trim() ?? '';
@@ -829,7 +877,7 @@ export const useStore = create<AppState>()((set, get, api) => {
       type,
       points,
       subject,
-      label: size || chestTool?.label || '',
+      label: size || (chestTool ? chestTool.label : td?.label) || '',
       comments: '',
       author: prefs.author,
       created: now,
@@ -841,9 +889,9 @@ export const useStore = create<AppState>()((set, get, api) => {
       custom,
       toolId: chestTool?.id,
       text: chestTool?.text ?? (type === 'stamp' ? 'APPROVED' : undefined),
-      depth: type === 'volume' ? chestTool?.depth ?? 4 : chestTool?.depth,
-      width: chestTool?.width,
-      units: chestTool?.units ? { ...chestTool.units } : undefined,
+      depth: type === 'volume' ? dims?.depth ?? 4 : dims?.depth,
+      width: dims?.width,
+      units: dims?.units ? { ...dims.units } : undefined,
       ...extra,
     };
     return m;
@@ -980,6 +1028,7 @@ export const useStore = create<AppState>()((set, get, api) => {
     flash: null,
     zoom: 1,
     cursor: null,
+    cursorPaneId: null,
     editingTextId: null,
     list: { ...defaultList, ...lsGet<Partial<ListState>>('ts.list', {}) },
     ui: { ...defaultUI, ...lsGet<Partial<UIState>>('ts.ui', {}) },
@@ -1128,9 +1177,15 @@ export const useStore = create<AppState>()((set, get, api) => {
     },
     requestView: (r) => set({ viewRequest: { ...(r as ViewRequest), paneId: get().activePaneId, nonce: Date.now() + Math.random() } }),
     setZoom: (zoom) => set({ zoom }),
-    setCursor: (cursor) => set({ cursor }),
+    setCursor: (cursor, paneId) => set({ cursor, cursorPaneId: cursor ? paneId ?? get().activePaneId : null }),
 
-    setTool: (tool) => set({ tool, editingTextId: null }),
+    setTool: (tool) => {
+      // Picking a drawing tool: the Properties panel shows what it draws, to change before drawing.
+      const picked = tool.kind === 'markup' && !tool.resumeId;
+      set({ tool, editingTextId: null, ...(picked ? { selection: [] } : {}) });
+      const { prefs, layout } = get();
+      if (picked && prefs.autoProperties && !isPanelOpen(layout, 'properties')) get().showPanel('properties');
+    },
     setSelection: (selection) => {
       set({ selection });
       // The Properties panel shows when markups are drawn or selected (Settings → General).
@@ -1152,6 +1207,7 @@ export const useStore = create<AppState>()((set, get, api) => {
     setDialog: (dialog) => set({ dialog: dialog?.kind === 'combine' && !get().hasFeature('combine') ? { kind: 'license', feature: 'combine' } : dialog }),
     license: { state: 'none' },
     licenseChecked: !lsGet<string>(LICENSE_KEY, ''),
+    computerId: null,
     trialStarted: (() => {
       const saved = lsGet<string | null>(TRIAL_KEY, null);
       if (saved) return saved;
@@ -1161,7 +1217,8 @@ export const useStore = create<AppState>()((set, get, api) => {
     })(),
     clock: Date.now(),
     activateLicense: async (key) => {
-      const status = await verifyLicense(key);
+      const computer = get().computerId ?? (await thisComputer());
+      const status = await verifyLicense(key, undefined, undefined, computer);
       if (status.state === 'valid') {
         lsSet(LICENSE_KEY, status.key);
         set({ license: status });
@@ -1279,11 +1336,12 @@ export const useStore = create<AppState>()((set, get, api) => {
       if (clipboard.length) get().toast(`Copied ${clipboard.length} markup${clipboard.length > 1 ? 's' : ''}`);
     },
     paste: (at) => {
-      const { currentSheetId, doc } = get();
+      const { currentSheetId, doc, cursor, cursorPaneId, activePaneId } = get();
       if (!clipboard.length || !currentSheetId) return;
-      const b = bbox(clipboard.flatMap((m) => m.points));
-      const dx = at ? at.x - b.x : 18;
-      const dy = at ? at.y - b.y : 18;
+      const to = at === undefined && cursor && cursorPaneId === activePaneId ? cursor : at;
+      const from = pasteAnchor(clipboard)!;
+      const dx = to ? to.x - from.x : 18;
+      const dy = to ? to.y - from.y : 18;
       const now = Date.now();
       // Pasted into another document: column values go to its columns of the same name, layers by id.
       const byName = new Map(doc.columns.map((c) => [normName(c.name), c.id]));
@@ -1316,17 +1374,46 @@ export const useStore = create<AppState>()((set, get, api) => {
       }));
       commit((d) => ({ ...d, markups: [...d.markups, ...copies] }));
       set({ selection: copies.map((c) => c.id) });
-      if (!at) clipboard = copies.map((m) => structuredClone(m));
+      if (!to) clipboard = copies.map((m) => structuredClone(m));
     },
     duplicateSelection: () => {
       get().copySelection();
-      get().paste();
+      get().paste(null);
     },
     addCutout: (id, pts) => mapMarkups(new Set([id]), (m) => ({ ...m, cutouts: [...(m.cutouts ?? []), pts] })),
     setTypeDefault: (type, d) => {
-      const typeDefaults = { ...get().typeDefaults, [type]: d };
+      const typeDefaults = { ...get().typeDefaults, [type]: d ?? undefined };
+      if (!d) delete typeDefaults[type];
       lsSet('ts.typeDefaults', typeDefaults);
       set({ typeDefaults });
+    },
+    nextMarkup: () => {
+      const { tool, currentSheetId } = get();
+      if (tool.kind !== 'markup' || tool.resumeId) return null;
+      return { ...buildMarkup(tool.type, currentSheetId ?? '', []), id: NEXT_MARKUP_ID, created: 0, modified: 0 };
+    },
+    editNextMarkup: (fn) => {
+      const { tool, toolChest, doc, typeDefaults } = get();
+      const before = get().nextMarkup();
+      if (!before || tool.kind !== 'markup') return;
+      const m = fn(before);
+      const chestTool = tool.chestToolId ? toolChest.flatMap((x) => x.tools).find((t) => t.id === tool.chestToolId) : undefined;
+      const td = typeDefaults[tool.type];
+      // Column values by column name, as tools keep them; the tool's values for columns not in this project stay.
+      const custom: Record<string, CustomValue> = { ...(chestTool ? chestTool.custom : td?.custom) };
+      for (const c of doc.columns) {
+        if (c.kind === 'formula') continue;
+        for (const k of Object.keys(custom)) if (normName(k) === normName(c.name)) delete custom[k];
+        const v = m.custom[c.id];
+        if (v !== undefined && v !== '') custom[c.name] = v;
+      }
+      const props = { subject: m.subject, style: m.style, depth: m.depth, width: m.width, units: m.units, layer: m.layer || undefined, custom };
+      if (!chestTool) return get().setTypeDefault(tool.type, { ...td, ...props, label: m.label || undefined });
+      const size = chestTool.sizeTool;
+      if (!size) return get().patchTool(chestTool.id, { ...props, label: m.label || undefined, text: m.text });
+      // A size tool: its Label is its size (and its Member Size comes from that).
+      if (size.setMemberSize) for (const k of Object.keys(custom)) if (normName(k) === 'membersize') delete custom[k];
+      get().patchTool(chestTool.id, { ...props, ...(m.label !== before.label && m.label.trim() ? { sizeTool: { ...size, value: m.label } } : {}) });
     },
 
     addColumn: (c) => {
@@ -1741,11 +1828,13 @@ export const useStore = create<AppState>()((set, get, api) => {
 
 export const getState = () => useStore.getState();
 
-// The saved license is checked once the program starts (the check is quick but not instant).
-{
+// The saved license is checked once the program starts (the check is quick but not instant), on this
+// computer: a license tied to other computers doesn't work here.
+void thisComputer().then(async (computerId) => {
+  useStore.setState({ computerId });
   const saved = lsGet<string>(LICENSE_KEY, '');
-  if (saved) void verifyLicense(saved).then((license) => useStore.setState({ license, licenseChecked: true }));
-}
+  if (saved) useStore.setState({ license: await verifyLicense(saved, undefined, undefined, computerId), licenseChecked: true });
+});
 
 /** What can be used now: the license's tier, else Basic during the trial, else nothing. */
 export function useAccess() {

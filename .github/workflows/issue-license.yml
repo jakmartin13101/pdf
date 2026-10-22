@@ -22,6 +22,12 @@ on:
       expires:
         description: Expires YYYY-MM-DD (blank – does not expire)
         required: false
+      computers:
+        description: Computer IDs it works on, comma-separated (Help → License… shows each one; blank – any computer)
+        required: false
+      seats:
+        description: Number of computers (blank – as many as listed)
+        required: false
 
 permissions:
   contents: read
@@ -42,15 +48,20 @@ jobs:
           COMPANY: ${{ inputs.company }}
           EMAIL: ${{ inputs.email }}
           EXPIRES: ${{ inputs.expires }}
+          COMPUTERS: ${{ inputs.computers }}
+          SEATS: ${{ inputs.seats }}
         run: |
           if [ -z "$LICENSE_PRIVATE_KEY" ]; then echo "::error::Add the LICENSE_PRIVATE_KEY repository secret first."; exit 1; fi
           set -- issue --tier "$TIER" --name "$NAME" --file takeoff-studio.bslicense
           [ -n "$COMPANY" ] && set -- "$@" --company "$COMPANY"
           [ -n "$EMAIL" ] && set -- "$@" --email "$EMAIL"
           [ -n "$EXPIRES" ] && set -- "$@" --expires "$EXPIRES"
+          [ -n "$COMPUTERS" ] && set -- "$@" --computers "$COMPUTERS"
+          [ -n "$SEATS" ] && set -- "$@" --seats "$SEATS"
           KEY=$(node scripts/license.mjs "$@")
           {
             echo "### Takeoff Studio ${TIER^} license for ${NAME}"
+            [ -n "$COMPUTERS" ] && echo && echo "For these computers only: ${COMPUTERS}"
             echo
             echo "Paste this key in Help → License… (or send the attached .bslicense file):"
             echo

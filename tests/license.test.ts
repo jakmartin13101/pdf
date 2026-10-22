@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FEATURES, LICENSE_PREFIX, TRIAL_DAYS, accessName, accessOf, hasFeature, licenseTier, readLicense, trialDaysLeft, verifyLicense, type LicenseInfo, type LicenseStatus } from '../src/core/license';
+import { FEATURES, LICENSE_PREFIX, TRIAL_DAYS, accessName, accessOf, cleanComputerId, computerIdText, hasFeature, isComputerId, licenseSeats, licenseTier, readLicense, trialDaysLeft, verifyLicense, type LicenseInfo, type LicenseStatus } from '../src/core/license';
 
 /** Access with a license and no trial left. */
 const licensed = (s: LicenseStatus) => accessOf(s, null);
@@ -99,5 +99,46 @@ describe('license keys', () => {
 
   it('Pro is the Combine Report and the Automatic Takeoff', () => {
     expect(Object.keys(FEATURES).sort()).toEqual(['autoTakeoff', 'combine']);
+  });
+});
+
+describe('licenses tied to computers', () => {
+  it('computer IDs: 16 letters and digits in fours, typed any way', () => {
+    const id = computerIdText(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 250]));
+    expect(id).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$/);
+    expect(isComputerId(id)).toBe(true);
+    expect(computerIdText(new Uint8Array(10).fill(255))).toBe('ZZZZ-ZZZZ-ZZZZ-ZZZZ');
+    expect(computerIdText(new Uint8Array(10))).toBe('0000-0000-0000-0000');
+    // Lower case, spaces, O for 0 and I or L for 1.
+    expect(cleanComputerId(' 7k3o mx9i-2ab4 5c6l ')).toBe('7K30-MX91-2AB4-5C61');
+    expect(isComputerId('7K30-MX91-2AB4-5C6U')).toBe(false);
+  });
+
+  it('works on the computers it lists and no others', async () => {
+    const { priv, pub } = await keyPair();
+    const here = 'AAAA-BBBB-CCCC-0001';
+    const key = await issue(priv, { seats: 2, computers: [here, 'AAAA-BBBB-CCCC-0002'] });
+    expect((await verifyLicense(key, [pub], new Date(), here)).state).toBe('valid');
+    expect((await verifyLicense(key, [pub], new Date(), 'aaaa bbbb cccc 0002')).state).toBe('valid');
+    const elsewhere = await verifyLicense(key, [pub], new Date(), 'ZZZZ-ZZZZ-ZZZZ-ZZZZ');
+    expect(elsewhere.state).toBe('invalid');
+    expect(elsewhere.state === 'invalid' && elsewhere.reason).toContain('This license is for 2 other computers. This computer’s ID is ZZZZ-ZZZZ-ZZZZ-ZZZZ');
+    expect(licensed(elsewhere).tier).toBeNull();
+    // Without knowing which computer this is, a tied license doesn't work.
+    expect((await verifyLicense(key, [pub])).state).toBe('invalid');
+    // Not tied: any computer.
+    expect((await verifyLicense(await issue(priv), [pub], new Date(), 'ZZZZ-ZZZZ-ZZZZ-ZZZZ')).state).toBe('valid');
+    // Adding a computer to the list makes the key not genuine (the list is signed).
+    const read = readLicense(key)!;
+    const changed = { ...read.info, computers: [...read.info.computers!, 'ZZZZ-ZZZZ-ZZZZ-ZZZZ'] };
+    const forged = `${LICENSE_PREFIX}.${b64url(new TextEncoder().encode(JSON.stringify(changed)))}.${key.split('.')[2]}`;
+    expect((await verifyLicense(forged, [pub], new Date(), 'ZZZZ-ZZZZ-ZZZZ-ZZZZ')).state).toBe('invalid');
+  });
+
+  it('how many computers a license is for', () => {
+    const base: LicenseInfo = { v: 1, product: 'takeoff-studio', tier: 'pro', name: 'x', issued: '2026-10-22', id: 'i' };
+    expect(licenseSeats(base)).toBeNull();
+    expect(licenseSeats({ ...base, computers: ['AAAA-BBBB-CCCC-0001'] })).toBe(1);
+    expect(licenseSeats({ ...base, seats: 3, computers: ['AAAA-BBBB-CCCC-0001'] })).toBe(3);
   });
 });

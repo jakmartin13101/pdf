@@ -294,6 +294,80 @@ ipcMain.handle('buildsuite:set-graphics', async (_event, mode) => {
   return true;
 });
 
+// ---------------------------------------------------------------------------
+// This computer's ID, for licenses tied to computers: the operating system's machine ID (Windows'
+// MachineGuid, the Mac's hardware UUID, Linux's machine-id) hashed with the product's name, so it stays the
+// same after a reinstall and means nothing anywhere else. Without one, a random ID kept with the app's data.
+
+const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+function idText(bytes) {
+  let out = '';
+  let value = 0;
+  let bits = 0;
+  for (const b of bytes) {
+    value = ((value << 8) | b) & 0x1fff;
+    bits += 8;
+    while (bits >= 5 && out.length < 16) {
+      out += B32[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  return out.match(/.{4}/g).join('-');
+}
+
+function osMachineId() {
+  const { execFileSync } = require('node:child_process');
+  try {
+    if (process.platform === 'win32') {
+      const out = execFileSync('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid', '/reg:64'], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+      return /MachineGuid\s+REG_SZ\s+(\S+)/i.exec(out)?.[1] ?? null;
+    }
+    if (process.platform === 'darwin') {
+      const out = execFileSync('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'], { encoding: 'utf8', timeout: 5000 });
+      return /"IOPlatformUUID"\s*=\s*"([^"]+)"/.exec(out)?.[1] ?? null;
+    }
+    for (const f of ['/etc/machine-id', '/var/lib/dbus/machine-id']) {
+      try {
+        const id = fs.readFileSync(f, 'utf8').trim();
+        if (id) return id;
+      } catch {
+        /* the next one */
+      }
+    }
+  } catch {
+    /* none: a kept random ID */
+  }
+  return null;
+}
+
+let computerId = null;
+function thisComputerId() {
+  if (computerId) return computerId;
+  const crypto = require('node:crypto');
+  const raw = osMachineId();
+  if (raw) computerId = idText(crypto.createHash('sha256').update(`takeoff-studio:${raw.toLowerCase()}`).digest());
+  else {
+    const file = path.join(app.getPath('userData'), 'computer-id.txt');
+    try {
+      computerId = fs.readFileSync(file, 'utf8').trim();
+    } catch {
+      /* made below */
+    }
+    if (!/^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$/.test(computerId ?? '')) {
+      computerId = idText(crypto.randomBytes(10));
+      try {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, computerId);
+      } catch {
+        /* kept for this run only */
+      }
+    }
+  }
+  return computerId;
+}
+
+ipcMain.handle('buildsuite:computer-id', async () => thisComputerId());
+
 ipcMain.handle('buildsuite:relaunch', async () => {
   app.relaunch();
   app.exit(0);

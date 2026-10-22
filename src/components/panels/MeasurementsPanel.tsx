@@ -15,6 +15,7 @@ import { areaText, computeMeasure, dimText, markupHeight, scaleForMarkup, takesD
 import { LENGTH_UNITS, SCALE_PRESETS, bareUnit, defaultPrecision, fmtNumber, formatLength, isMetric, parseLength, precisionOptions, scaleFromPreset, userUnits } from '../../core/units';
 import { sheetDisplayName } from '../../core/columns';
 import { sizeText } from '../../core/steelShapes';
+import { useNextMarkup } from '../useNextMarkup';
 
 function common<T>(items: Markup[], get: (m: Markup) => T): T | undefined {
   if (!items.length) return undefined;
@@ -110,16 +111,20 @@ function DimInput({
   );
 }
 
-/** Subject, Label, the dimensions and the units of the selected measurements. */
-function MeasurementProperties({ items }: { items: Markup[] }) {
+/**
+ * Subject, Label, the dimensions and the units of the selected measurements – or, `forTool`, of the next
+ * one the picked tool draws (changes kept in the tool).
+ */
+function MeasurementProperties({ items, forTool }: { items: Markup[]; forTool?: boolean }) {
   const doc = useStore((s) => s.doc);
   const st = getState();
   const ids = items.map((m) => m.id);
   const types = new Set(items.map((m) => m.type));
   const type = types.size === 1 ? items[0].type : null;
-  const set = (patch: Partial<Markup>) => st.updateMarkups(ids, (m) => ({ ...m, ...patch }));
+  const update = (fn: (m: Markup) => Markup) => (forTool ? st.editNextMarkup(fn) : st.updateMarkups(ids, fn));
+  const set = (patch: Partial<Markup>) => update((m) => ({ ...m, ...patch }));
   const setUnits = (patch: Partial<MarkupUnits>) =>
-    st.updateMarkups(ids, (m) => {
+    update((m) => {
       const u = { ...m.units, ...patch };
       for (const k of Object.keys(u) as (keyof MarkupUnits)[]) if (!u[k]) delete u[k];
       return { ...m, units: Object.keys(u).length ? u : undefined };
@@ -163,7 +168,7 @@ function MeasurementProperties({ items }: { items: Markup[] }) {
               items={items}
               value={depth}
               placeholder={`e.g. ${dimText({ units: dimUnit ? { dim: dimUnit } : undefined }, 0.5)}`}
-              onCommit={(d) => st.updateMarkups(ids, (m) => ({ ...m, depth: m.type === 'volume' ? d ?? 0 : d }))}
+              onCommit={(d) => update((m) => ({ ...m, depth: m.type === 'volume' ? d ?? 0 : d }))}
               testId="meas-depth"
             />
             <select
@@ -200,7 +205,8 @@ function MeasurementProperties({ items }: { items: Markup[] }) {
             bare="ft-in"
             onCommit={(h) => {
               if (!heightCol) return st.toast('This project has no Height column (Tools → Manage Columns)', 'error');
-              st.setCustomValue(ids, heightCol.id, h ?? '');
+              if (forTool) update((m) => ({ ...m, custom: { ...m.custom, [heightCol.id]: h ?? '' } }));
+              else st.setCustomValue(ids, heightCol.id, h ?? '');
             }}
             testId="meas-height"
           />
@@ -248,7 +254,7 @@ function MeasurementProperties({ items }: { items: Markup[] }) {
           </select>
         </div>
       )}
-      {one && v && scale && (
+      {one && v && scale && !forTool && (
         <div className="meas-result" data-testid="meas-result">
           {v.count != null && (
             <div>
@@ -462,12 +468,20 @@ export function MeasurementsPanel() {
   const markups = useStore((s) => s.doc.markups);
   const loaded = useStore((s) => s.loaded);
   useStore((s) => s.prefs.units); // dimensions are written in your units
-  const items = useMemo(() => {
+  const selected = useMemo(() => {
     const s = new Set(selection);
     return markups.filter((m) => s.has(m.id) && TYPE_INFO[m.type].measure);
   }, [selection, markups]);
+  // A measuring tool picked and nothing selected: the next measurement, to set up before drawing.
+  const next = useNextMarkup();
+  const forTool = !selection.length && !!next && TYPE_INFO[next.type].measure;
+  const items = useMemo(() => (forTool ? [next!] : selected), [forTool, next, selected]);
   const types = new Set(items.map((m) => m.type));
-  const title = types.size === 1 ? `${TYPE_INFO[items[0].type].label} Measurement Properties` : 'Measurement Properties';
+  const title = forTool
+    ? `Next ${TYPE_INFO[items[0].type].label} Measurement`
+    : types.size === 1
+      ? `${TYPE_INFO[items[0].type].label} Measurement Properties`
+      : 'Measurement Properties';
 
   return (
     <div className="panel" style={{ height: '100%' }}>
@@ -479,7 +493,7 @@ export function MeasurementsPanel() {
         </PropSection>
         <PropSection id="meas-props" title={title} hint={items.length > 1 ? `${items.length} selected` : undefined} defaultOpen>
           {items.length ? (
-            <MeasurementProperties items={items} />
+            <MeasurementProperties items={items} forTool={forTool} />
           ) : (
             <div className="hint meas-empty">{loaded ? 'Select a measurement to see its Subject, Label, dimensions and units.' : 'Open a drawing set to measure.'}</div>
           )}

@@ -234,6 +234,8 @@ export function runCommand(id: string) {
       return toggle('snapMarkup');
     case 'snap.ortho':
       return toggle('ortho');
+    case 'view.crosshair':
+      return cmdToggleCrosshair();
     case 'takeoff.addDetail':
       if (st.selection.length) st.setDialog({ kind: 'addDetail', markupIds: st.selection });
       else st.toast('Select one or more markups first', 'info');
@@ -257,6 +259,12 @@ export function runCommand(id: string) {
     const type = id.slice(5) as MarkupType;
     if (TYPE_INFO[type]) st.setTool({ kind: 'markup', type });
   }
+}
+
+/** Full-screen crosshairs on (with the drawing tools, unless set to show always) or off. */
+export function cmdToggleCrosshair() {
+  const st = getState();
+  st.setPrefs({ crosshair: st.prefs.crosshair === 'off' ? 'draw' : 'off' });
 }
 
 /** Page labels from a box: drag a box around the sheet number (and/or title) on the page. */

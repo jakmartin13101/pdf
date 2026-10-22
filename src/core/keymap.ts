@@ -82,6 +82,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'snap.content', label: 'Snap to Drawing (on/off)', group: 'Drawing', keys: [] },
   { id: 'snap.markup', label: 'Snap to Markups (on/off)', group: 'Drawing', keys: [] },
   { id: 'snap.ortho', label: 'Ortho (on/off)', group: 'Drawing', keys: [] },
+  { id: 'view.crosshair', label: 'Full-Screen Crosshairs (on/off)', group: 'Drawing', keys: [] },
 
   { id: 'takeoff.addDetail', label: 'Add Detail to Selection…', group: 'Takeoff', keys: [] },
   { id: 'takeoff.details', label: 'Standard Details…', group: 'Takeoff', keys: [] },

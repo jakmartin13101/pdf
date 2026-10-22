@@ -2,9 +2,9 @@
 // no license once the trial is over – in front of the whole program): what this copy is licensed for, the
 // two tiers, and where to enter a license key.
 import { useRef, useState } from 'react';
-import { Check, Clock, KeyRound, Lock, Minus, Upload } from 'lucide-react';
+import { Check, Clock, Copy, KeyRound, Lock, Minus, Monitor, Upload } from 'lucide-react';
 import { getState, useAccess, useStore } from '../../store/store';
-import { FEATURES, TIER_NAMES, TRIAL_DAYS, type Feature } from '../../core/license';
+import { FEATURES, TIER_NAMES, TRIAL_DAYS, licenseSeats, type Feature } from '../../core/license';
 import { PRODUCT_NAME } from '../../brand';
 import { Modal } from './Modal';
 
@@ -21,6 +21,7 @@ const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
 
 export function LicenseDialog({ feature, locked }: { feature?: Feature; locked?: boolean }) {
   const license = useStore((s) => s.license);
+  const computerId = useStore((s) => s.computerId);
   const access = useAccess();
   const [key, setKey] = useState('');
   const [error, setError] = useState('');
@@ -102,11 +103,17 @@ export function LicenseDialog({ feature, locked }: { feature?: Feature; locked?:
               </b>
               <div className="hint">
                 {info.email ? `${info.email} · ` : ''}Issued {info.issued} · {info.expires ? `Expires ${info.expires}` : 'Does not expire'}
+                {licenseSeats(info) ? ` · For ${licenseSeats(info)} computer${licenseSeats(info) === 1 ? '' : 's'}` : ''}
               </div>
             </>
           ) : (
             <>
               {info && license.state === 'expired' && <b className="warn-text">The license for {info.name} expired on {info.expires}. </b>}
+              {license.state === 'invalid' && (
+                <div className="warn-text" data-testid="license-saved-error">
+                  The saved license doesn’t work here: {license.reason}
+                </div>
+              )}
               {access.trial ? (
                 <>
                   <b data-testid="license-trial">
@@ -198,7 +205,27 @@ export function LicenseDialog({ feature, locked }: { feature?: Feature; locked?:
           }}
         />
       </div>
-      <div className="hint">The license is kept on this computer and checked without going online.</div>
+      <div className="license-computer">
+        <Monitor size={14} />
+        <span>This computer’s ID</span>
+        <code data-testid="license-computer-id">{computerId ?? '…'}</code>
+        <button
+          className="icon-btn"
+          title="Copy the computer ID (to send for a license tied to this computer)"
+          disabled={!computerId}
+          onClick={() => {
+            if (!computerId) return;
+            void navigator.clipboard?.writeText(computerId).catch(() => undefined);
+            st.toast('Computer ID copied', 'success');
+          }}
+          data-testid="license-computer-copy"
+        >
+          <Copy size={13} />
+        </button>
+      </div>
+      <div className="hint">
+        The license is kept on this computer and checked without going online. A license for a number of computers lists their IDs and works on those only.
+      </div>
     </Modal>
   );
 }

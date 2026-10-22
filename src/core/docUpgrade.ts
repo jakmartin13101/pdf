@@ -3,7 +3,7 @@
 import type { CustomColumn, DocState, ToolSet } from '../types';
 import { normName } from './formula';
 import { sizeText } from './steelShapes';
-import { OLD_WEIGHT_FORMULA, WEIGHT_FORMULA, defaultColumns } from './defaults';
+import { OLD_WEIGHT_FORMULA, WEIGHT_FORMULA, bentPlateTool, defaultColumns } from './defaults';
 
 const isSizeColumn = (name: string) => ['membersize', 'size'].includes(normName(name));
 
@@ -76,4 +76,18 @@ export function upgradeToolChest(sets: ToolSet[]): ToolSet[] {
       };
     }),
   }));
+}
+
+/**
+ * Tools added to the built-in Tool Chest since a saved one was made, each added once (`done` keeps the
+ * ones already offered, so a tool deleted afterwards stays deleted).
+ */
+export function addNewTools(sets: ToolSet[], done: string[]): { sets: ToolSet[]; done: string[] } {
+  if (done.includes('bent-plate')) return { sets, done };
+  const has = sets.some((s) => s.tools.some((t) => t.sizeTool?.family === 'BP'));
+  const at = Math.max(0, sets.findIndex((s) => s.name === 'Misc Metals'));
+  return {
+    sets: has || !sets.length ? sets : sets.map((s, i) => (i === at ? { ...s, tools: [...s.tools, bentPlateTool()] } : s)),
+    done: [...done, 'bent-plate'],
+  };
 }

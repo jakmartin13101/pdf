@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, Crosshair, ListChecks, Lock, PackagePlus, Pin, Play, Scissors, SlidersHorizontal } from 'lucide-react';
-import type { CountSymbol, CustomColumn, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
+import { ChevronDown, ChevronRight, Crosshair, ListChecks, Lock, PackagePlus, Pin, Play, RotateCcw, Scissors, SlidersHorizontal, Wrench } from 'lucide-react';
+import type { CountSymbol, CustomColumn, CustomValue, FontFamily, LineEnd, LineStyle, Markup, MarkupStatus, MarkupStyle } from '../../types';
 import { STATUSES } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { buildRows, customColId, lengthValue, type Row } from '../../core/columns';
@@ -16,6 +16,7 @@ import { COMMON_SHAPES, sizeText } from '../../core/steelShapes';
 import { normName } from '../../core/formula';
 import { lsGet, lsSet } from '../../core/persistence';
 import { PanelHeader } from '../dock/PanelHeader';
+import { useNextMarkup } from '../useNextMarkup';
 
 /** Columns holding a steel designation get shape suggestions (and feed PLF()/PSF()). */
 const isShapeColumn = (name: string) => /member\s*size|shape|section/i.test(name);
@@ -33,11 +34,17 @@ export function PropertiesPanel() {
   const selection = useStore((s) => s.selection);
   const doc = useStore((s) => s.doc);
   const hidden = useStore((s) => s.prefs.propHidden);
+  const tool = useStore((s) => s.tool);
+  const toolChest = useStore((s) => s.toolChest);
   const [choosing, setChoosing] = useState(false);
-  const items = useMemo(() => {
+  const selected = useMemo(() => {
     const s = new Set(selection);
     return doc.markups.filter((m) => s.has(m.id));
   }, [selection, doc.markups]);
+  // A drawing tool picked and nothing selected: what it draws next, to change before drawing.
+  const next = useNextMarkup();
+  const forTool = !selected.length && !!next;
+  const items = useMemo(() => (forTool ? [next!] : selected), [forTool, next, selected]);
   const units = useStore((s) => s.prefs.units);
   const rows = useMemo(() => buildRows(doc, items), [doc, items, units]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -58,8 +65,17 @@ export function PropertiesPanel() {
   const row = one ? rows[0] : null;
   const types = new Set(items.map((m) => m.type));
   const allMeasure = items.every((m) => TYPE_INFO[m.type].measure);
-  const setStyle = <K extends keyof MarkupStyle>(k: K, v: MarkupStyle[K]) => st.updateMarkups(ids, (m) => ({ ...m, style: { ...m.style, [k]: v } }));
-  const set = (patch: Partial<Markup>) => st.updateMarkups(ids, (m) => ({ ...m, ...patch }));
+  // Changes go to the selected markups, or to the tool (its Tool Chest tool, else its type's defaults).
+  const update = (fn: (m: Markup) => Markup) => (forTool ? st.editNextMarkup(fn) : st.updateMarkups(ids, fn));
+  const setCustom = (colId: string, v: CustomValue) => {
+    if (!forTool) return st.setCustomValue(ids, colId, v);
+    const col = doc.columns.find((c) => c.id === colId);
+    const value = typeof v === 'string' && col && ['membersize', 'size'].includes(normName(col.name)) ? sizeText(v) : v;
+    update((m) => ({ ...m, custom: { ...m.custom, [colId]: value } }));
+  };
+  const setStyle = <K extends keyof MarkupStyle>(k: K, v: MarkupStyle[K]) => update((m) => ({ ...m, style: { ...m.style, [k]: v } }));
+  const set = (patch: Partial<Markup>) => update((m) => ({ ...m, ...patch }));
+  const chestTool = forTool && tool.kind === 'markup' && tool.chestToolId ? toolChest.flatMap((x) => x.tools).find((t) => t.id === tool.chestToolId) : undefined;
   const style = (k: keyof MarkupStyle) => common(items, (m) => m.style[k]);
   const Icon = one ? TYPE_ICON[one.type] : null;
   const sheet = one ? doc.sheets.find((s) => s.id === one.sheetId) : undefined;
@@ -92,9 +108,9 @@ export function PropertiesPanel() {
           value={val === undefined ? '' : v == null ? String(val) : fmtLen(v)}
           placeholder={val === undefined ? '(multiple)' : `e.g. ${fmtLen(42)}`}
           onCommit={(t) => {
-            if (!t.trim()) return st.setCustomValue(ids, c.id, '');
+            if (!t.trim()) return setCustom(c.id, '');
             const n = parseLength(t, bareUnit());
-            if (n != null && n >= 0) st.setCustomValue(ids, c.id, n);
+            if (n != null && n >= 0) setCustom(c.id, n);
             else st.toast(`“${t}” is not a length`, 'error');
           }}
           data-testid={`prop-col-${c.id}`}
@@ -105,7 +121,7 @@ export function PropertiesPanel() {
       <ChoiceInput
         value={val === undefined ? undefined : String(val)}
         options={c.kind === 'choice' ? c.options ?? [] : COMMON_SHAPES}
-        onCommit={(v) => st.setCustomValue(ids, c.id, v)}
+        onCommit={(v) => setCustom(c.id, v)}
         testId={`prop-col-${c.id}`}
       />
     ) : (
@@ -115,10 +131,10 @@ export function PropertiesPanel() {
         inputMode={c.kind === 'number' ? 'decimal' : undefined}
         onCommit={(v) => {
           if (c.kind === 'number') {
-            if (v.trim() === '') st.setCustomValue(ids, c.id, '');
-            else if (isFinite(Number(v))) st.setCustomValue(ids, c.id, Number(v));
+            if (v.trim() === '') setCustom(c.id, '');
+            else if (isFinite(Number(v))) setCustom(c.id, Number(v));
             else st.toast(`${c.name} must be a number`, 'error');
-          } else st.setCustomValue(ids, c.id, v);
+          } else setCustom(c.id, v);
         }}
         data-testid={`prop-col-${c.id}`}
       />
@@ -198,6 +214,8 @@ export function PropertiesPanel() {
       ),
     },
   ];
+  // A tool keeps its layer, not a comment, status or author of its own.
+  if (forTool) builtins.splice(0, builtins.length, ...builtins.filter((b) => b.key === 'layer'));
   const otherFields = [
     ...builtins.filter((b) => b.show),
     ...doc.columns.filter((c) => !mainCols.has(c.id)).map((c) => ({ key: `c:${c.id}`, name: c.name, show: true, node: () => customField(c) })),
@@ -397,7 +415,15 @@ export function PropertiesPanel() {
     return { label: types.size === 1 && types.has('count') ? 'Count' : 'Total', text: parts.join(' · ') || '—' };
   })();
 
-  const header = (
+  const header = forTool ? (
+    <PanelHeader icon={<Wrench size={14} />} title={chestTool ? `Tool: ${chestTool.name}` : `${TYPE_INFO[one!.type].label} Tool`}>
+      {!chestTool && st.typeDefaults[one!.type] && (
+        <button className="icon-btn" title="Back to the built-in properties for this tool" onClick={() => st.setTypeDefault(one!.type, null)} data-testid="tool-props-reset">
+          <RotateCcw size={14} />
+        </button>
+      )}
+    </PanelHeader>
+  ) : (
     <PanelHeader icon={Icon ? <Icon size={14} /> : undefined} title={one ? `${TYPE_INFO[one.type].listName}` : `${items.length} markups selected`}>
       {one && (
         <button className="icon-btn" title="Zoom to markup" onClick={() => st.focusMarkup(one.id)}>
@@ -424,6 +450,12 @@ export function PropertiesPanel() {
     </PanelHeader>
   );
 
+  const toolNote = forTool && (
+    <div className="tool-props-note" data-testid="tool-props">
+      <b>Next {TYPE_INFO[one!.type].label.toLowerCase()}</b> – change anything before drawing. {chestTool ? `Kept in the Tool Chest tool “${chestTool.name}”.` : 'Kept as this tool’s defaults.'}
+    </div>
+  );
+
   if (allMeasure) {
     // Measurements and counts: the main fields, then Style, Properties and the rest folded away.
     const toggleField = (key: string, show: boolean) => st.setPrefs({ propHidden: show ? hidden.filter((k) => k !== key) : [...hidden, key] });
@@ -432,15 +464,18 @@ export function PropertiesPanel() {
         {header}
         <div className="panel-body">
           <div className="form" data-testid="properties">
+            {toolNote}
             <div className="prop-main" data-testid="prop-main">
               {subjectField}
               {labelField}
-              <div className="field">
-                <label>{quantity.label}</label>
-                <span className="readout big-ish" data-testid="prop-measurement">
-                  {quantity.text}
-                </span>
-              </div>
+              {!forTool && (
+                <div className="field">
+                  <label>{quantity.label}</label>
+                  <span className="readout big-ish" data-testid="prop-measurement">
+                    {quantity.text}
+                  </span>
+                </div>
+              )}
               {heightCol && (
                 <div className="field">
                   <label>{heightCol.name}</label>
@@ -455,12 +490,14 @@ export function PropertiesPanel() {
               )}
             </div>
 
-            <PropSection id="style" title="Style" hint="Line, text and colours">
+            <PropSection key={forTool ? 'tool-style' : 'style'} id={forTool ? 'tool-style' : 'style'} title="Style" hint="Line, text and colours" defaultOpen={forTool}>
               {appearance}
             </PropSection>
 
             <PropSection
-              id="properties"
+              key={forTool ? 'tool-properties' : 'properties'}
+              id={forTool ? 'tool-properties' : 'properties'}
+              defaultOpen={forTool}
               title="Properties"
               hint={`${otherFields.filter((f) => !hiddenSet.has(f.key)).length} of ${otherFields.length} fields`}
               extra={
@@ -502,15 +539,19 @@ export function PropertiesPanel() {
               )}
             </PropSection>
 
-            <PropSection id="measurement" title="Measurement" hint="Scale, ends, count">
-              {measurementDetails}
-              {items.every((m) => m.type === 'length' && m.points.length === 2) && <AdjustEnds items={items} />}
-              {items.length > 1 && <SelectionTotals rows={rows} />}
-            </PropSection>
+            {!forTool && (
+              <PropSection id="measurement" title="Measurement" hint="Scale, ends, count">
+                {measurementDetails}
+                {items.every((m) => m.type === 'length' && m.points.length === 2) && <AdjustEnds items={items} />}
+                {items.length > 1 && <SelectionTotals rows={rows} />}
+              </PropSection>
+            )}
 
-            <PropSection id="details" title="Standard Details" hint="Material added">
-              <DetailSection items={items} rows={rows} />
-            </PropSection>
+            {!forTool && (
+              <PropSection id="details" title="Standard Details" hint="Material added">
+                <DetailSection items={items} rows={rows} />
+              </PropSection>
+            )}
           </div>
         </div>
       </div>
@@ -522,19 +563,20 @@ export function PropertiesPanel() {
       {header}
       <div className="panel-body">
         <div className="form" data-testid="properties">
-          <DetailSection items={items} rows={rows} />
+          {toolNote}
+          {!forTool && <DetailSection items={items} rows={rows} />}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <h4>General</h4>
             {subjectField}
             {labelField}
-            {(types.has('text') || types.has('callout')) && one && (
+            {(types.has('text') || types.has('callout')) && one && !forTool && (
               <div className="field">
                 <label>Text</label>
                 <CommitInput multiline value={one.text ?? ''} onCommit={(v) => set({ text: v })} />
               </div>
             )}
-            {types.has('stamp') && one && (
+            {types.has('stamp') && one && (!forTool || chestTool) && (
               <div className="field">
                 <label>Stamp</label>
                 <select value={STAMP_TEXTS.includes(one.text ?? '') ? one.text : '__custom'} onChange={(e) => e.target.value !== '__custom' && set({ text: e.target.value })}>
@@ -545,7 +587,7 @@ export function PropertiesPanel() {
                 </select>
               </div>
             )}
-            {types.has('stamp') && one && (
+            {types.has('stamp') && one && (!forTool || chestTool) && (
               <div className="field">
                 <label>Stamp text</label>
                 <CommitInput value={one.text ?? ''} onCommit={(v) => set({ text: v })} />

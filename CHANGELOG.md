@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.21.0 – 2026-10-22
+
+### Drawing
+- **A picked tool shows what it draws.** Picking a measuring or markup tool (toolbar, Measurements panel, Tool Chest)
+  opens Properties on the **next markup** – Subject, Label, Height, Finish, Style, every column and the layer, its
+  sections open – and the Measurements panel on the next measurement (Depth, Width, Height, units). Change anything
+  before drawing: a Tool Chest tool keeps the changes, other tools keep them as their defaults (↺ goes back to the
+  built-in ones). Drawn, Properties shows the new markup as before.
+- **Paste at the pointer**: `Ctrl+V` puts the copied markups down with their farthest-left point – a box's bottom-left
+  corner – at the mouse (right-click *Paste* at the point clicked). With the pointer off the drawing, and for
+  *Duplicate*, the copy lands just below and right as before.
+- **Full-screen crosshairs**: lines across the whole view through the pointer (its snapped point while drawing).
+  *Settings → Full-Screen Crosshairs*, or *Settings → Drawing & Editing*: off, while drawing and measuring, or always.
+  A key can be set for it in *Settings → Keyboard*.
+- **The view moves at its edge while drawing**: pulling a length (or a polylength, area, box, a markup being moved or
+  an end being dragged) to the edge of the view, or past it while holding the button, scrolls the drawing along.
+  Switch it off in *Settings → Drawing & Editing* or the Settings menu.
+
+### Bent plate as a length
+- A **Bent Plate** size tool in the Tool Chest (*Misc Metals*): a length measurement where you type the bent plate
+  size in its box (`BP3X3X1/4`, `BP6X4X3/8`…); each run weighs length × lb/ft. Added once to Tool Chests from
+  before. The plain Length tool works too: give it subject BP and the size as its label before drawing.
+
+### Licenses tied to computers
+- Every computer has a **computer ID** (`XXXX-XXXX-XXXX-XXXX`), shown with a copy button in *Help → License…*. The
+  desktop app takes it from Windows (the same after reinstalling); a browser makes one up and keeps it.
+- A license can list the computers it works on: it is refused on any other (“This license is for another computer.
+  This computer’s ID is …”), on activation and at every start. The number of computers is set when the license is
+  issued: `npm run license -- issue … --computers ID1,ID2 [--seats N]`, or the *Computer IDs* and *Number of
+  computers* boxes of the *Issue license* workflow. Licenses without a list still work on any computer.
+
 ## 1.20.0 – 2026-10-21
 
 ### Plate and bent plate weights

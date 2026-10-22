@@ -21,10 +21,11 @@ const addendumPdf = join(root, 'public', 'samples', 'Sample-S1.02-Addendum-2.pdf
  * A short-lived Pro license for the Pro checks, when the signing key is here (license/ on a developer's
  * computer, the LICENSE_PRIVATE_KEY secret in CI); released builds trust no other key.
  */
-function proLicense() {
+function proLicense(computers) {
   if (!process.env.LICENSE_PRIVATE_KEY && !existsSync(join(root, 'license', 'private-key.jwk.json'))) return null;
   const tomorrow = new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10);
-  return execFileSync(process.execPath, [join(root, 'scripts', 'license.mjs'), 'issue', '--tier', 'pro', '--name', 'Desktop smoke test', '--expires', tomorrow], { encoding: 'utf8' }).trim();
+  const args = ['issue', '--tier', 'pro', '--name', 'Desktop smoke test', '--expires', tomorrow, ...(computers ? ['--computers', computers] : [])];
+  return execFileSync(process.execPath, [join(root, 'scripts', 'license.mjs'), ...args], { encoding: 'utf8' }).trim();
 }
 
 /** A well-formed Pro license signed by a key nobody trusts: the program must refuse it. */
@@ -96,12 +97,26 @@ async function launch(extraArgs = []) {
     .then(() => true)
     .catch(() => false);
   check(refused, 'a forged license key is refused');
-  const pro = proLicense();
+  // This computer's ID comes from the operating system (the same on every start).
+  await win.getByTestId('license-computer-id').filter({ hasText: /-/ }).waitFor({ timeout: 5000 }).catch(() => undefined);
+  const computer = (await win.getByTestId('license-computer-id').textContent())?.trim() ?? '';
+  check(/^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$/.test(computer), `this computer has a computer ID (${computer})`);
+  const pro = proLicense(computer);
   if (pro) {
+    // A license for another computer doesn't work here; one for this computer does.
+    await win.getByTestId('license-key').fill(proLicense('ZZZZ-ZZZZ-ZZZZ-ZZZZ'));
+    await win.getByTestId('license-activate').click();
+    const elsewhere = await win
+      .getByTestId('license-error')
+      .filter({ hasText: 'another computer' })
+      .waitFor({ timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    check(elsewhere, 'a license for another computer is refused');
     await win.getByTestId('license-key').fill(pro);
     await win.getByTestId('license-activate').click();
     await win.getByTestId('license-name').waitFor({ timeout: 10000 }).catch(() => undefined);
-    check((await win.getByTestId('license-badge').textContent()) === 'Pro', 'a Pro license key activates Pro');
+    check((await win.getByTestId('license-badge').textContent()) === 'Pro', 'a Pro license for this computer activates Pro');
   } else console.log('SKIP  Pro checks: no license signing key (license/private-key.jwk.json or LICENSE_PRIVATE_KEY)');
   await win.keyboard.press('Escape');
 

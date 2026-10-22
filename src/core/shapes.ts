@@ -133,3 +133,28 @@ export function wrapText(text: string, maxWidth: number, measure: (s: string) =>
 export function stampFontSize(text: string, r: Rect): number {
   return Math.max(4, Math.min(r.h * 0.5, (r.w * 0.86) / Math.max(1, text.length * 0.72)));
 }
+
+/** The corners and points a markup is drawn through (a box's four corners, not the two it is stored as). */
+export function outlinePoints(m: Pick<Markup, 'type' | 'points'>): Pt[] {
+  const corners = (r: Rect): Pt[] => [
+    { x: r.x, y: r.y },
+    { x: r.x + r.w, y: r.y },
+    { x: r.x + r.w, y: r.y + r.h },
+    { x: r.x, y: r.y + r.h },
+  ];
+  if (RECT_TYPES.has(m.type)) return corners(markupRect(m));
+  if (m.type === 'callout' && m.points.length >= 3) return [m.points[0], ...corners(calloutBox(m))];
+  return m.points;
+}
+
+/**
+ * Where markups are picked up when pasted: their farthest-left point, the lowest of those when several are
+ * as far left (a box's bottom-left corner). Page y runs down, so the lowest has the greatest y.
+ */
+export function pasteAnchor(markups: Pick<Markup, 'type' | 'points'>[]): Pt | null {
+  const pts = markups.flatMap(outlinePoints);
+  if (!pts.length) return null;
+  const left = Math.min(...pts.map((p) => p.x));
+  const tol = 0.5;
+  return pts.filter((p) => p.x - left <= tol).reduce((a, b) => (b.y > a.y ? b : a));
+}

@@ -647,7 +647,7 @@ export function Viewer({ paneId }: { paneId: string }) {
     setMouse({ x: e.clientX - rectEl.left, y: e.clientY - rectEl.top });
     const raw = toPage(e.clientX, e.clientY);
     const st = getState();
-    st.setCursor(raw);
+    st.setCursor(raw, paneId);
     const d = dragRef.current;
 
     if (d?.kind === 'pan') {
@@ -865,6 +865,69 @@ export function Viewer({ paneId }: { paneId: string }) {
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [onWheel]);
+
+  // ---- moving the view while drawing or dragging past its edge
+  // The pointer's last position, kept by the window (it can be outside the pane), and the newest move
+  // handler, which the panning calls again so the measurement being drawn follows the pointer.
+  const lastPtr = useRef<{ clientX: number; clientY: number; shiftKey: boolean; target: EventTarget | null } | null>(null);
+  const moveRef = useRef(onPointerMove);
+  moveRef.current = onPointerMove;
+  const edgePan = useRef<{ raf: number; since: number } | null>(null);
+
+  useEffect(() => {
+    const EDGE = 18; // px inside the pane's edge where panning starts
+    const OUT = 48; // without a button held: how far outside the edge it still pans
+    const DELAY = 220; // ms at the edge before it starts
+    /** Drawing or dragging something that the view should follow. */
+    const busy = () => {
+      const d = dragRef.current;
+      if (d) return d.kind !== 'pan' && d.kind !== 'overlay' && (d.kind !== 'move' || d.began) && (d.kind !== 'handle' || d.began);
+      return !!draftRef.current;
+    };
+    /** How fast to move the view along one axis: + toward the start (left/top), − toward the end. */
+    const speed = (pos: number, lo: number, hi: number, held: boolean) => {
+      const toLo = pos - lo;
+      const toHi = hi - pos;
+      const depth = toLo < EDGE ? EDGE - toLo : toHi < EDGE ? -(EDGE - toHi) : 0;
+      if (!depth || (!held && Math.abs(depth) > EDGE + OUT)) return 0;
+      return Math.sign(depth) * Math.min(32, 3 + Math.abs(depth) * 0.45);
+    };
+    const step = () => {
+      const run = edgePan.current;
+      const p = lastPtr.current;
+      const el = containerRef.current;
+      if (!run || !p || !el || !getState().prefs.autoPan || !busy()) {
+        edgePan.current = null;
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const held = !!dragRef.current;
+      const vx = speed(p.clientX, r.left, r.right, held);
+      const vy = speed(p.clientY, r.top, r.bottom, held);
+      if (!vx && !vy) {
+        edgePan.current = null;
+        return;
+      }
+      if (performance.now() - run.since >= DELAY) {
+        const v = viewRef.current;
+        setView({ ...v, x: v.x + vx, y: v.y + vy });
+        moveRef.current(p as unknown as React.PointerEvent);
+      }
+      run.raf = win.requestAnimationFrame(step);
+    };
+    const onMove = (e: PointerEvent) => {
+      lastPtr.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, target: e.target };
+      if (edgePan.current || !getState().prefs.autoPan || !busy()) return;
+      edgePan.current = { raf: 0, since: performance.now() };
+      step();
+    };
+    win.addEventListener('pointermove', onMove);
+    return () => {
+      win.removeEventListener('pointermove', onMove);
+      if (edgePan.current) win.cancelAnimationFrame(edgePan.current.raf);
+      edgePan.current = null;
+    };
+  }, [win, setView]);
 
   // ---- context menu
   const onContextMenu = (e: React.MouseEvent) => {
@@ -1118,6 +1181,15 @@ export function Viewer({ paneId }: { paneId: string }) {
 
   const scaleAtCursor = hover ? scaleAt(sheet, hover.pt) : null;
 
+  // Full-screen crosshairs through the pointer (its snapped point while drawing).
+  const drawingTool = tool.kind !== 'select' && tool.kind !== 'pan' && tool.kind !== 'moveOverlay';
+  const crosshair =
+    mouse && (prefs.crosshair === 'always' || (prefs.crosshair === 'draw' && drawingTool)) && tool.kind !== 'pan'
+      ? hover && drawingTool && !rectPreview && !freehand
+        ? { x: view.x + hover.pt.x * z, y: view.y + hover.pt.y * z }
+        : mouse
+      : null;
+
   // Overlay compare: while aligning by points only the sheet being clicked is shown.
   const pick = tool.kind === 'alignPoints' && tool.sheetId === sheet.id ? (tool.ptsA.length < tool.count ? 'A' : 'B') : null;
   const overlay =
@@ -1232,6 +1304,12 @@ export function Viewer({ paneId }: { paneId: string }) {
         </svg>
         {editing && isActive && <TextEditor m={editing} zoom={z} />}
       </div>
+      {crosshair && (
+        <div className="crosshair" aria-hidden data-testid="crosshair">
+          <div className="ch-h" style={{ top: crosshair.y }} />
+          <div className="ch-v" style={{ left: crosshair.x }} />
+        </div>
+      )}
       {mouse && draftLabel && (
         <div className="live-measure" style={{ left: mouse.x + 18, top: mouse.y + 14 }}>
           {draftLabel}

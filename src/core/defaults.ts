@@ -101,6 +101,14 @@ const steel = (size: string, extra: Record<string, string | number> = {}) => ({
   ...extra,
 });
 
+/** Bent plate measured as a length: type its size (legs × thickness) in its box in the Tool Chest. */
+export function bentPlateTool(): ChestTool {
+  return {
+    ...tool('Bent Plate', 'length', '#c2410c', steel('BP3X3X1/4', { Grade: 'A36', Category: 'Misc Metals' }), { subject: 'BP', lineWidth: 2.5, fontBold: true }),
+    sizeTool: { family: 'BP', value: 'BP3X3X1/4', setSubject: true, setMemberSize: true },
+  };
+}
+
 export function defaultToolChest(): ToolSet[] {
   return [
     {
@@ -145,6 +153,7 @@ export function defaultToolChest(): ToolSet[] {
         tool('Stair', 'count', '#264653', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { symbol: 'star', symbolSize: 12 }),
         tool('Ladder', 'count', '#2a9d8f', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { symbol: 'triangle', symbolSize: 10 }),
         tool('Lintel', 'length', '#bc4749', steel('L6X4X3/8', { Category: 'Misc Metals' }), { lineWidth: 2.5 }),
+        bentPlateTool(),
       ],
     },
     {

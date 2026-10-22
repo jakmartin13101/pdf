@@ -26,6 +26,8 @@ export interface DesktopBridge {
   graphics?(): Promise<{ mode: GpuMode; saved: GpuMode; status: Record<string, string>; gpu: { vendorId: number; deviceId: number; driver: string } | null }>;
   setGraphics?(mode: GpuMode): Promise<boolean>;
   relaunch?(): Promise<void>;
+  /** This computer's ID for licenses tied to computers (from the operating system's machine ID). */
+  computerId?(): Promise<string>;
 }
 
 export type GpuMode = 'auto' | 'off' | 'force';

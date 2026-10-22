@@ -7,10 +7,10 @@ takeoff**, built for the way estimators work through a drawing set. Drop in a PD
 sheets, calibrate scales, measure and count with standardized Tool Chest tools, and work with every quantity in an
 editable, filterable markup database that stays linked to the drawing. Part of the **BuildSuite** family of programs.
 
-> **Version 1.20.0**: **bent plate weights** – `BP3X3X1/4` weighs 5.10 lb/ft (12" × legs added together × thickness),
-> and plate and bent plate weigh from the Member Size or just the label (1.19.0: 7-day Basic trial, then a Basic or Pro
-> license; 1.18.0: licensing – Pro adds the Combine Report and the Automatic Takeoff) – see the
-> [changelog](CHANGELOG.md).
+> **Version 1.21.0**: a picked tool shows **what it draws in Properties**, to change before drawing; **paste at the
+> pointer** (by the farthest-left / bottom-left point); **full-screen crosshairs**; the view **moves at its edge**
+> while drawing; a **Bent Plate** length tool; **licenses tied to computers** (1.20.0: bent plate weights; 1.19.0:
+> 7-day Basic trial) – see the [changelog](CHANGELOG.md).
 
 ![Takeoff on the roof framing plan](docs/screenshot-takeoff.png)
 
@@ -93,6 +93,14 @@ key off the computer (back to the trial if it hasn't ended). An expired license 
 License keys are signed by BuildSuite: a key that has been edited, is for another program or has expired is refused.
 For now the license lives in this program; later a BuildSuite program can supply it instead (`src/core/license.ts`).
 
+**Licenses tied to computers.** Each computer has a **computer ID** (`XXXX-XXXX-XXXX-XXXX`), shown in the License
+window with a copy button – the desktop app takes it from Windows, so it stays the same after reinstalling. A license
+can list the computer IDs it is for: it then works on those computers only and is refused on any other, when entered
+and at every start. You set how many computers a license is for when you issue it (see
+[Issuing license keys](#issuing-license-keys)); a license without a list works on any computer.
+
+![A license for two computers](docs/screenshot-license-computers.png)
+
 ![The license window: Basic and Pro](docs/screenshot-license.png)
 
 ![After the trial: the program waits for a license key](docs/screenshot-license-locked.png)
@@ -148,6 +156,14 @@ reads. Files from earlier versions are brought up to date when they open (W24x55
 Chest. Weights (PLF/PSF) read sizes either way.
 
 ### Properties panel
+
+**Before drawing:** picking a tool – on the toolbar, in the Measurements panel or the Tool Chest – shows the **next
+markup** it draws in Properties: Subject, Label, Height, Finish, **Style** and **Properties** (every column and the
+layer) open, ready to change. A Tool Chest tool keeps what you change (*Kept in the Tool Chest tool “W12X26”*); the
+plain tools keep it as their defaults, and ↺ in the panel's header puts back the built-in ones. The Measurements panel
+shows the next measurement the same way (Depth, Width, Height, units). Once drawn, Properties shows the new markup.
+
+![Properties of the W12X26 tool before drawing](docs/screenshot-tool-properties.png)
 
 For **measurements and counts** the Properties panel opens on its own when you draw a markup or select one (switch
 this off in *Settings → General*) and shows only the main fields:
@@ -664,8 +680,9 @@ length × width × thickness × 0.2836 lb/in³ (steel, 490 lb/ft³) for a 12" le
 | `BP4X6X4X3/8` – more bends: every leg | 4" + 6" + 4" = 14" | 3/8" | 17.86 |
 | `PL1/2X7` – plate, thickness then width | 7" | 1/2" | 11.91 |
 
-* Take bent plate off as **lengths** (subject **BP**; a *BP3X3X1/4* tool is in the Tool Chest), or a size tool with
-  the **BP – Bent plate** family. Its weight is the length × lb/ft.
+* Take bent plate off as **lengths** (subject **BP**): the **Bent Plate** size tool in the Tool Chest (*Misc Metals* –
+  type the size in its box: `BP3X3X1/4`, `BP6X4X3/8`…), the *BP3X3X1/4* tool, or the plain Length tool with subject BP
+  and the size as its label (set them before drawing, in Properties). Its weight is the length × lb/ft.
 * Plates (subject **PL**) as **lengths** with a width (`PL1/2X7`), as **counts** with a **Height** – the length of
   each piece (3 × PL1/2X7 at 1'-2" = 3'-6" × 11.91 lb/ft) – or as **areas** of a plate thickness (`PL1/2`, lb/ft²).
 * The size can be in the Member Size or just the label (`bp 3*3*1/4` is written `BP 3X3X1/4`); either weighs.
@@ -692,6 +709,17 @@ Report units (LF/in/m, SF/SY/m², CY/CF/m³) and decimals are set in the **Measu
 | `Ctrl+,` | Settings & Preferences |
 
 These are the defaults: every command's keys can be changed in *Settings → Keyboard*.
+
+**Paste** puts the copied markups down with their farthest-left point – a box's bottom-left corner – at the mouse
+(*Paste* on the right-click menu: at the point clicked); with the pointer off the drawing, and for *Duplicate*, the
+copy lands just below and right of the original.
+
+**Full-screen crosshairs** – lines across the whole view through the pointer – are in the *Settings* menu and
+*Settings → Drawing & Editing* (off, while drawing and measuring, or always). **The view moves at its edge**: drawing or
+dragging to the edge of the view (or past it with the button held) scrolls the drawing along; switch it off in the
+same places.
+
+![Full-screen crosshairs while measuring](docs/screenshot-crosshairs.png)
 
 Status-bar toggles: **CONTENT** (snap to PDF geometry), **MARKUP** (snap to markup vertices), **ORTHO**, **REUSE** (keep the
 tool active), **LABELS** (measurement labels on the drawing).
@@ -781,8 +809,13 @@ expiry), made with a private signing key and checked by the program with the pub
   *Actions → Issue license → Run workflow*: choose the tier and fill in who it's for (and an expiry date if any). The
   run's summary shows the key, and the `.bslicense` file is attached to the run.
 * **On a computer** with Node: `npm run license -- issue --tier pro --name "Jane Smith" --company "Smith Steel"
-  [--email …] [--expires 2027-12-31] [--file jane.bslicense]` with the key in `license/private-key.jwk.json` (or
-  `--key <file>`, or the `LICENSE_PRIVATE_KEY` variable). `npm run license -- verify <key>` checks one.
+  [--email …] [--expires 2027-12-31] [--computers ID,ID…] [--seats N] [--file jane.bslicense]` with the key in
+  `license/private-key.jwk.json` (or `--key <file>`, or the `LICENSE_PRIVATE_KEY` variable). `npm run license --
+  verify <key>` checks one.
+* **Computers**: the customer sends the computer ID from *Help → License…* on each computer; `--computers` lists them
+  (the workflow's *Computer IDs* box, comma-separated) and the license works on those only. `--seats` (*Number of
+  computers*) is how many computers the license is for – at most that many IDs can be listed, by default as many as
+  are given. To move a license to another computer, issue it again with the new list.
 * **A new signing key**: `npm run license -- keygen` writes a new pair to `license/` (ignored by git); put its public key in
   `src/core/licenseKeys.ts` (keep the old one listed for as long as keys signed with it should keep working) and
   update the secret.
@@ -827,3 +860,5 @@ GitHub release when a `v*` tag is pushed.
   connected by a leader line, or one *TYP.* label meant for several members, give one member each; scans have no line
   work or text to read.
 * Single user; there is no real-time collaboration.
+* Licenses are checked offline. A license tied to computers needs their IDs when it is issued (no online activation
+  yet); in a browser the computer ID belongs to the browser and changes if its site data is cleared.

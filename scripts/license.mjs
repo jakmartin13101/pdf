@@ -4,12 +4,17 @@
 //   node scripts/license.mjs keygen [--out license]           a new key pair: the private key stays in --out
 //                                                            (never commit it); the public key is printed
 //   node scripts/license.mjs issue --tier pro|basic --name "Customer" [--company "…"] [--email "…"]
-//                                  [--expires YYYY-MM-DD] [--key license/private-key.jwk.json] [--file out.bslicense]
+//                                  [--expires YYYY-MM-DD] [--computers ID,ID…] [--seats N]
+//                                  [--key license/private-key.jwk.json] [--file out.bslicense]
 //   node scripts/license.mjs verify <license key> [--public public.jwk.json]
 //
 // The private key is read from --key, else the LICENSE_PRIVATE_KEY environment variable (the JWK as JSON,
 // e.g. a GitHub Actions secret), else license/private-key.jwk.json. Keys are ECDSA P-256 signatures over
 // the license details, checked offline by the program with the public key in src/core/licenseKeys.ts.
+//
+// Computers: --computers lists the computer IDs (Help → License… shows each computer's) the license works
+// on; it works on no others. --seats is how many computers it is for (the most --computers may list; by
+// default as many as are listed). Without --computers it works on any computer.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -21,6 +26,13 @@ const PRODUCT = 'takeoff-studio';
 const ALG = { name: 'ECDSA', namedCurve: 'P-256' };
 const SIGN = { name: 'ECDSA', hash: 'SHA-256' };
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** Computer IDs written the standard way (see cleanComputerId in src/core/license.ts). */
+const COMPUTER_ID = /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/;
+const cleanComputerId = (id) => {
+  const t = id.toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+  return t.length === 16 ? t.match(/.{4}/g).join('-') : t;
+};
 
 const b64url = (bytes) => Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const fromB64url = (s) => new Uint8Array(Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64'));
@@ -71,6 +83,13 @@ async function issue(o) {
   const name = (o.name ?? '').trim();
   if (!name || name === 'true') fail('--name "Licensed to"');
   if (o.expires && !/^\d{4}-\d{2}-\d{2}$/.test(o.expires)) fail('--expires YYYY-MM-DD');
+  const computers = o.computers && o.computers !== 'true' ? o.computers.split(/[,;\n]+/).filter(Boolean).map(cleanComputerId) : [];
+  const bad = computers.find((c) => !COMPUTER_ID.test(c));
+  if (bad) fail(`"${bad}" is not a computer ID (16 letters and digits, XXXX-XXXX-XXXX-XXXX: Help → License… shows it)`);
+  if (new Set(computers).size !== computers.length) fail('--computers lists a computer twice');
+  const seats = o.seats && o.seats !== 'true' ? Number(o.seats) : computers.length || undefined;
+  if (seats !== undefined && !(Number.isInteger(seats) && seats >= 1)) fail('--seats: a whole number of computers, 1 or more');
+  if (seats !== undefined && computers.length > seats) fail(`--computers lists ${computers.length} computers, more than --seats ${seats}`);
   const info = {
     v: 1,
     product: PRODUCT,
@@ -81,6 +100,8 @@ async function issue(o) {
     issued: new Date().toISOString().slice(0, 10),
     ...(o.expires ? { expires: o.expires } : {}),
     id: b64url(crypto.getRandomValues(new Uint8Array(9))),
+    ...(seats !== undefined ? { seats } : {}),
+    ...(computers.length ? { computers } : {}),
   };
   const key = await crypto.subtle.importKey('jwk', privateKeyJwk(o), ALG, false, ['sign']);
   const payload = new TextEncoder().encode(JSON.stringify(info));

@@ -5,7 +5,7 @@ import { getState, isDirty, listStyleOf, useStore, PANEL_IDS, PANEL_TITLES, type
 import { dockMenuItems } from './dock/PanelHeader';
 import { useShortcuts } from './useShortcuts';
 import { FULL_NAME, ICON_URL, PRODUCT_NAME, SUITE_NAME } from '../brand';
-import { cmdCloseAll, cmdCloseDocument, cmdLabelsFromBox, cmdSplitAtMax, cmdOpenExample, cmdOpenPdf, cmdOpenSample, cmdSave, cmdSaveAll, cmdSaveAs, exportPdf, view } from '../store/commands';
+import { cmdCloseAll, cmdCloseDocument, cmdLabelsFromBox, cmdSplitAtMax, cmdToggleCrosshair, cmdOpenExample, cmdOpenPdf, cmdOpenSample, cmdSave, cmdSaveAll, cmdSaveAs, exportPdf, view } from '../store/commands';
 import { tabMenuItems } from './dock/Panes';
 import { csvBlob, markupsCsv, openReport, summaryCsv, summaryReportHtml } from '../core/export';
 import { buildTakeoffRows } from '../core/details';
@@ -200,6 +200,8 @@ export function MenuBar() {
       { label: 'Snap to Drawing', checked: prefs.snapContent, onClick: () => st().setPrefs({ snapContent: !prefs.snapContent }) },
       { label: 'Snap to Markups', checked: prefs.snapMarkup, onClick: () => st().setPrefs({ snapMarkup: !prefs.snapMarkup }) },
       { label: 'Ortho', checked: prefs.ortho, onClick: () => st().setPrefs({ ortho: !prefs.ortho }) },
+      { label: 'Full-Screen Crosshairs', shortcut: sc('view.crosshair'), checked: prefs.crosshair !== 'off', onClick: () => cmdToggleCrosshair() },
+      { label: 'Move View at Edge While Drawing', checked: prefs.autoPan, onClick: () => st().setPrefs({ autoPan: !prefs.autoPan }) },
       { label: 'Keep Tool Active (Reuse)', checked: prefs.reuse, onClick: () => st().setPrefs({ reuse: !prefs.reuse }) },
       { label: 'Measurement Labels on Drawing', checked: prefs.showLabels, onClick: () => st().setPrefs({ showLabels: !prefs.showLabels }) },
       { label: 'Standard Detail Material on Drawing', checked: prefs.detailMarks.show, onClick: () => st().setPrefs({ detailMarks: { ...prefs.detailMarks, show: !prefs.detailMarks.show } }) },

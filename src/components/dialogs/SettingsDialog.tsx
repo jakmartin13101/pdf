@@ -7,7 +7,7 @@ import { COMMANDS, COMMAND_BY_ID, chordFromEvent, chordLabel, conflicts, resolve
 import type { AutoStyleRule, CountSymbol, LengthUnit, LineStyle, ProjectSettings } from '../../types';
 import { COUNT_SYMBOLS, OTHER_SHAPES, defaultDetailStyles, lookStyle, newDetailStyle, type DetailShapeStyle } from '../../core/detailMarks';
 import { dashArray, symbolPath } from '../../core/shapes';
-import { defaultListStyle, getState, useStore, type PerfPrefs, type SettingsTab, featureOn } from '../../store/store';
+import { defaultListStyle, getState, useStore, type PerfPrefs, type Prefs, type SettingsTab, featureOn } from '../../store/store';
 import { cmdConvertSubjects, cmdExportListStyle, cmdImportListStyle, cmdSaveDefaultListStyle } from '../../store/commands';
 import { DEFAULT_SUBJECTS, cleanSubjects, findSubject } from '../../core/subjects';
 import { defaultCombineSettings, type CombineSettings } from '../../core/combine';
@@ -223,6 +223,19 @@ function Editing() {
       </Check>
       <Check checked={prefs.ortho} onChange={(v) => st.setPrefs({ ortho: v })}>
         Ortho: draw at 0° / 45° / 90°
+      </Check>
+
+      <h4 className="set-h">Cursor and view</h4>
+      <div className="field">
+        <label>Full-screen crosshairs</label>
+        <select value={prefs.crosshair} onChange={(e) => st.setPrefs({ crosshair: e.target.value as Prefs['crosshair'] })} data-testid="set-crosshair">
+          <option value="off">Off</option>
+          <option value="draw">While drawing and measuring</option>
+          <option value="always">Always</option>
+        </select>
+      </div>
+      <Check checked={prefs.autoPan} onChange={(v) => st.setPrefs({ autoPan: v })} testId="set-autopan">
+        Move the view when drawing or dragging past its edge
       </Check>
 
       <h4 className="set-h">Fine adjustment</h4>

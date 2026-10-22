@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { openSample } from './helpers';
-import { BASIC_LICENSE, EXPIRED_PRO_LICENSE, PRO_LICENSE } from './licenses';
+import { BASIC_LICENSE, EXPIRED_PRO_LICENSE, OTHER_COMPUTER_LICENSE, PRO_LICENSE, TWO_COMPUTER_LICENSE } from './licenses';
 
 // Start without a license (the other tests run with Pro).
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -103,5 +103,29 @@ test.describe('after the trial', () => {
     await expect(page.getByTestId('license-badge')).toHaveText('Basic');
     await openSample(page);
     await expect(page.getByTestId('sheet-thumb')).toHaveCount(7);
+  });
+});
+
+test.describe('a license tied to computers', () => {
+  // This browser is computer TEST-0000-0000-0001.
+  test.use({ storageState: { cookies: [], origins: [{ origin: 'http://localhost:5199', localStorage: [{ name: 'ts.computerId', value: JSON.stringify('TEST-0000-0000-0001') }] }] } });
+
+  test('works on the computers it lists and no others', async ({ page }) => {
+    await openSample(page);
+    await page.getByTestId('license-badge').click();
+    await expect(page.getByTestId('license-computer-id')).toHaveText('TEST-0000-0000-0001');
+    await page.getByTestId('license-key').fill(OTHER_COMPUTER_LICENSE);
+    await page.getByTestId('license-activate').click();
+    await expect(page.getByTestId('license-error')).toContainText('This license is for another computer. This computer’s ID is TEST-0000-0000-0001');
+    await expect(page.getByTestId('license-badge')).toHaveText('Trial · 7d');
+    await page.getByTestId('license-key').fill(TWO_COMPUTER_LICENSE);
+    await page.getByTestId('license-activate').click();
+    await expect(page.getByTestId('license-name')).toHaveText('Licensed to Two Seat Estimator, Test Steel Co.');
+    await expect(page.getByTestId('license-status')).toContainText('For 2 computers');
+    await expect(page.getByTestId('license-badge')).toHaveText('Pro');
+    await page.screenshot({ path: 'test-results/license-computers.png' });
+    // Checked again on every start, on this computer.
+    await page.reload();
+    await expect(page.getByTestId('license-badge')).toHaveText('Pro');
   });
 });
