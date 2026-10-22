@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildRows } from '../src/core/columns';
 import { OLD_WEIGHT_FORMULA, WEIGHT_FORMULA, defaultColumns, defaultLayers } from '../src/core/defaults';
-import { upgradeToolChest, withAddedColumns } from '../src/core/docUpgrade';
+import { upgradeToolLibrary, withAddedColumns } from '../src/core/docUpgrade';
 import { evaluate } from '../src/core/formula';
 import { defaultStyle } from '../src/core/markupTypes';
 import { plf, psf } from '../src/core/steelShapes';
@@ -95,7 +95,7 @@ describe('bent plate and plate weights', () => {
     });
   });
 
-  it('older documents and tool chests are brought up to date', () => {
+  it('older documents and tool libraries are brought up to date', () => {
     const old = defaultColumns().map((c) => (c.id === 'weight' ? { ...c, formula: OLD_WEIGHT_FORMULA } : c));
     expect(withAddedColumns(old).find((c) => c.id === 'weight')?.formula).toBe(WEIGHT_FORMULA);
     // A formula of the user's own is left alone.
@@ -103,6 +103,6 @@ describe('bent plate and plate weights', () => {
     expect(withAddedColumns(own).find((c) => c.id === 'weight')?.formula).toBe('Length * 2');
     // BP is bent plate: the base plate tool takes PL.
     const sets: ToolSet[] = [{ id: 's', name: 'S', tools: [{ id: 't', name: 'Base Plate', type: 'count', subject: 'BP', style: defaultStyle('count'), custom: {} }] }];
-    expect(upgradeToolChest(sets)[0].tools[0].subject).toBe('PL');
+    expect(upgradeToolLibrary(sets)[0].tools[0].subject).toBe('PL');
   });
 });

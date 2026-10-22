@@ -11,13 +11,13 @@ async function units(page: Page, unit: string, shot?: string) {
 
 test('lengths in your units: Height is a length, typed lengths are rewritten (0-28 → 2\'-4")', async ({ page }) => {
   await openSample(page);
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
 
   // A 23'-0" W24X55.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0) + 9, gy(1));
   await clickAt(page, gx(1) - 9, gy(1));
   await page.keyboard.press('Escape');

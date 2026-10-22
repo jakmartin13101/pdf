@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ChestTool, CountSymbol, FontFamily, LineEnd, LineStyle, MarkupType } from '../../types';
+import type { LibraryTool, CountSymbol, FontFamily, LineEnd, LineStyle, MarkupType } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
 import { defaultStyle, MEASURE_TYPES, TYPE_INFO } from '../../core/markupTypes';
@@ -8,7 +8,7 @@ import { ColorField, TextColorField } from '../fields';
 import { ToolSwatch } from '../icons';
 import { uid } from '../../core/ids';
 import { subjectForSize } from '../../core/subjects';
-import { BeamIcon } from '../panels/ToolChestPanel';
+import { BeamIcon } from '../panels/ToolLibraryPanel';
 
 const GRADE_BY_FAMILY: Record<string, string> = { W: 'A992', WT: 'A992', HP: 'A572 Gr. 50', HSS: 'A500 Gr. C', Pipe: 'A53 Gr. B' };
 const FONTS: { id: FontFamily; label: string }[] = [
@@ -18,11 +18,11 @@ const FONTS: { id: FontFamily; label: string }[] = [
 ];
 
 /**
- * Create or edit a "size tool": a Tool Chest tool whose label (e.g. W18X35) is typed in the chest and
+ * Create or edit a "size tool": a Tool Library tool whose label (e.g. W18X35) is typed in the library and
  * stays with the tool. Works for any measurement type, not just steel.
  */
 export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: string }) {
-  const sets = useStore((s) => s.toolChest);
+  const sets = useStore((s) => s.toolLibrary);
   const layers = useStore((s) => s.doc.layers);
   const st = getState();
   const existing = toolId ? sets.flatMap((s) => s.tools).find((t) => t.id === toolId) : undefined;
@@ -32,7 +32,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
     return i < 0 ? SHAPE_FAMILIES.length - 1 : i;
   });
   const family = SHAPE_FAMILIES[familyIdx];
-  const [tool, setTool] = useState<ChestTool>(() =>
+  const [tool, setTool] = useState<LibraryTool>(() =>
     existing
       ? structuredClone(existing)
       : {
@@ -49,8 +49,8 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
   const [targetSet, setTargetSet] = useState(sets.some((s) => s.id === setId) ? setId! : existing ? sets.find((s) => s.tools.some((t) => t.id === existing.id))?.id ?? '' : sets[0]?.id ?? '');
   const cfg = tool.sizeTool!;
   const s = tool.style;
-  const setStyle = (patch: Partial<ChestTool['style']>) => setTool({ ...tool, style: { ...s, ...patch } });
-  const setCfg = (patch: Partial<NonNullable<ChestTool['sizeTool']>>) => setTool({ ...tool, sizeTool: { ...cfg, ...patch } });
+  const setStyle = (patch: Partial<LibraryTool['style']>) => setTool({ ...tool, style: { ...s, ...patch } });
+  const setCfg = (patch: Partial<NonNullable<LibraryTool['sizeTool']>>) => setTool({ ...tool, sizeTool: { ...cfg, ...patch } });
   const close = () => st.setDialog(null);
   const size = normalizeSize(cfg.family, cfg.value);
   const weight = plf(size) || psf(size);
@@ -86,7 +86,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
   const save = () => {
     const id = targetSet || st.addToolSet('My Tools');
     st.upsertTool(id, { ...tool, name: tool.name.trim() || 'Size Tool', subject: shape, sizeTool: { ...cfg, value: size } });
-    st.toast(`${existing ? 'Updated' : 'Added'} size tool “${tool.name}”. Type a size in its box in the Tool Chest.`, 'success');
+    st.toast(`${existing ? 'Updated' : 'Added'} size tool “${tool.name}”. Type a size in its box in the Tool Library.`, 'success');
     close();
   };
 
@@ -115,7 +115,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
       }
     >
       <div className="hint">
-        A size tool keeps the size you type in the Tool Chest (for example <b>W18X35</b>) and labels every markup you place with it until you type a different size. Set the
+        A size tool keeps the size you type in the Tool Library (for example <b>W18X35</b>) and labels every markup you place with it until you type a different size. Set the
         colour, line and font once here.
       </div>
       <div className="two-col">
@@ -219,7 +219,7 @@ export function ShapeToolDialog({ setId, toolId }: { setId?: string; toolId?: st
               </div>
             </>
           )}
-          {(tool.type === 'length' || tool.type === 'polylength') && (
+          {(tool.type === 'length' || tool.type === 'pathlength') && (
             <div className="field">
               <label>Line ends</label>
               <div className="field-row">

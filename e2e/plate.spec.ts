@@ -3,13 +3,13 @@ import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample } from 
 
 test('bent plate and plate weigh by the foot in the Weight column', async ({ page }) => {
   await openSample(page);
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
 
   // 23'-0" of BP3X3X1/4 at 5.10 lb/ft = 117 lb.
-  await page.getByTestId('chest-tool').filter({ hasText: 'BP3X3X1/4' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'BP3X3X1/4' }).first().click();
   await clickAt(page, gx(0) + 9, gy(1));
   await clickAt(page, gx(1) - 9, gy(1));
   await page.keyboard.press('Escape');

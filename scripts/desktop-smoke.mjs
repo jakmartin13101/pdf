@@ -187,6 +187,18 @@ async function launch(extraArgs = []) {
   await win.locator('.menu-btn', { hasText: /^Settings$/ }).click();
   await win.locator('.dropdown .menu-item', { hasText: 'Auto Takeoff Line Styles' }).click();
   check((await win.getByTestId('style-rule').count()) === 6, 'Settings menu opens settings with the auto takeoff line styles');
+  // Text and icon size: the window itself zooms (not the page's styles), and back to normal.
+  const dpr0 = await win.evaluate(() => window.devicePixelRatio);
+  const zoomedTo = (k) =>
+    win
+      .waitForFunction(([d, f]) => Math.abs(window.devicePixelRatio - d * f) < 0.02, [dpr0, k], { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+  await win.getByTestId('set-tab-general').click();
+  await win.getByTestId('set-ui-scale').selectOption('1.25');
+  check((await zoomedTo(1.25)) && (await win.evaluate(() => document.documentElement.style.zoom)) === '', 'text and icon size zooms the desktop window to 125%');
+  await win.getByTestId('set-ui-scale-reset').click();
+  check(await zoomedTo(1), 'and back to 100%');
   await win.getByTestId('settings-done').click();
 
   // Split the view and detach a pane into its own desktop window.

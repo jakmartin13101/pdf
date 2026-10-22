@@ -4,7 +4,7 @@
 //   IF [Subject] = Handrail    →  ADD Post  HSS1-1/2X1-1/2X1/8  × 3'-6"  @ 4'-0" OC
 //
 // Each matching markup gets one read-only material row per item. Material rows flow through the
-// same columns as markups (so formula columns such as Weight compute for them), the Markups List,
+// same columns as markups (so formula columns such as Weight compute for them), the Takeoff List,
 // the Takeoff Summary and the exports.
 
 import type { DetailCondition, DetailItem, DetailOp, DocState, Markup, StandardDetail } from '../types';
@@ -163,13 +163,13 @@ export function itemQuantity(item: DetailItem, r: Row, qtyCol: string | null): I
   if (item.rule === 'spacing') {
     const sp = parseDetailLength(item.value);
     if (!sp) return { pieces: 0, pieceLength: typed, totalLength: 0, basis: '@ ? OC', warning: 'Enter a spacing' };
-    if (!run) return { pieces: 0, pieceLength: typed, totalLength: 0, basis: `@ ${ftIn(sp)} OC`, warning: 'Spacing needs a length, polylength, perimeter or area markup' };
+    if (!run) return { pieces: 0, pieceLength: typed, totalLength: 0, basis: `@ ${ftIn(sp)} OC`, warning: 'Spacing needs a length, path length, perimeter or area markup' };
     const pieces = (Math.ceil(run / sp - 1e-6) + (item.addEnd ? 1 : 0)) * mult;
     return { pieces, pieceLength: typed, totalLength: pieces * typed, basis: `@ ${ftIn(sp)} OC` };
   }
   if (item.rule === 'full') {
     const runs = item.value.trim() === '' ? 1 : toNum(item.value);
-    if (!run) return { pieces: 0, pieceLength: 0, totalLength: 0, basis: 'full length', warning: 'Full length needs a length, polylength, perimeter or area markup' };
+    if (!run) return { pieces: 0, pieceLength: 0, totalLength: 0, basis: 'full length', warning: 'Full length needs a length, path length, perimeter or area markup' };
     const pieces = runs * mult;
     return { pieces, pieceLength: run, totalLength: pieces * run, basis: runs === 1 ? 'full length' : `full length × ${fmtCount(runs)}` };
   }
@@ -349,7 +349,7 @@ export function exampleDetails(doc: DocState): StandardDetail[] {
       name: 'Footing dowels',
       conditions: [
         { column: catCol, op: 'eq', value: 'Concrete' },
-        { column: 'type', op: 'eq', value: TYPE_INFO.polylength.listName },
+        { column: 'type', op: 'eq', value: TYPE_INFO.pathlength.listName },
       ],
       items: [newDetailItem({ subject: 'Dowel', size: '#5 Rebar', length: `3'-0"`, rule: 'spacing', value: '24', addEnd: true })],
       category: 'Concrete',

@@ -91,10 +91,10 @@ export function StatusBar() {
           <div className="sb-sep sb-wide" />
           <span className="sb-wide" title="Scale at cursor">{scale ? scale.label : 'Scale not set'}</span>
           <div className="sb-sep sb-wide" />
-          <Toggle k="snapContent" label="CONTENT" title="Snap to PDF line work (endpoints, midpoints, lines)" />
-          <Toggle k="snapMarkup" label="MARKUP" title="Snap to existing markup vertices" />
+          <Toggle k="snapContent" label="DWG SNAP" title="Snap to the drawing's line work (endpoints, midpoints, lines)" />
+          <Toggle k="snapMarkup" label="MARKUP SNAP" title="Snap to the points of existing markups" />
           <Toggle k="ortho" label="ORTHO" title="Constrain drawing to horizontal/vertical (Shift for 45°)" />
-          <Toggle k="reuse" label="REUSE" title="Keep the current tool active after placing a markup" />
+          <Toggle k="reuse" label="KEEP TOOL" title="Keep the current tool active after placing a markup" />
           <Toggle k="showLabels" label="LABELS" title="Show measurement labels on the drawing" />
           <div className="sb-sep" />
           <div className="sb-nav">

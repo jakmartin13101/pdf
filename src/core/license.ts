@@ -11,7 +11,7 @@ export type Feature = 'combine' | 'autoTakeoff';
 
 export const TIER_NAMES: Record<Tier, string> = { basic: 'Basic', pro: 'Pro' };
 
-/** What each tier includes beyond the basics (measuring, markups, Tool Chest, Markups List, reports…). */
+/** What each tier includes beyond the basics (measuring, markups, Tool Library, Takeoff List, reports…). */
 export const TIER_FEATURES: Record<Tier, Feature[]> = { basic: [], pro: ['combine', 'autoTakeoff'] };
 
 export const FEATURES: Record<Feature, { name: string; what: string }> = {

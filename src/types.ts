@@ -14,7 +14,7 @@ export interface Rect {
   h: number;
 }
 
-export type MeasureType = 'length' | 'polylength' | 'perimeter' | 'area' | 'volume' | 'count' | 'angle';
+export type MeasureType = 'length' | 'pathlength' | 'perimeter' | 'area' | 'volume' | 'count' | 'angle';
 
 export type AnnotType =
   | 'text'
@@ -230,7 +230,7 @@ export interface ProjectSettings {
   showPerimeterOnArea: boolean;
 }
 
-/** How a document's Markups List shows its columns. */
+/** How a document's Takeoff List shows its columns. */
 export interface ListStyle {
   /** Visible columns in order ('subject', 'c:<custom column id>', …). */
   columns: string[];
@@ -240,7 +240,7 @@ export interface ListStyle {
 }
 
 /**
- * A Markups List style that can be saved as the default for new files, or exported and imported:
+ * A Takeoff List style that can be saved as the default for new files, or exported and imported:
  * the custom columns themselves plus how the list shows them.
  */
 export interface MarkupListStyle {
@@ -260,7 +260,7 @@ export interface DocState {
   settings: ProjectSettings;
   /** Standard details: rules that add material to markups matching a condition. */
   standardDetails?: StandardDetail[];
-  /** The Markups List columns of this document (older files: the list's own columns). */
+  /** The Takeoff List columns of this document (older files: the list's own columns). */
   listStyle?: ListStyle;
 }
 
@@ -315,7 +315,7 @@ export interface StandardDetail {
 
 /**
  * A "size tool" keeps a typed size (e.g. W18X35) on the tool itself. Every markup placed with it is
- * labelled with that size until the size is changed in the Tool Chest.
+ * labelled with that size until the size is changed in the Tool Library.
  */
 export interface SizeToolConfig {
   /** Shape family prefix such as W, HSS, L, C; empty for free text. */
@@ -327,7 +327,7 @@ export interface SizeToolConfig {
   setMemberSize: boolean;
 }
 
-export interface ChestTool {
+export interface LibraryTool {
   id: string;
   name: string;
   hidden?: boolean;
@@ -350,7 +350,7 @@ export interface ToolSet {
   name: string;
   collapsed?: boolean;
   hidden?: boolean;
-  tools: ChestTool[];
+  tools: LibraryTool[];
 }
 
 /** Computed measurement values in base units (inches). */

@@ -31,11 +31,11 @@ test('calibrates from a known dimension and measures length and area', async ({ 
   await expect(page.getByTestId('total-area')).toHaveText('15,000.00 SF');
 });
 
-test('tool chest tools carry subject and data; formula column computes weight', async ({ page }) => {
+test('tool library tools carry subject and data; formula column computes weight', async ({ page }) => {
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W18X35' }).first().click();
   for (let i = 0; i < 2; i++) {
     await clickAt(page, gx(i) + 9, gy(0));
     await clickAt(page, gx(i + 1) - 9, gy(0));
@@ -54,7 +54,7 @@ test('count tool accumulates clicks into one count markup', async ({ page }) => 
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'HSS6X6X3/8 Column' }).click();
+  await page.getByTestId('library-tool').filter({ hasText: 'HSS6X6X3/8 Column' }).click();
   for (let i = 0; i < 4; i++) await clickAt(page, gx(i), gy(2));
   await page.keyboard.press('Escape');
   const rows = page.getByTestId('markup-row');
@@ -85,7 +85,7 @@ test('viewport scale overrides the sheet scale inside a detail', async ({ page }
   await expect(m).toHaveText([`24'-0"`, `1'-2"`]);
 });
 
-test('markups list and drawing stay in sync; cells are editable', async ({ page }) => {
+test('takeoff list and drawing stay in sync; cells are editable', async ({ page }) => {
   await openSample(page);
   await calibrateFoundationPlan(page);
   await page.getByTestId('tb-length').click();

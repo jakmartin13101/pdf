@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { autoLook, autoStyleFor, chestToolForSize, defaultAutoStyles, isAutoMarkup, newAutoStyle } from '../src/core/autoStyles';
+import { autoLook, autoStyleFor, libraryToolForSize, defaultAutoStyles, isAutoMarkup, newAutoStyle } from '../src/core/autoStyles';
 import { extendSegment, projectOnLine } from '../src/core/geometry';
-import { defaultToolChest } from '../src/core/defaults';
+import { defaultToolLibrary } from '../src/core/defaults';
 import type { Markup } from '../src/types';
 
 describe('auto takeoff line styles', () => {
@@ -21,16 +21,16 @@ describe('auto takeoff line styles', () => {
     expect(autoStyleFor(rules, 'C10X15.3')).toBeUndefined(); // rule switched off
   });
 
-  it('a rule beats the Tool Chest tool, which beats a colour per size', () => {
-    const chest = defaultToolChest();
-    expect(chestToolForSize(chest, 'W24X55')?.name).toBe('W24X55');
-    const ruled = autoLook(chest, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'W24X55');
+  it('a rule beats the Tool Library tool, which beats a colour per size', () => {
+    const library = defaultToolLibrary();
+    expect(libraryToolForSize(library, 'W24X55')?.name).toBe('W24X55');
+    const ruled = autoLook(library, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'W24X55');
     expect([ruled.style.color, ruled.style.lineStyle, ruled.rule?.text]).toEqual(['#1aa34a', 'solid', 'W']);
-    const tool = autoLook(chest, { autoStyles: [], autoUseToolStyle: true }, 'W24X55');
+    const tool = autoLook(library, { autoStyles: [], autoUseToolStyle: true }, 'W24X55');
     expect([tool.style.color, tool.style.lineWidth]).toEqual(['#f46036', 3.5]); // the W24X55 tool's look
-    const plain = autoLook(chest, { autoStyles: [], autoUseToolStyle: false }, 'W24X55');
+    const plain = autoLook(library, { autoStyles: [], autoUseToolStyle: false }, 'W24X55');
     expect(plain.style.color).not.toBe('#f46036');
-    expect(autoLook(chest, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'HSS6X6X1/4').style.lineStyle).toBe('dashed');
+    expect(autoLook(library, { autoStyles: defaultAutoStyles(), autoUseToolStyle: true }, 'HSS6X6X1/4').style.lineStyle).toBe('dashed');
   });
 
   it('recognises measurements made by the automatic takeoff', () => {

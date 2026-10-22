@@ -3,14 +3,14 @@ import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample } from 
 
 test('the Measurements panel: tools, page scale, and a count with a Height taking off a length', async ({ page }) => {
   await openSample(page);
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
 
-  // Tool Chest and Measurements stacked down the right dock (Properties below them once something is picked).
+  // Tool Library and Measurements stacked down the right dock (Properties below them once something is picked).
   const meas = page.locator('[data-panel="measurements"]');
-  await expect(page.locator('[data-panel="toolchest"]')).toBeVisible();
+  await expect(page.locator('[data-panel="toollibrary"]')).toBeVisible();
   await expect(meas).toBeVisible();
   await expect(meas.getByTestId('prop-sec-meas-scale')).toHaveClass(/open/);
   await expect(meas.getByTestId('sheet-scale')).toHaveText(`1/8" = 1'-0"`);
@@ -49,7 +49,7 @@ test('the Measurements panel: tools, page scale, and a count with a Height takin
   await page.screenshot({ path: 'test-results/measurements-panel.png' });
 
   // A length: no Height.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0) + 9, gy(1));
   await clickAt(page, gx(1) - 9, gy(1));
   await page.keyboard.press('Escape');

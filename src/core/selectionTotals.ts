@@ -19,7 +19,7 @@ export interface SelectionTotals {
   material: { pieces: number; length: number };
 }
 
-const LENGTH_TYPES = new Set(['length', 'polylength', 'perimeter']);
+const LENGTH_TYPES = new Set(['length', 'pathlength', 'perimeter']);
 
 export function selectionTotals(doc: DocState, ids: string[]): SelectionTotals {
   const want = new Set(ids);

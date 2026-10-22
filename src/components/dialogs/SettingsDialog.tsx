@@ -19,6 +19,7 @@ import { AUTO_MATCH, autoStyleFor, defaultAutoStyles, isAutoMarkup, newAutoStyle
 import { MEMBER_FAMILIES } from '../../core/autoTakeoff';
 import { LENGTH_UNITS, bareUnit, fmtLen, fmtNumber, parseLength, precisionOptions, userPrecisionFor, type UserUnits } from '../../core/units';
 import { CommitInput } from '../fields';
+import { UI_SCALES } from '../../store/uiScale';
 import { LineSample, StepSelect } from '../EndAdjuster';
 import { Modal } from './Modal';
 
@@ -31,7 +32,7 @@ const TABS: { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'subjects', label: 'Subjects', hint: 'Shapes markups can have' },
   { id: 'details', label: 'Detail Marks', hint: 'Detail material by shape' },
   { id: 'combine', label: 'Combine', hint: 'Stock lengths to order' },
-  { id: 'list', label: 'Markups List', hint: 'Default columns for new files' },
+  { id: 'list', label: 'Takeoff List', hint: 'Default columns for new files' },
   { id: 'auto', label: 'Auto Takeoff', hint: 'Line styles by subject' },
   { id: 'speed', label: 'Speed & Graphics', hint: 'Graphics card, rendering' },
   { id: 'workspace', label: 'Workspace', hint: 'Panels and toolbar' },
@@ -85,6 +86,21 @@ function General() {
         </select>
       </div>
       <div className="field">
+        <label>Text and icon size</label>
+        <div className="field-row">
+          <select value={String(prefs.uiScale)} onChange={(e) => st.setPrefs({ uiScale: Number(e.target.value) })} data-testid="set-ui-scale">
+            {(UI_SCALES.includes(prefs.uiScale) ? UI_SCALES : [...UI_SCALES, prefs.uiScale].sort((a, b) => a - b)).map((s) => (
+              <option key={s} value={String(s)}>
+                {Math.round(s * 100)}%{s === 1 ? ' (normal)' : ''}
+              </option>
+            ))}
+          </select>
+          <button className="btn sm narrow" disabled={prefs.uiScale === 1} onClick={() => st.setPrefs({ uiScale: 1 })} data-testid="set-ui-scale-reset">
+            Reset
+          </button>
+        </div>
+      </div>
+      <div className="field">
         <label>Mouse wheel</label>
         <select value={prefs.wheelZoom ? 'zoom' : 'scroll'} onChange={(e) => st.setPrefs({ wheelZoom: e.target.value === 'zoom' })}>
           <option value="zoom">Zoom (Ctrl+wheel also zooms)</option>
@@ -95,13 +111,13 @@ function General() {
         Show measurement labels on the drawing
       </Check>
       <Check checked={prefs.reuse} onChange={(v) => st.setPrefs({ reuse: v })}>
-        Keep a tool active after placing a markup (Reuse)
+        Keep a tool active after placing a markup
       </Check>
       <Check checked={prefs.autoProperties} onChange={(v) => st.setPrefs({ autoProperties: v })} testId="set-auto-properties">
         Show the Properties panel when a markup is drawn or selected
       </Check>
       <Check checked={ui.showHiddenTools} onChange={(v) => st.setUI({ showHiddenTools: v })}>
-        Show hidden Tool Chest tools
+        Show hidden Tool Library tools
       </Check>
       <div className="hint">Preferences are yours: they stay on this computer and apply to every project.</div>
     </>
@@ -524,7 +540,7 @@ function AutoTakeoff() {
             onRemove={() => setRules(rules.filter((x) => x.id !== r.id))}
           />
         ))}
-        {!rules.length && <div className="hint" style={{ padding: 6 }}>No rules: auto measurements use the Tool Chest tool's look or a colour per size.</div>}
+        {!rules.length && <div className="hint" style={{ padding: 6 }}>No rules: auto measurements use the Tool Library tool's look or a colour per size.</div>}
       </div>
       <div className="field-row" style={{ justifyContent: 'flex-start' }}>
         <button className="btn sm narrow" onClick={() => setRules([...rules, newAutoStyle({ text: '' })])} data-testid="rule-add">
@@ -552,7 +568,7 @@ function AutoTakeoff() {
       <div className="field">
         <label>No rule matches</label>
         <select value={prefs.autoUseToolStyle ? 'tool' : 'size'} onChange={(e) => st.setPrefs({ autoUseToolStyle: e.target.value === 'tool' })} data-testid="set-auto-fallback">
-          <option value="tool">Tool Chest tool for the size, else a colour per size</option>
+          <option value="tool">Tool Library tool for the size, else a colour per size</option>
           <option value="size">A colour per size</option>
         </select>
       </div>
@@ -833,8 +849,8 @@ function MaxLengths() {
   return (
     <>
       <div className="hint">
-        The longest piece you take off for each shape. A length or polylength measurement longer than its shape's maximum is taken off as pieces along the same
-        line, each a markup of its own on the drawing and in the Markups List: with W at 40'-0", a 63'-0" line becomes a 40'-0" W and a 23'-0" W. A markup's
+        The longest piece you take off for each shape. A length or path length measurement longer than its shape's maximum is taken off as pieces along the same
+        line, each a markup of its own on the drawing and in the Takeoff List: with W at 40'-0", a 63'-0" line becomes a 40'-0" W and a 23'-0" W. A markup's
         shape is its subject, else the shape of its Member Size. Bare numbers are feet.
       </div>
       <Check checked={ml.enabled} onChange={(v) => set({ enabled: v })} testId="set-max-enabled">
@@ -1170,7 +1186,7 @@ function Subjects() {
   return (
     <>
       <div className="hint">
-        A markup's subject is the shape it takes off. These are the subjects to pick from (in the Markups List, Properties and the Tool Chest editor). New markups
+        A markup's subject is the shape it takes off. These are the subjects to pick from (in the Takeoff List, Properties and the Tool Library editor). New markups
         get the shape of their size: W24X55 → W, HSS6X6X3/8 → HSS. The size itself is the Member Size and the label, and the Takeoff Summary lists each size on its
         own line. The list is yours: it applies to every file.
       </div>
@@ -1216,7 +1232,7 @@ function Subjects() {
       <div className="hint" data-testid="subject-others">
         {loaded
           ? others
-            ? `${others} markup${others === 1 ? ' has a subject' : 's have subjects'} that ${others === 1 ? 'is' : 'are'} not in the list (shown in italics in the Markups List), e.g. from before subjects were shapes.`
+            ? `${others} markup${others === 1 ? ' has a subject' : 's have subjects'} that ${others === 1 ? 'is' : 'are'} not in the list (shown in italics in the Takeoff List), e.g. from before subjects were shapes.`
             : 'Every markup in this file has a subject from the list (or none).'
           : 'Open a file to check its subjects.'}
       </div>
@@ -1232,7 +1248,7 @@ function Subjects() {
   );
 }
 
-/** The Markups List style files opened from now on start with. */
+/** The Takeoff List style files opened from now on start with. */
 function ListDefaults() {
   const prefs = useStore((s) => s.prefs);
   const loaded = useStore((s) => s.loaded);
@@ -1242,7 +1258,7 @@ function ListDefaults() {
   return (
     <>
       <div className="hint">
-        Each file keeps its own Markups List layout: which columns show, their order, widths and header names, and its custom columns. Files you open from now on start with
+        Each file keeps its own Takeoff List layout: which columns show, their order, widths and header names, and its custom columns. Files you open from now on start with
         this default. Change a file's layout in the list itself (drag headers, right-click a header, or Columns…), then save it as the default here or from the list's style
         button.
       </div>

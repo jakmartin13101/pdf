@@ -123,7 +123,7 @@ test('standard details belong to the file they were made in', async ({ page }) =
   await expect(page.getByTestId('detail-entry')).toHaveText([/Set only/]);
 });
 
-test('the Markups List layout is saved as the default, exported and imported', async ({ page }, info) => {
+test('the Takeoff List layout is saved as the default, exported and imported', async ({ page }, info) => {
   await openSample(page);
   const headers = () => page.getByTestId('list-header');
   const header = (id: string) => page.locator(`[data-testid=list-header][data-col=${id}]`);

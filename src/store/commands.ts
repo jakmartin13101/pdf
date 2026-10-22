@@ -11,6 +11,8 @@ import { marksForPdf } from './flatten';
 import { COMMAND_BY_ID, chordFromEvent, commandForChord, resolveBindings } from '../core/keymap';
 import { TYPE_INFO } from '../core/markupTypes';
 import { desktop } from '../brand';
+import { upgradeToolLibrary } from '../core/docUpgrade';
+import { stepUiScale } from './uiScale';
 
 export function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
   return new Promise((resolve) => {
@@ -236,6 +238,12 @@ export function runCommand(id: string) {
       return toggle('ortho');
     case 'view.crosshair':
       return cmdToggleCrosshair();
+    case 'view.uiLarger':
+      return st.setPrefs({ uiScale: stepUiScale(st.prefs.uiScale, 1) });
+    case 'view.uiSmaller':
+      return st.setPrefs({ uiScale: stepUiScale(st.prefs.uiScale, -1) });
+    case 'view.uiNormal':
+      return st.setPrefs({ uiScale: 1 });
     case 'takeoff.addDetail':
       if (st.selection.length) st.setDialog({ kind: 'addDetail', markupIds: st.selection });
       else st.toast('Select one or more markups first', 'info');
@@ -295,15 +303,15 @@ export const cmdOpenExample = () => openExampleTakeoff();
 
 export const view = (kind: ViewRequest['kind'], factor?: number) => getState().requestView({ kind, factor } as ViewRequest);
 
-export async function cmdImportToolChest() {
+export async function cmdImportToolLibrary() {
   const [file] = await pickFiles('.json,application/json', false);
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
     const sets = Array.isArray(data) ? data : data.toolSets;
-    if (!Array.isArray(sets)) throw new Error('Invalid tool chest file');
+    if (!Array.isArray(sets)) throw new Error('Invalid tool library file');
     const st = getState();
-    st.setToolChest([...st.toolChest, ...sets]);
+    st.setToolLibrary([...st.toolLibrary, ...upgradeToolLibrary(sets)]);
     st.toast(`Imported ${sets.length} tool set${sets.length === 1 ? '' : 's'}`, 'success');
   } catch (e) {
     getState().toast(`Import failed: ${(e as Error).message}`, 'error');
@@ -311,7 +319,7 @@ export async function cmdImportToolChest() {
 }
 
 // ---------------------------------------------------------------------------
-// Markups List styles (columns shown, their order, widths and header names, and the custom columns)
+// Takeoff List styles (columns shown, their order, widths and header names, and the custom columns)
 
 /** The active document's list as a style. */
 function currentStyle() {
@@ -322,26 +330,26 @@ function currentStyle() {
 /** Files opened from now on start with this document's list style. */
 export function cmdSaveDefaultListStyle() {
   getState().setPrefs({ listStyle: currentStyle() });
-  getState().toast('Saved as the default Markups List style for files you open from now on', 'success');
+  getState().toast('Saved as the default Takeoff List style for files you open from now on', 'success');
 }
 
 export function cmdApplyDefaultListStyle() {
   const st = getState();
   st.applyListStyle(defaultListStyle(st.prefs));
-  st.toast('Applied the default Markups List style', 'success');
+  st.toast('Applied the default Takeoff List style', 'success');
 }
 
 export function cmdResetListStyle() {
   getState().applyListStyle(builtInListStyle());
-  getState().toast('Markups List columns reset to the built-in style', 'success');
+  getState().toast('Takeoff List columns reset to the built-in style', 'success');
 }
 
 /** Save the list style to a file: a backup, or to use on another computer. */
 export async function cmdExportListStyle(which: 'current' | 'default' = 'current') {
   const st = getState();
   const style = which === 'default' ? defaultListStyle(st.prefs) : currentStyle();
-  const name = which === 'default' ? 'Default Markups List Style.json' : `${safeName(st.projectName)} Markups List Style.json`;
-  await offerFile(new Blob([JSON.stringify(listStyleFile(style), null, 2)], { type: 'application/json' }), name, 'Markups List style');
+  const name = which === 'default' ? 'Default Takeoff List Style.json' : `${safeName(st.projectName)} Takeoff List Style.json`;
+  await offerFile(new Blob([JSON.stringify(listStyleFile(style), null, 2)], { type: 'application/json' }), name, 'Takeoff List style');
 }
 
 /** Read a list style file: use it on this document (applyHere), and (asDefault) make it the default. */
@@ -353,7 +361,7 @@ export async function cmdImportListStyle(asDefault = false, applyHere = true) {
     const st = getState();
     if (applyHere && st.activeDocId) st.applyListStyle(style);
     if (asDefault) st.setPrefs({ listStyle: style });
-    st.toast(asDefault ? `Imported the Markups List style as the default${applyHere && st.activeDocId ? ' (and used it here)' : ''}` : 'Imported the Markups List style', 'success');
+    st.toast(asDefault ? `Imported the Takeoff List style as the default${applyHere && st.activeDocId ? ' (and used it here)' : ''}` : 'Imported the Takeoff List style', 'success');
   } catch (e) {
     getState().toast(`Import failed: ${(e as Error).message}`, 'error');
   }

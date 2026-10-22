@@ -1,4 +1,4 @@
-// Maximum lengths by shape (Settings → Length Measurements). A length or polylength measurement longer
+// Maximum lengths by shape (Settings → Length Measurements). A length or path length measurement longer
 // than its shape's maximum is taken off as pieces along the same line: with W at 40'-0", a 63'-0" line
 // becomes a 40'-0" markup and a 23'-0" markup, end to end.
 
@@ -25,7 +25,7 @@ export const defaultMaxLengths = (): MaxLengthPrefs => ({ enabled: true, byShape
 const EPS = 1 / 16;
 
 /** Types that are broken up: open measured lines. */
-export const SPLITTABLE = new Set<Markup['type']>(['length', 'polylength']);
+export const SPLITTABLE = new Set<Markup['type']>(['length', 'pathlength']);
 
 /**
  * A markup's shape: its subject when that is a shape, else the shape of its Member Size (`sizeCol`: the

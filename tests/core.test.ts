@@ -252,7 +252,7 @@ describe('standard details', () => {
     custom,
   });
   const beam = mk('b1', 'length', 'W24x55', [[0, 0], [23, 0]], { member_size: 'W24x55', qty: 1, category: 'Structural Steel' });
-  const rail = mk('r1', 'polylength', 'Handrail', [[0, 0], [100, 0]], { category: 'Misc Metals' });
+  const rail = mk('r1', 'pathlength', 'Handrail', [[0, 0], [100, 0]], { category: 'Misc Metals' });
   const cols = mk('c1', 'count', 'HSS Column', [[0, 0], [25, 0], [50, 0]], { qty: 1 });
   const base: DocState = { files: [], sheets: [sheet], markups: [beam, rail, cols], columns: defaultColumns(), layers: defaultLayers(), settings: DEFAULT_SETTINGS };
 

@@ -19,12 +19,12 @@ import {
   Waypoints,
   type LucideIcon,
 } from 'lucide-react';
-import type { ChestTool, MarkupStyle, MarkupType } from '../types';
+import type { LibraryTool, MarkupStyle, MarkupType } from '../types';
 import { symbolPath } from '../core/shapes';
 
 export const TYPE_ICON: Record<MarkupType, LucideIcon> = {
   length: Ruler,
-  polylength: Spline,
+  pathlength: Spline,
   perimeter: Hexagon,
   area: Pentagon,
   volume: Box,
@@ -44,8 +44,8 @@ export const TYPE_ICON: Record<MarkupType, LucideIcon> = {
   stamp: Stamp,
 };
 
-/** Small preview of a tool chest tool's appearance. */
-export function ToolSwatch({ tool, size = 26 }: { tool: Pick<ChestTool, 'type' | 'style' | 'text'>; size?: number }) {
+/** Small preview of a tool library tool's appearance. */
+export function ToolSwatch({ tool, size = 26 }: { tool: Pick<LibraryTool, 'type' | 'style' | 'text'>; size?: number }) {
   const s: MarkupStyle = tool.style;
   const c = s.color;
   const lw = Math.min(4, Math.max(1.2, s.lineWidth * 0.7));
@@ -81,7 +81,7 @@ export function ToolSwatch({ tool, size = 26 }: { tool: Pick<ChestTool, 'type' |
         />
       );
       break;
-    case 'polylength':
+    case 'pathlength':
     case 'polyline':
       body = <path d="M3 20 L10 9 L16 16 L23 5" fill="none" stroke={c} strokeWidth={lw} strokeDasharray={dash} strokeLinejoin="round" strokeLinecap="round" />;
       break;

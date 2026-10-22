@@ -12,7 +12,7 @@ test('size tool keeps its typed size as the label until it is changed', async ({
   await page.getByTestId('shape-font').selectOption('Times');
   await page.getByTestId('shape-tool-save').click();
 
-  const tool = page.getByTestId('chest-tool').filter({ hasText: 'W Beam' });
+  const tool = page.getByTestId('library-tool').filter({ hasText: 'W Beam' });
   await expect(tool.getByTestId('size-box')).toHaveValue('W24X68');
   await tool.click();
   await clickAt(page, gx(0) + 9, gy(0));
@@ -35,12 +35,12 @@ test('size tool keeps its typed size as the label until it is changed', async ({
 
   // The size stays with the tool across sessions.
   await page.reload();
-  await expect(page.getByTestId('chest-tool').filter({ hasText: 'W Beam' }).getByTestId('size-box')).toHaveValue('W21X44');
+  await expect(page.getByTestId('library-tool').filter({ hasText: 'W Beam' }).getByTestId('size-box')).toHaveValue('W21X44');
 });
 
-test('tool chest tools can be hidden and shown again', async ({ page }) => {
+test('tool library tools can be hidden and shown again', async ({ page }) => {
   await openSample(page);
-  const w12 = page.getByTestId('chest-tool').filter({ hasText: 'W12X26' });
+  const w12 = page.getByTestId('library-tool').filter({ hasText: 'W12X26' });
   await expect(w12).toHaveCount(1);
   await w12.click({ button: 'right' });
   await page.getByText('Hide Tool', { exact: true }).click();
@@ -59,7 +59,7 @@ test('count markups take a manual quantity, resume counting and split', async ({
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'HSS6X6X3/8 Column' }).click();
+  await page.getByTestId('library-tool').filter({ hasText: 'HSS6X6X3/8 Column' }).click();
   for (let i = 0; i < 3; i++) await clickAt(page, gx(i), gy(2));
   await page.keyboard.press('Escape');
 
@@ -131,20 +131,20 @@ test('document splits into panes that show different sheets', async ({ page }) =
 
 test('panels float, dock to another side and the layout can be locked', async ({ page }) => {
   await openSample(page);
-  // Drag the Tool Chest tab into the middle of the drawing: it becomes a floating window.
-  const tab = page.getByTestId('tab-tool-chest');
+  // Drag the Tool Library tab into the middle of the drawing: it becomes a floating window.
+  const tab = page.getByTestId('tab-tool-library');
   const box = (await tab.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(700, 450, { steps: 10 });
   await page.mouse.up();
-  await expect(page.getByTestId('float-toolchest')).toBeVisible();
+  await expect(page.getByTestId('float-toollibrary')).toBeVisible();
 
   // Dock it on the left from its menu.
-  await page.getByTestId('dock-menu-toolchest').click();
+  await page.getByTestId('dock-menu-toollibrary').click();
   await page.getByText('Dock Left', { exact: true }).click();
-  await expect(page.getByTestId('float-toolchest')).toHaveCount(0);
-  await expect(page.locator('.side-panel.left').getByTestId('toolchest')).toBeVisible();
+  await expect(page.getByTestId('float-toollibrary')).toHaveCount(0);
+  await expect(page.locator('.side-panel.left').getByTestId('toollibrary')).toBeVisible();
 
   // Toolbar to the right side.
   await page.getByTestId('dock-menu-toolbar').click();
@@ -155,17 +155,17 @@ test('panels float, dock to another side and the layout can be locked', async ({
   await page.getByTestId('dock-menu-toolbar').click();
   await page.getByText('Lock Workspace Layout', { exact: true }).click();
   await expect(page.locator('.app.layout-locked')).toHaveCount(1);
-  await page.getByTestId('dock-menu-toolchest').click();
+  await page.getByTestId('dock-menu-toollibrary').click();
   await expect(page.locator('.menu-item', { hasText: /^Float$/ })).toHaveClass(/disabled/);
 });
 
-test('docks split into sections: the sheets and the tool chest on the left at once', async ({ page }) => {
+test('docks split into sections: the sheets and the tool library on the left at once', async ({ page }) => {
   await openSample(page);
   const left = page.locator('.side-panel.left');
   await expect(left.getByTestId('dock-section')).toHaveCount(1);
 
-  // Drag the Tool Chest tab onto the lower part of the Sheets panel: a new section below it.
-  const tab = page.getByTestId('tab-tool-chest');
+  // Drag the Tool Library tab onto the lower part of the Sheets panel: a new section below it.
+  const tab = page.getByTestId('tab-tool-library');
   const t = (await tab.boundingBox())!;
   const sheets = (await left.getByTestId('dock-section').first().boundingBox())!;
   await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2);
@@ -175,10 +175,10 @@ test('docks split into sections: the sheets and the tool chest on the left at on
   await page.mouse.up();
   await expect(left.getByTestId('dock-section')).toHaveCount(2);
   await expect(left.getByTestId('sheet-thumb').first()).toBeVisible();
-  await expect(left.getByTestId('chest-tool').first()).toBeVisible();
+  await expect(left.getByTestId('library-tool').first()).toBeVisible();
   await expect(page.getByTestId('dock-left').getByTestId('side-tab-group')).toHaveCount(2);
 
-  // Drag the splitter between them: the sheets get taller, the tool chest shorter.
+  // Drag the splitter between them: the sheets get taller, the tool library shorter.
   const [a0, b0] = [(await left.getByTestId('dock-section').nth(0).boundingBox())!, (await left.getByTestId('dock-section').nth(1).boundingBox())!];
   const bar = (await left.locator('.dock-sections > .splitter-h').boundingBox())!;
   await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
@@ -219,7 +219,7 @@ test('docks split into sections: the sheets and the tool chest on the left at on
   await expect(page.locator('.menu-item', { hasText: 'Split Below (New Section)' })).toHaveClass(/disabled/);
   await page.keyboard.press('Escape');
 
-  // The bottom dock: the Takeoff Summary next to the Markups List.
+  // The bottom dock: the Takeoff Summary next to the Takeoff List.
   await show('tab-summary', 'summary');
   await page.getByTestId('dock-menu-summary').click();
   await page.getByText('Split Right (New Section)', { exact: true }).click();

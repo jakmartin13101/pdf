@@ -1,4 +1,4 @@
-// "Standard Details" submenu for markups (Markups List and drawing right-click menus):
+// "Standard Details" submenu for markups (Takeoff List and drawing right-click menus):
 // add or take off a detail by hand on every selected markup.
 import { getState } from '../store/store';
 import { buildRows } from '../core/columns';

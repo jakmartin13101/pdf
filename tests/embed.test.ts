@@ -37,7 +37,7 @@ describe('takeoff saved inside the PDF', () => {
   });
 });
 
-describe('markups list styles', () => {
+describe('takeoff list styles', () => {
   it('round-trips through a style file and rejects other files', () => {
     const style = { ...builtInListStyle(), labels: { length: 'LF' }, widths: { subject: 200 } };
     const back = parseListStyle(JSON.stringify(listStyleFile(style)));

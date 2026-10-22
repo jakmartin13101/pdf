@@ -3,7 +3,7 @@
 // PDFs in one) open as one document per PDF.
 
 import type { DocState, Sheet, SourceFile } from '../types';
-import { upgradeSizes, withAddedColumns } from '../core/docUpgrade';
+import { upgradeSizes, upgradeTypes, withAddedColumns } from '../core/docUpgrade';
 import { detectSheetLabel, pageInfos, registerPdf, unregisterPdf } from '../core/pdf';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { uid } from '../core/ids';
@@ -128,7 +128,7 @@ async function readLabelsLater(docId: string) {
 function normalizeDoc(saved: DocState): DocState {
   const st = getState();
   // From earlier versions: sizes with a capital X, and the Height and Finish columns.
-  const doc = upgradeSizes({ ...saved, columns: withAddedColumns(saved.columns ?? []) });
+  const doc = upgradeTypes(upgradeSizes({ ...saved, columns: withAddedColumns(saved.columns ?? []) }));
   return {
     ...emptyDoc(),
     ...doc,

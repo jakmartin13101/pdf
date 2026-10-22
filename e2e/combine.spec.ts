@@ -5,7 +5,7 @@ const FT = 9; // page points per foot at 1/8" = 1'-0"
 
 /** A size tool for this size, then a length measurement of each given length (feet). */
 async function takeOff(page: Page, size: string, lengths: number[], row: number) {
-  const tool = page.getByTestId('chest-tool').filter({ hasText: 'Combine Test' });
+  const tool = page.getByTestId('library-tool').filter({ hasText: 'Combine Test' });
   await tool.getByTestId('size-box').fill(size);
   await tool.getByTestId('size-box').press('Enter');
   for (const [i, l] of lengths.entries()) {
@@ -21,8 +21,8 @@ test('the combine report nests pieces on the stock lengths to order', async ({ p
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
   // Exact lengths: no snapping to the drawing or to other markups.
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await page.getByTestId('btn-shape-tool').click();
   await page.getByTestId('shape-size').fill('8x10');
   await page.getByTestId('shape-name').fill('Combine Test');
@@ -89,8 +89,8 @@ test('a piece as long as a stock length is ordered whole, and splice rests are n
   await openSample(page);
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await page.getByTestId('btn-shape-tool').click();
   await page.getByTestId('shape-size').fill('L3X3X1/4');
   await page.getByTestId('shape-name').fill('Combine Test');

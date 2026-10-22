@@ -196,7 +196,7 @@ export function labelFrame(m: Markup, lines: string[]): LabelFrame | null {
     case 'length':
     case 'line':
     case 'arrow':
-    case 'polylength':
+    case 'pathlength':
     case 'polyline': {
       if (pts.length < 2) return null;
       const anc =
@@ -339,7 +339,7 @@ const fmtCount = (n: number) => fmtNumber(n, n % 1 ? 2 : 0);
 /** More pieces than this along one markup are not drawn one by one. */
 const MAX_SPACED = 400;
 
-const LINEAR = new Set(['length', 'polylength']);
+const LINEAR = new Set(['length', 'pathlength']);
 const RINGS = new Set(['area', 'perimeter', 'volume']);
 
 /** The marks for the material standard details add to these markups. */

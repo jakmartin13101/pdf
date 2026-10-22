@@ -35,7 +35,7 @@ export function scaleForMarkup(m: Pick<Markup, 'type' | 'points'> & { units?: Ma
 }
 
 /** Measurements that take a Width: counts (each piece) and runs (a strip). */
-export const takesWidth = (t: Markup['type']) => t === 'count' || t === 'length' || t === 'polylength' || t === 'perimeter';
+export const takesWidth = (t: Markup['type']) => t === 'count' || t === 'length' || t === 'pathlength' || t === 'perimeter';
 /** …a Depth: those, and areas (a volume) and volumes. */
 export const takesDepth = (t: Markup['type']) => takesWidth(t) || t === 'area' || t === 'volume';
 /** …a Height: counts (the length of each piece). */
@@ -62,7 +62,7 @@ export function computeMeasure(m: Measurable, scale: Scale): MeasureValues {
   };
   switch (m.type) {
     case 'length':
-    case 'polylength':
+    case 'pathlength':
       return run(polylineLength(m.points) * k);
     case 'perimeter':
       return run(polygonPerimeter(m.points) * k);
@@ -118,7 +118,7 @@ export function dimText(m: { units?: Markup['units'] }, inches: number): string 
 export function measurementText(m: WithUnits, v: MeasureValues, scale: Scale, s: ProjectSettings): string {
   switch (m.type) {
     case 'length':
-    case 'polylength':
+    case 'pathlength':
     case 'perimeter':
       return formatLength(v.length ?? 0, scale.unit, scale.precision);
     case 'area':

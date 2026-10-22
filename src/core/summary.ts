@@ -24,7 +24,7 @@ export interface SummaryGroup {
   total: SummaryLine;
 }
 
-const LINEAR: MarkupType[] = ['length', 'polylength', 'perimeter'];
+const LINEAR: MarkupType[] = ['length', 'pathlength', 'perimeter'];
 
 function emptyLine(subject: string, color = ''): SummaryLine {
   return { subject, color, markups: 0, count: 0, length: 0, area: 0, volume: 0, extras: {}, primary: 'count', ids: [] };

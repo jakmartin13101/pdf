@@ -1,7 +1,8 @@
-// Bringing documents (and the Tool Chest) from earlier versions up to date when they are opened.
+// Bringing documents (and the Tool Library) from earlier versions up to date when they are opened.
 
 import type { CustomColumn, DocState, ToolSet } from '../types';
 import { normName } from './formula';
+import { currentId, currentTypeName } from './renamed';
 import { sizeText } from './steelShapes';
 import { OLD_WEIGHT_FORMULA, WEIGHT_FORMULA, bentPlateTool, defaultColumns } from './defaults';
 
@@ -59,8 +60,8 @@ export function upgradeSizes(doc: DocState): DocState {
   return changed ? { ...doc, markups, standardDetails } : doc;
 }
 
-/** A Tool Chest saved before sizes were written with a capital X. */
-export function upgradeToolChest(sets: ToolSet[]): ToolSet[] {
+/** A Tool Library saved before sizes were written with a capital X. */
+export function upgradeToolLibrary(sets: ToolSet[]): ToolSet[] {
   return sets.map((s) => ({
     ...s,
     tools: s.tools.map((t) => {
@@ -68,6 +69,7 @@ export function upgradeToolChest(sets: ToolSet[]): ToolSet[] {
       for (const k of Object.keys(custom)) if (isSizeColumn(k) && typeof custom[k] === 'string') custom[k] = sizeText(custom[k] as string);
       return {
         ...t,
+        type: currentId(t.type),
         // BP is bent plate: the base plate tool takes plate (PL).
         ...(t.name === 'Base Plate' && t.subject === 'BP' ? { subject: 'PL' } : {}),
         name: sizeText(t.name),
@@ -79,7 +81,7 @@ export function upgradeToolChest(sets: ToolSet[]): ToolSet[] {
 }
 
 /**
- * Tools added to the built-in Tool Chest since a saved one was made, each added once (`done` keeps the
+ * Tools added to the built-in Tool Library since a saved one was made, each added once (`done` keeps the
  * ones already offered, so a tool deleted afterwards stays deleted).
  */
 export function addNewTools(sets: ToolSet[], done: string[]): { sets: ToolSet[]; done: string[] } {
@@ -89,5 +91,17 @@ export function addNewTools(sets: ToolSet[], done: string[]): { sets: ToolSet[];
   return {
     sets: has || !sets.length ? sets : sets.map((s, i) => (i === at ? { ...s, tools: [...s.tools, bentPlateTool()] } : s)),
     done: [...done, 'bent-plate'],
+  };
+}
+
+/** Markup types and the Type names standard details compare under their current names (files from before 1.22). */
+export function upgradeTypes(doc: DocState): DocState {
+  return {
+    ...doc,
+    markups: doc.markups.map((m) => (currentId(m.type) === m.type ? m : { ...m, type: currentId(m.type) })),
+    standardDetails: doc.standardDetails?.map((d) => ({
+      ...d,
+      conditions: d.conditions.map((c) => (c.column === 'type' ? { ...c, value: currentTypeName(c.value) } : c)),
+    })),
   };
 }

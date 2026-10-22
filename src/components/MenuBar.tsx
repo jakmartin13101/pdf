@@ -13,6 +13,7 @@ import { safeName } from '../store/project';
 import { offerFile } from '../store/files';
 import { MEASURE_TYPES, MARKUP_TYPES, TYPE_INFO } from '../core/markupTypes';
 import { isPanelOpen } from '../store/dockLayout';
+import { MAX_UI_SCALE, MIN_UI_SCALE, UI_SCALES, stepUiScale } from '../store/uiScale';
 
 const panelOpen = (layout: LayoutState, id: PanelId) => isPanelOpen(layout, id);
 
@@ -21,7 +22,7 @@ export { exportPdf };
 export function exportMarkupsCsv() {
   const st = getState();
   const rows = buildTakeoffRows(st.doc, st.list.showDetails);
-  void offerFile(csvBlob(markupsCsv(rows, listStyleOf(st).columns, st.doc)), `${safeName(st.projectName)}_markups.csv`, 'Markups list');
+  void offerFile(csvBlob(markupsCsv(rows, listStyleOf(st).columns, st.doc)), `${safeName(st.projectName)}_markups.csv`, 'Takeoff list');
 }
 
 export function exportSummaryCsv(groupBy: string | null = 'c:category') {
@@ -95,7 +96,7 @@ export function MenuBar() {
         disabled: !loaded,
         children: [
           { label: 'Flattened PDF with Markups…', onClick: exportPdf },
-          { label: 'Markups List (CSV)', onClick: exportMarkupsCsv },
+          { label: 'Takeoff List (CSV)', onClick: exportMarkupsCsv },
           { label: 'Takeoff Summary (CSV)', onClick: () => exportSummaryCsv() },
           { label: 'Takeoff Summary Report (Print / PDF)', onClick: () => printSummary() },
           { label: `Combine Report (Stock to Order)…${pro ? '' : ' (Pro)'}`, onClick: () => st().setDialog({ kind: 'combine' }) },
@@ -142,6 +143,15 @@ export function MenuBar() {
       { label: 'Measurement Labels on Drawing', checked: prefs.showLabels, onClick: () => st().setPrefs({ showLabels: !prefs.showLabels }) },
       { label: 'Standard Detail Material on Drawing', checked: prefs.detailMarks.show, onClick: () => st().setPrefs({ detailMarks: { ...prefs.detailMarks, show: !prefs.detailMarks.show } }) },
       {
+        label: `Text and Icon Size (${Math.round(prefs.uiScale * 100)}%)`,
+        children: [
+          { label: 'Larger', shortcut: sc('view.uiLarger'), disabled: prefs.uiScale >= MAX_UI_SCALE, onClick: () => st().setPrefs({ uiScale: stepUiScale(prefs.uiScale, 1) }) },
+          { label: 'Smaller', shortcut: sc('view.uiSmaller'), disabled: prefs.uiScale <= MIN_UI_SCALE, onClick: () => st().setPrefs({ uiScale: stepUiScale(prefs.uiScale, -1) }) },
+          { sep: true },
+          ...UI_SCALES.map<MenuItem>((v) => ({ label: `${Math.round(v * 100)}%${v === 1 ? ' (normal)' : ''}`, checked: prefs.uiScale === v, onClick: () => st().setPrefs({ uiScale: v }) })),
+        ],
+      },
+      {
         label: 'Theme',
         children: (['system', 'light', 'dark'] as const).map((t) => ({
           label: t === 'system' ? 'Match System' : t === 'light' ? 'Light' : 'Dark',
@@ -185,7 +195,7 @@ export function MenuBar() {
       { label: 'Standard Details…', onClick: () => st().setDialog({ kind: 'details' }) },
       { label: `Combine Report…${pro ? '' : ' (Pro)'}`, shortcut: sc('report.combine'), disabled: !loaded, onClick: () => st().setDialog({ kind: 'combine' }) },
       { label: `Automatic Takeoff (Beams & Tubing)…${pro ? '' : ' (Pro)'}`, disabled: !loaded, onClick: () => st().showPanel('autotakeoff') },
-      { label: 'Tool Chest', onClick: () => st().showPanel('toolchest') },
+      { label: 'Tool Library', onClick: () => st().showPanel('toollibrary') },
       { label: 'New Steel Shape / Size Tool…', onClick: () => st().setDialog({ kind: 'shapeTool' }) },
     ],
     Settings: [
@@ -202,7 +212,7 @@ export function MenuBar() {
       { label: 'Ortho', checked: prefs.ortho, onClick: () => st().setPrefs({ ortho: !prefs.ortho }) },
       { label: 'Full-Screen Crosshairs', shortcut: sc('view.crosshair'), checked: prefs.crosshair !== 'off', onClick: () => cmdToggleCrosshair() },
       { label: 'Move View at Edge While Drawing', checked: prefs.autoPan, onClick: () => st().setPrefs({ autoPan: !prefs.autoPan }) },
-      { label: 'Keep Tool Active (Reuse)', checked: prefs.reuse, onClick: () => st().setPrefs({ reuse: !prefs.reuse }) },
+      { label: 'Keep Tool Active', checked: prefs.reuse, onClick: () => st().setPrefs({ reuse: !prefs.reuse }) },
       { label: 'Measurement Labels on Drawing', checked: prefs.showLabels, onClick: () => st().setPrefs({ showLabels: !prefs.showLabels }) },
       { label: 'Standard Detail Material on Drawing', checked: prefs.detailMarks.show, onClick: () => st().setPrefs({ detailMarks: { ...prefs.detailMarks, show: !prefs.detailMarks.show } }) },
       {

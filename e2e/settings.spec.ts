@@ -20,7 +20,7 @@ test('the Settings menu opens settings and preferences; toggles apply at once', 
   await expect(page.getByTestId('settings')).toHaveCount(0);
 
   // Quick toggles in the menu.
-  const snap = page.locator('.sb-toggle', { hasText: 'CONTENT' });
+  const snap = page.locator('.sb-toggle', { hasText: 'DWG SNAP' });
   await expect(snap).toHaveClass(/on/);
   await menu(page, 'Settings', 'Snap to Drawing');
   await expect(snap).not.toHaveClass(/on/);

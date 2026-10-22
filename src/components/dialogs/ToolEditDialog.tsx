@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Wrench } from 'lucide-react';
-import type { ChestTool, CountSymbol, FontFamily, LineStyle, MarkupType } from '../../types';
+import type { LibraryTool, CountSymbol, FontFamily, LineStyle, MarkupType } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { Modal } from './Modal';
 import { defaultStyle, MARKUP_TYPES, MEASURE_TYPES, STAMP_TEXTS, TYPE_INFO } from '../../core/markupTypes';
@@ -11,12 +11,12 @@ import { bareUnit, fmtLen, normalizeLengthText, parseLength } from '../../core/u
 import { lengthValue } from '../../core/columns';
 
 export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string; toolId?: string; fromMarkupId?: string }) {
-  const sets = useStore((s) => s.toolChest);
+  const sets = useStore((s) => s.toolLibrary);
   const columns = useStore((s) => s.doc.columns);
   const layers = useStore((s) => s.doc.layers);
   const st = getState();
   const existing = toolId ? sets.flatMap((s) => s.tools).find((t) => t.id === toolId) : undefined;
-  const [tool, setTool] = useState<ChestTool>(() => {
+  const [tool, setTool] = useState<LibraryTool>(() => {
     if (existing) return structuredClone(existing);
     if (fromMarkupId) {
       const t = st.toolFromMarkup(fromMarkupId);
@@ -28,7 +28,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
   const [depthText, setDepthText] = useState(fmtLen(tool.depth ?? 4));
   const close = () => st.setDialog(null);
   const s = tool.style;
-  const setStyle = (patch: Partial<ChestTool['style']>) => setTool({ ...tool, style: { ...s, ...patch } });
+  const setStyle = (patch: Partial<LibraryTool['style']>) => setTool({ ...tool, style: { ...s, ...patch } });
   const editableCols = columns.filter((c) => c.kind !== 'formula');
 
   const save = () => {
@@ -43,7 +43,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
 
   return (
     <Modal
-      title={existing ? 'Tool Properties' : 'Add Tool to Tool Chest'}
+      title={existing ? 'Tool Properties' : 'Add Tool to Tool Library'}
       icon={<Wrench size={16} />}
       size="mid"
       onClose={close}
@@ -215,7 +215,7 @@ export function ToolEditDialog({ setId, toolId, fromMarkupId }: { setId: string;
                 }
                 data-testid="tool-size-toggle"
               />
-              Type the label in the Tool Chest (kept on the tool until changed)
+              Type the label in the Tool Library (kept on the tool until changed)
             </label>
             {tool.sizeTool && (
               <>

@@ -3,8 +3,8 @@ import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample, toScre
 
 async function setUp(page: Page) {
   await openSample(page);
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
 }
@@ -14,10 +14,10 @@ test('a picked tool shows what it draws in Properties, to change before drawing'
   const props = page.locator('[data-panel="properties"]');
   const rows = page.getByTestId('markup-row');
 
-  // A Tool Chest tool: its fields, every section open; changes are kept in the tool.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W12X26' }).first().click();
+  // A Tool Library tool: its fields, every section open; changes are kept in the tool.
+  await page.getByTestId('library-tool').filter({ hasText: 'W12X26' }).first().click();
   await expect(props).toBeVisible();
-  await expect(props.getByTestId('tool-props')).toContainText('Kept in the Tool Chest tool “W12X26”');
+  await expect(props.getByTestId('tool-props')).toContainText('Kept in the Tool Library tool “W12X26”');
   await expect(props.locator('.panel-header')).toContainText('Tool: W12X26');
   await expect(page.getByTestId('prop-main').locator('.field > label')).toHaveText(['Subject', 'Label', 'Height', 'Finish']);
   await expect(page.getByTestId('prop-sec-tool-style')).toHaveClass(/open/);
@@ -36,7 +36,7 @@ test('a picked tool shows what it draws in Properties, to change before drawing'
   await expect(page.getByTestId('prop-measurement')).toHaveText(`23'-0"`);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
-  await page.getByTestId('chest-tool').filter({ hasText: 'W12X26' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W12X26' }).first().click();
   await expect(page.getByTestId('prop-col-finish')).toHaveValue('Galvanize');
   await page.keyboard.press('Escape');
 
@@ -67,7 +67,7 @@ test('a picked tool shows what it draws in Properties, to change before drawing'
 
 test('paste puts the farthest-left point of what was copied at the pointer', async ({ page }) => {
   await setUp(page);
-  await page.getByTestId('chest-tool').filter({ hasText: 'W12X26' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W12X26' }).first().click();
   await clickAt(page, gx(0) + 9, gy(1));
   await clickAt(page, gx(1) - 9, gy(1));
   await page.keyboard.press('Escape');

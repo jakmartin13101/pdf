@@ -23,7 +23,7 @@ export function toCsv(table: string[][]): string {
   return table.map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
 
-/** Markups list export: visible columns, raw numeric values for measurement columns. */
+/** Takeoff list export: visible columns, raw numeric values for measurement columns. */
 export function markupsCsv(rows: Row[], columnIds: string[], doc: DocState): string {
   const cols = allColumns(doc.columns, doc.listStyle?.labels);
   const specs = columnIds.map((id) => cols.find((c) => c.id === id)).filter(Boolean) as ReturnType<typeof allColumns>;
@@ -360,7 +360,7 @@ function paintMarkup(p: Painter, m: Markup, labelLines: string[]) {
     case 'length':
     case 'line':
     case 'arrow':
-    case 'polylength':
+    case 'pathlength':
     case 'polyline':
     case 'pen': {
       p.path(pts, stroke);

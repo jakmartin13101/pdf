@@ -1,4 +1,4 @@
-// Markups List styles: which columns a document's list shows, in what order, how wide and under what
+// Takeoff List styles: which columns a document's list shows, in what order, how wide and under what
 // header names, plus the custom columns themselves. A style can be saved as the default for files
 // opened from now on, and exported to a file (a backup, or to share) and imported again.
 
@@ -38,7 +38,7 @@ const isColumn = (c: unknown): c is CustomColumn =>
 export function parseListStyle(text: string): MarkupListStyle {
   const data = JSON.parse(text) as Partial<ListStyleFile>;
   const s = data?.style;
-  if (data?.kind !== 'markup-list-style' || !s || !Array.isArray(s.visible) || !Array.isArray(s.columns)) throw new Error('Not a Markups List style file');
+  if (data?.kind !== 'markup-list-style' || !s || !Array.isArray(s.visible) || !Array.isArray(s.columns)) throw new Error('Not a Takeoff List style file');
   const strings = (o: unknown) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => typeof v === 'string')) as Record<string, string>;
   const numbers = (o: unknown) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => typeof v === 'number' && v > 0)) as Record<string, number>;
   return {

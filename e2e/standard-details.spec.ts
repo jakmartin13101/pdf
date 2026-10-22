@@ -6,7 +6,7 @@ test('a standard detail adds material to every markup whose column matches the c
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
   // Two W24X55 beams, 23'-0" each.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   for (let i = 0; i < 2; i++) {
     await clickAt(page, gx(i) + 9, gy(1));
     await clickAt(page, gx(i + 1) - 9, gy(1));
@@ -42,7 +42,7 @@ test('a standard detail adds material to every markup whose column matches the c
   await expect(preview.nth(1).locator('td').nth(1)).toHaveText('48'); // (23 + 1) × 2 beams
   await page.getByTestId('details-save').click();
 
-  // Material rows follow each beam in the Markups List.
+  // Material rows follow each beam in the Takeoff List.
   await expect(rows).toHaveCount(6);
   await expect(rows.locator('[data-col=subject]')).toHaveText(['W', '↳ Clip Angle', '↳ Shear Stud', 'W', '↳ Clip Angle', '↳ Shear Stud']);
   await expect(rows.nth(1).locator('[data-col=count]')).toHaveText('4');
@@ -76,12 +76,12 @@ test('details are added by hand to several selected markups', async ({ page }) =
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
   // Two W24X55 beams and a W18X35.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   for (let i = 0; i < 2; i++) {
     await clickAt(page, gx(i) + 9, gy(1));
     await clickAt(page, gx(i + 1) - 9, gy(1));
   }
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W18X35' }).first().click();
   await clickAt(page, gx(0) + 9, gy(2));
   await clickAt(page, gx(1) - 9, gy(2));
   await page.keyboard.press('Escape');

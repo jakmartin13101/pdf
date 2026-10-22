@@ -121,10 +121,10 @@ describe('measurement dimensions', () => {
   });
 });
 
-describe('workspace: Measurements stacked between the Tool Chest and Properties', () => {
+describe('workspace: Measurements stacked between the Tool Library and Properties', () => {
   const docks: Record<PanelId, PanelPlace['dock']> = {
     sheets: 'left',
-    toolchest: 'right',
+    toollibrary: 'right',
     properties: 'right',
     measurements: 'right',
     layers: 'right',
@@ -136,10 +136,10 @@ describe('workspace: Measurements stacked between the Tool Chest and Properties'
   it('gives Measurements a section of its own, open, once', () => {
     const panels = {} as LayoutState['panels'];
     for (const id of PANEL_IDS) panels[id] = { dock: docks[id], float: { x: 0, y: 0, w: 300, h: 400 }, open: false, section: id === 'properties' ? 1 : 0 };
-    // A layout from 1.12: Tool Chest (and Measurements) above, Properties below.
+    // A layout from 1.12: Tool Library (and Measurements) above, Properties below.
     const old = normalizeLayout({
       panels,
-      active: { left: ['sheets'], right: ['toolchest', 'properties'], top: [null], bottom: ['markups'] },
+      active: { left: ['sheets'], right: ['toollibrary', 'properties'], top: [null], bottom: ['markups'] },
       split: { left: [1], right: [1.3, 1], top: [1], bottom: [1] },
       size: { left: 250, right: 310, top: 220, bottom: 250 },
       floatOrder: [],
@@ -149,10 +149,10 @@ describe('workspace: Measurements stacked between the Tool Chest and Properties'
     });
     const l = upgradeLayout(old);
     expect(l.measOwn).toBe(true);
-    expect(sectionPanels(l, 'right', 0)).toEqual(['toolchest', 'layers', 'compare', 'autotakeoff']);
+    expect(sectionPanels(l, 'right', 0)).toEqual(['toollibrary', 'layers', 'compare', 'autotakeoff']);
     expect(sectionPanels(l, 'right', 1)).toEqual(['measurements']);
     expect(sectionPanels(l, 'right', 2)).toEqual(['properties']);
-    expect(['toolchest', 'measurements', 'properties'].every((id) => isPanelOpen(l, id as PanelId))).toBe(true);
+    expect(['toollibrary', 'measurements', 'properties'].every((id) => isPanelOpen(l, id as PanelId))).toBe(true);
     // Once only: moved back, it stays.
     expect(upgradeLayout({ ...old, measOwn: true })).toEqual({ ...old, measOwn: true });
   });

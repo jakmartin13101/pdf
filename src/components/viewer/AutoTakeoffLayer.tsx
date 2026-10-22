@@ -19,14 +19,14 @@ function toPage(el: SVGElement, clientX: number, clientY: number): Pt | null {
 }
 
 export function AutoTakeoffLayer({ members, state, zoom, clickable, sheet }: { members: AutoMember[]; state: AutoTakeoffState; zoom: number; clickable: boolean; sheet: Sheet }) {
-  const chest = useStore((s) => s.toolChest);
+  const library = useStore((s) => s.toolLibrary);
   const prefs = useStore((s) => s.prefs);
   const snap = useRef<SnapIndex | null>(null);
   const looks = useMemo(() => {
     const out = new Map<string, ReturnType<typeof autoLook>>();
-    for (const m of members) if (!out.has(m.size)) out.set(m.size, autoLook(chest, prefs, m.size));
+    for (const m of members) if (!out.has(m.size)) out.set(m.size, autoLook(library, prefs, m.size));
     return out;
-  }, [members, chest, prefs]);
+  }, [members, library, prefs]);
 
   const update = (id: string, fn: (m: AutoMember) => AutoMember, focus = true) => {
     const a = getState().autoTakeoff;

@@ -1,12 +1,27 @@
 # Changelog
 
+## 1.22.0 – 2026-10-22
+
+### Text and icon size
+- The whole program larger or smaller, 75% to 200%: *Settings → General → Text and icon size*, *View → Text and Icon
+  Size*, or `Ctrl+Shift+=` / `Ctrl+Shift+-` (*Normal Text and Icon Size* can be given a key in *Settings → Keyboard*).
+  Kept for every project and the next start. The desktop app zooms every window (detached panes and reports too);
+  drawing, dragging, menus and resizing still follow the mouse. The drawing's own zoom is unchanged.
+
+### New names
+- **Tool Library** (was Tool Chest), **Takeoff List** (was Markups List), **Path Length** (the multi-point length
+  measurement), and the status-bar switches **DWG SNAP**, **MARKUP SNAP** and **KEEP TOOL**. Everything else works as
+  before: your tool library, workspace layout, key bindings and tool defaults are brought over on the first start, and
+  takeoffs saved by earlier versions open as before (their path lengths and the standard details that pick them by
+  type included).
+
 ## 1.21.0 – 2026-10-22
 
 ### Drawing
-- **A picked tool shows what it draws.** Picking a measuring or markup tool (toolbar, Measurements panel, Tool Chest)
+- **A picked tool shows what it draws.** Picking a measuring or markup tool (toolbar, Measurements panel, Tool Library)
   opens Properties on the **next markup** – Subject, Label, Height, Finish, Style, every column and the layer, its
   sections open – and the Measurements panel on the next measurement (Depth, Width, Height, units). Change anything
-  before drawing: a Tool Chest tool keeps the changes, other tools keep them as their defaults (↺ goes back to the
+  before drawing: a Tool Library tool keeps the changes, other tools keep them as their defaults (↺ goes back to the
   built-in ones). Drawn, Properties shows the new markup as before.
 - **Paste at the pointer**: `Ctrl+V` puts the copied markups down with their farthest-left point – a box's bottom-left
   corner – at the mouse (right-click *Paste* at the point clicked). With the pointer off the drawing, and for
@@ -14,13 +29,13 @@
 - **Full-screen crosshairs**: lines across the whole view through the pointer (its snapped point while drawing).
   *Settings → Full-Screen Crosshairs*, or *Settings → Drawing & Editing*: off, while drawing and measuring, or always.
   A key can be set for it in *Settings → Keyboard*.
-- **The view moves at its edge while drawing**: pulling a length (or a polylength, area, box, a markup being moved or
+- **The view moves at its edge while drawing**: pulling a length (or a path length, area, box, a markup being moved or
   an end being dragged) to the edge of the view, or past it while holding the button, scrolls the drawing along.
   Switch it off in *Settings → Drawing & Editing* or the Settings menu.
 
 ### Bent plate as a length
-- A **Bent Plate** size tool in the Tool Chest (*Misc Metals*): a length measurement where you type the bent plate
-  size in its box (`BP3X3X1/4`, `BP6X4X3/8`…); each run weighs length × lb/ft. Added once to Tool Chests from
+- A **Bent Plate** size tool in the Tool Library (*Misc Metals*): a length measurement where you type the bent plate
+  size in its box (`BP3X3X1/4`, `BP6X4X3/8`…); each run weighs length × lb/ft. Added once to Tool Libraries from
   before. The plain Length tool works too: give it subject BP and the size as its label before drawing.
 
 ### Licenses tied to computers
@@ -40,9 +55,9 @@
 - `PLF()` and `PSF()` take several sizes and use the first they know. The default Weight column reads the Member Size,
   else the label: `Qty * (Length * PLF([Member Size], Label) + Area * PSF([Member Size], Label))`. Documents with the
   earlier default are changed when they open; formulas of your own are left alone.
-- A **BP3X3X1/4** tool in the Tool Chest, a **BP – Bent plate** family for size tools, and BP and PL sizes among the
+- A **BP3X3X1/4** tool in the Tool Library, a **BP – Bent plate** family for size tools, and BP and PL sizes among the
   suggestions.
-- BP is bent plate: the *Base Plate* tool's subject is PL (Tool Chests from before are changed to match).
+- BP is bent plate: the *Base Plate* tool's subject is PL (Tool Libraries from before are changed to match).
 
 ## 1.19.0 – 2026-10-21
 
@@ -97,7 +112,7 @@
 ## 1.15.0 – 2026-10-20
 
 ### Measurements panel
-- Rebuilt: the measuring tools in a row (Calibrate, Length, Polylength, Area, Perimeter, Volume, Count, Angle), then
+- Rebuilt: the measuring tools in a row (Calibrate, Length, Path Length, Area, Perimeter, Volume, Count, Angle), then
   *Page Scale* (the sheet's scale and viewports), *<Type> Measurement Properties* and *Totals & Display*, each folding
   open and shut.
 - Measurement Properties of the selection: Subject, Label, **Depth** (with the unit its dimensions are written in),
@@ -107,13 +122,13 @@
   column, labels, totals, selection totals, weight formulas and the Combine report. Width × Height gives its area,
   × Depth its volume. A length with a Width is a strip with an area (and a volume with a Depth); an area with a Depth a
   volume.
-- A measurement's own units show on the drawing and in the Markups List; totals stay in the project's units. Tools
+- A measurement's own units show on the drawing and in the Takeoff List; totals stay in the project's units. Tools
   made from a markup keep its Depth, Width and units.
-- The Markups List has a Width column; Depth can be typed for counts and lengths too. Depth and Width aren't added up.
+- The Takeoff List has a Width column; Depth can be typed for counts and lengths too. Depth and Width aren't added up.
 
 ### Workspace
-- The right dock stacks the Tool Chest, Measurements and Properties, each sized by the splitter between them. Saved
-  layouts get Measurements in its own section below the Tool Chest once.
+- The right dock stacks the Tool Library, Measurements and Properties, each sized by the splitter between them. Saved
+  layouts get Measurements in its own section below the Tool Library once.
 - Side panels resize at every window size: in a narrow window, where a panel lies over the drawing, by a grip on its
   edge. Docks can be made narrower (160 px) and wider (up to the window less 260 px).
 - Sheets panel: a **slider for the thumbnail size**; small thumbnails sit side by side.
@@ -149,8 +164,8 @@
   feet in feet-inches (inches where a field is in inches), inches in inches, the metric unit in metric.
 
 ### Height is a length
-- The Height column is a length: typed in your units in the Properties panel, the Markups List and Tool Chest tools,
-  kept exactly and totalled in the document's length unit. Height shows in the Markups List for new files; documents
+- The Height column is a length: typed in your units in the Properties panel, the Takeoff List and Tool Library tools,
+  kept exactly and totalled in the document's length unit. Height shows in the Takeoff List for new files; documents
   from before get the Height column as a length when they open.
 - Columns can be lengths (*Manage Columns → Length*).
 
@@ -160,19 +175,19 @@
 ## 1.12.0 – 2026-10-15
 
 ### Sizes with a capital X
-- Sizes are written with a capital X (W24X55, HSS6X6X3/8) in the Markups List and exports. `*` can be typed for the
+- Sizes are written with a capital X (W24X55, HSS6X6X3/8) in the Takeoff List and exports. `*` can be typed for the
   X (`w8*10` → `W8X10`); a space after the shape is kept (`W 8*10` → `W 8X10`). Member Size cells and fields, size
-  tools, labels that are sizes, standard detail material, the Tool Chest and the automatic takeoff.
-- Files and Tool Chests from earlier versions are brought up to date when they open.
+  tools, labels that are sizes, standard detail material, the Tool Library and the automatic takeoff.
+- Files and Tool Libraries from earlier versions are brought up to date when they open.
 
 ### Properties panel
 - Measurements and counts show the main fields – Subject, Label, Length (or Count, Area…), Height and Finish – then
   *Style* (line and text styles and colours) and *Properties* (a box for every other column, Comments, Status, Layer,
   Author) that fold open, and *Measurement* and *Standard Details*. Sections stay open or shut as left.
-- *Properties* has a field chooser: hidden fields keep their values in the markups and the Markups List.
+- *Properties* has a field chooser: hidden fields keep their values in the markups and the Takeoff List.
 - The panel opens when a markup is drawn or selected (*Settings → General* to switch off). Properties has its own
-  section below the Tool Chest, so the Tool Chest stays in view; saved layouts are changed once to match.
-- New columns **Height** and **Finish** (Galvanize, Prime, Paint, Powder Coat, Bare); Finish shows in the Markups List.
+  section below the Tool Library, so the Tool Library stays in view; saved layouts are changed once to match.
+- New columns **Height** and **Finish** (Galvanize, Prime, Paint, Powder Coat, Bare); Finish shows in the Takeoff List.
   Documents from before get them when they open.
 
 ### Selection totals
@@ -189,12 +204,12 @@
 ### Maximum lengths by shape
 - *Settings → Length Measurements* (new; also *Settings → Length Measurements…*): the longest piece of each shape
   (every subject, plus *Other shapes*), blank for none; *Set Every Shape*, *Clear All*.
-- A length or polylength measurement longer than its shape's maximum is taken off as pieces along the same line, each
-  its own markup on the drawing and in the Markups List: with W at 40'-0", a 63'-0" line becomes 40'-0" + 23'-0".
-  Full pieces first from the start of the line; polylengths are cut along their length.
+- A length or path length measurement longer than its shape's maximum is taken off as pieces along the same line, each
+  its own markup on the drawing and in the Takeoff List: with W at 40'-0", a 63'-0" line becomes 40'-0" + 23'-0".
+  Full pieces first from the start of the line; path lengths are cut along their length.
 - The shape is the markup's subject, else the shape of its Member Size or label. Members found by the automatic
   takeoff are broken too (can be switched off).
-- *Split at Maximum Length* (right-click on the drawing or in the Markups List, *Edit* menu) breaks measurements
+- *Split at Maximum Length* (right-click on the drawing or in the Takeoff List, *Edit* menu) breaks measurements
   already taken off; one undo puts them back.
 
 ## 1.10.0 – 2026-10-15
@@ -207,11 +222,11 @@
 - Add and remove shapes, reset to the defaults; a sample of each look in the list. Text size and the space from the
   markup at the top (moved here from Drawing & Editing). Used on the drawing and in flattened PDFs.
 - A material's shape comes from its size (L4x4x3/8 → L), else its subject. Detail marks no longer follow the Auto
-  Takeoff line styles or the Tool Chest.
+  Takeoff line styles or the Tool Library.
 
 ### Docks split into sections
 - Each dock (left, right, top, bottom) splits into up to four sections (three splits), each a group of tabs with its
-  own open panel: the Sheets and the Tool Chest on the left at the same time, the Markups List beside the Takeoff
+  own open panel: the Sheets and the Tool Library on the left at the same time, the Takeoff List beside the Takeoff
   Summary.
 - Drag a panel onto the end of a section to split a new section there (the place is highlighted), or onto a section
   to join its tabs; or *Split Below / Split Right (New Section)* and *Move to Section* in a panel's layout menu.
@@ -234,10 +249,10 @@
   - **@ spacing** – a mark for every piece where it falls along the member, with the number, size and spacing;
   - **× quantity** – a count mark with the number of pieces next to the markup's label (stacked when there are
     several; by the count label on a count markup).
-- Drawn in the look of the material's shape: the Auto Takeoff line style rule for the shape, else the Tool Chest tool
+- Drawn in the look of the material's shape: the Auto Takeoff line style rule for the shape, else the Tool Library tool
   for the size (its symbol for marks), else a colour per size.
 - Hover shows the detail and the quantity; clicking selects the markup. Not a markup of its own: the material is
-  still counted once, in the Markups List, Summary and exports.
+  still counted once, in the Takeoff List, Summary and exports.
 - *Settings → Drawing & Editing → Standard detail material*: show or hide it (also *View / Settings → Standard Detail
   Material on Drawing*), its size and count text, and the space from the markup. Flattened PDFs draw it too.
 
@@ -268,23 +283,23 @@
 
 ### Subjects are shapes
 - A markup's subject is the shape it takes off – W, HSS, L, C, MC, WT, S, HP, PL, BP, BO, PIPE to start with – picked
-  from a list rather than typed (Subject cell of the Markups List, Properties, Tool Chest tool editor). The size is
+  from a list rather than typed (Subject cell of the Takeoff List, Properties, Tool Library tool editor). The size is
   the Member Size and the label.
 - *Settings → Subjects*: add and remove shapes, reorder, reset to the defaults; the list is per user and applies to
   every file. Each shows how many markups in the open file use it.
 - New markups, size tools and the automatic takeoff take the shape of their size from the list (W24x55 → W,
   HSS6x6x3/8 → HSS, MC12x10.6 → MC). Markups whose size has no shape in the list have no subject. The built-in Tool
-  Chest tools have shape subjects (Base Plate: BP).
+  Library tools have shape subjects (Base Plate: BP).
 - The Takeoff Summary lists each size on its own line (W24x55, W18x35…).
 - Subjects from earlier files (W24x55, HSS Column…) show in italics; *Change Sizes to Shapes* turns them into shapes
   (the size goes into Member Size), *… and Clear the Rest* clears subjects that name no shape. Revision clouds from
   overlay compare have no subject (their label says what they are).
-- The built-in standard detail examples match on Subject, Category and Type; searching the Markups List keeps the
+- The built-in standard detail examples match on Subject, Category and Type; searching the Takeoff List keeps the
   material standard details add with the markups it finds. The example takeoff was made again with shape subjects.
 
 ### Text colour
 - Labels and text have their own colour, separate from the line: *Properties → Text colour* (or *Same as line*), the
-  Tool Chest tool editor, size tools (*Label colour*) and each automatic takeoff line style rule (*Text*). Used on the
+  Tool Library tool editor, size tools (*Label colour*) and each automatic takeoff line style rule (*Text*). Used on the
   drawing and in flattened PDFs.
 
 ## 1.6.0 – 2026-10-14
@@ -292,7 +307,7 @@
 ### Every PDF is its own document
 - Opening a PDF opens it as its own document (in a new tab), no longer as part of a combined project. Its markups,
   sheet labels, scales and viewports, custom columns, layers, standard details and overlays belong to that file only,
-  and each document has its own undo history and selection. The Sheets panel, Markups List, Summary and the other
+  and each document has its own undo history and selection. The Sheets panel, Takeoff List, Summary and the other
   panels show the active document.
 - **The takeoff is saved inside the PDF** (as an embedded file the PDF carries along; the drawing looks unchanged in
   other PDF viewers). Opening that PDF again brings the takeoff back. *File → Save* (`Ctrl+S`) writes back to the
@@ -306,13 +321,13 @@
 - Opening a file that is already open shows its tab. Takeoff project files from earlier versions open as one
   document per PDF. *File → Add PDF to Set* and *New Project from PDF* are gone.
 
-### Markups List layout per file, with a default
+### Takeoff List layout per file, with a default
 - Rename column headers (double-click, or right-click → *Rename Column…*), move columns by dragging their headers
   (or *Move Left / Right*), hide them from the header menu; *Columns…* renames too. Each file keeps its own layout.
 - *Save as Default Style*: files opened from now on start with this layout (columns shown, order, widths, header
   names and the custom columns). *Apply Default Style*, *Reset to Built-in Style*.
 - *Export This Style… / Export Default Style…* save the layout to a file as a backup; *Import Style…* and *Import as
-  Default Style…* bring it back. Also in the new *Settings → Markups List*.
+  Default Style…* bring it back. Also in the new *Settings → Takeoff List*.
 
 ### Fixes
 - The sheet title bar no longer picks up the document tab style.
@@ -387,7 +402,7 @@
 - Rules set the line of automatic takeoff measurements by subject: *starts with*, *contains* or *is* a text → colour,
   width, solid/dashed/dotted and opacity, e.g. **W** → green solid line. The first matching rule wins; rules can be
   reordered, switched off, tried on a subject, and reset to the defaults (W green, HSS blue dashed, Pipe teal dashed,
-  MC/C purple, L orange dotted). Without a matching rule the Tool Chest tool for the size, or a colour per size, is
+  MC/C purple, L orange dotted). Without a matching rule the Tool Library tool for the size, or a colour per size, is
   used.
 - The preview on the drawing uses the same lines. *Apply to Existing Auto Measurements* restyles measurements already
   made (one undo step); measurements made by the automatic takeoff are marked as such.
@@ -412,7 +427,7 @@
   lengths. Leave out sizes or single members (in the list or by clicking them on the drawing), skip members already
   taken off, add a length to each end, search one sheet or all sheets.
 - **Create** adds one labelled length measurement per member (one undo step) with the size as Subject and Member Size,
-  using the Tool Chest tool for that size when there is one.
+  using the Tool Library tool for that size when there is one.
 - The sample roof framing plan has a tube-steel entrance canopy; the example takeoff's roof beams and tubes were made
   with the automatic takeoff.
 
@@ -451,13 +466,13 @@
 ## 1.1.0 – 2026-10-09
 
 ### Standard details
-- New **Standard Details** (Tools → Standard Details…, the package button in the Markups List, the Takeoff Summary
+- New **Standard Details** (Tools → Standard Details…, the package button in the Takeoff List, the Takeoff Summary
   or a markup's Properties). A standard detail is a rule:
   **IF** *[column]* = *value* **→ ADD** material (Subject, Size, Length) **@ spacing OC**, **× quantity** or
   **full length**.
 - The column and the value are picked from drop-downs; the value list holds the values that column has in the
   takeoff (with counts). Conditions can also be *≠* or *contains*, and several conditions can be combined (AND).
-- Material is added to every matching markup as read-only rows under it in the Markups List (Type
+- Material is added to every matching markup as read-only rows under it in the Takeoff List (Type
   *Standard Detail*). They get the size as Member Size, so formula columns such as Weight compute, and they appear
   in the Takeoff Summary (marked *std. detail*), the CSV exports and the printed report.
 - Spacing rules count pieces along the measured length (or an area's perimeter), with an optional end piece;
@@ -478,5 +493,5 @@
 ## 1.0.0 – 2026-10-09
 
 - First Windows desktop release: NSIS installer with the Terms of Service, desktop and Start Menu shortcuts.
-- BuildSuite branding, size tools and hidden tools in the Tool Chest, count editing (quantity, split, resume),
+- BuildSuite branding, size tools and hidden tools in the Tool Library, count editing (quantity, split, resume),
   split view, dockable and floating panels and toolbar.

@@ -45,7 +45,7 @@ const sheet = async (i) => {
   await page.getByTestId('sheet-thumb').nth(i).click();
   await page.waitForTimeout(400);
 };
-const tool = (name) => page.getByTestId('chest-tool').filter({ hasText: name }).first().click();
+const tool = (name) => page.getByTestId('library-tool').filter({ hasText: name }).first().click();
 const done = () => page.keyboard.press('Escape');
 const poly = async (pts) => {
   for (const [x, y] of pts) await click(x, y);
@@ -77,7 +77,7 @@ await page.getByTestId('tb-auto').click();
 await page.getByTestId('auto-find').click();
 await page.getByTestId('auto-status').filter({ hasText: 'members' }).waitFor();
 await page.getByTestId('auto-create').click();
-await page.getByTestId('tab-tool-chest').click();
+await page.getByTestId('tab-tool-library').click();
 await tool('HSS6x6x3/8 Column');
 for (let i = 0; i <= 6; i++) for (let j = 0; j <= 5; j++) await click(gx(i), gy(j));
 await done();

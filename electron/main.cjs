@@ -128,6 +128,38 @@ function serveDist(request) {
     .catch(() => new Response('Not found', { status: 404 }));
 }
 
+// ---------------------------------------------------------------------------
+// Text and icon size (Settings → General): every window of the program zoomed alike, kept with the app's
+// data so windows open at that size from the next start.
+
+const uiFile = () => path.join(app.getPath('userData'), 'ui.json');
+const clampZoom = (f) => (Number.isFinite(f) ? Math.min(2, Math.max(0.75, f)) : 1);
+let uiZoom = null;
+function zoomFactor() {
+  if (uiZoom === null) {
+    try {
+      uiZoom = clampZoom(Number(JSON.parse(fs.readFileSync(uiFile(), 'utf8')).zoom));
+    } catch {
+      uiZoom = 1;
+    }
+  }
+  return uiZoom;
+}
+function applyZoom(wc) {
+  if (!wc.isDestroyed()) wc.setZoomFactor(zoomFactor());
+}
+
+ipcMain.handle('buildsuite:set-zoom', async (_event, factor) => {
+  uiZoom = clampZoom(Number(factor));
+  for (const w of BrowserWindow.getAllWindows()) applyZoom(w.webContents);
+  try {
+    await fsp.mkdir(path.dirname(uiFile()), { recursive: true });
+    await fsp.writeFile(uiFile(), JSON.stringify({ zoom: uiZoom }, null, 2));
+  } catch {
+    /* kept for this run */
+  }
+});
+
 const devToolsKey = (input) => input.type === 'keyDown' && (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i'));
 
 function createWindow() {
@@ -155,6 +187,7 @@ function createWindow() {
 
   const { webContents } = win;
   webContents.setVisualZoomLevelLimits(1, 1);
+  webContents.on('did-finish-load', () => applyZoom(webContents));
 
   // Keep the app on its own origin; send web links to the default browser.
   const allowed = (url) => url.startsWith(ORIGIN + '/') || (DEV_URL && url.startsWith(DEV_URL));
@@ -185,6 +218,8 @@ function createWindow() {
     child.setMenu(null);
     const wc = child.webContents;
     wc.setVisualZoomLevelLimits(1, 1);
+    applyZoom(wc);
+    wc.on('did-finish-load', () => applyZoom(wc));
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     wc.on('will-navigate', (e) => e.preventDefault());
     wc.on('before-input-event', (_e, input) => devToolsKey(input) && wc.toggleDevTools());
@@ -269,6 +304,7 @@ ipcMain.handle('buildsuite:open-report', async (_event, html) => {
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   report.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  report.webContents.on('did-finish-load', () => applyZoom(report.webContents));
   report.webContents.on('will-navigate', (e) => e.preventDefault());
   report.on('closed', () => fsp.rm(file, { force: true }).catch(() => {}));
   await report.loadFile(file);

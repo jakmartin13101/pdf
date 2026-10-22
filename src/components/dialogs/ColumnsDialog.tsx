@@ -131,7 +131,7 @@ export function ColumnsDialog() {
       <div className="two-col">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
           <div className="hint">
-            Checked columns appear in the Markups List in this order (this file only: <i>List Style → Save as Default Style</i> makes it the layout for files you open from now
+            Checked columns appear in the Takeoff List in this order (this file only: <i>List Style → Save as Default Style</i> makes it the layout for files you open from now
             on). Custom columns store takeoff data on every markup. Click a name to rename its header.
           </div>
           <div className="col-list">

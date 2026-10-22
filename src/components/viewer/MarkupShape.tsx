@@ -140,7 +140,7 @@ function body(m: Markup, label: string, showLabels: boolean, draft: boolean) {
         </>
       );
     }
-    case 'polylength':
+    case 'pathlength':
     case 'polyline':
     case 'pen': {
       if (pts.length < 2) return null;

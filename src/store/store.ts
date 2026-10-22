@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
   AutoStyleRule,
-  ChestTool,
+  LibraryTool,
   CustomColumn,
   CustomValue,
   DocState,
@@ -26,7 +26,7 @@ import { DEFAULT_SETTINGS, DEFAULT_USER_UNITS, setUserUnits, type UserUnits } fr
 import { applyDetailAssignments, type DetailAssignment } from '../core/details';
 import { MEMBER_FAMILIES, type FoundMember, type MemberFamily } from '../core/autoTakeoff';
 import { defaultAutoStyles } from '../core/autoStyles';
-import { DEFAULT_VISIBLE_COLUMNS, defaultColumns, defaultLayers, defaultToolChest } from '../core/defaults';
+import { DEFAULT_VISIBLE_COLUMNS, defaultColumns, defaultLayers, defaultToolLibrary } from '../core/defaults';
 import { defaultStyle } from '../core/markupTypes';
 import { uid } from '../core/ids';
 import { normName } from '../core/formula';
@@ -37,9 +37,11 @@ import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, subjectFor, subjectForSiz
 import { appendTo, leaf, setSizesAt, splitIn, syncTree, type PaneNode } from './paneTree';
 import { accessOf, hasFeature, verifyLicense, type Feature, type LicenseStatus } from '../core/license';
 import { thisComputer } from './computer';
+import { applyUiScale, clampUiScale } from './uiScale';
 import { PANEL_IDS, dockPanelIn, isPanelOpen, normalizeLayout, setSectionSizesIn, showPanelIn, togglePanelIn, upgradeLayout, type DockTarget } from './dockLayout';
 import { sizeText } from '../core/steelShapes';
-import { addNewTools, upgradeToolChest } from '../core/docUpgrade';
+import { addNewTools, upgradeToolLibrary } from '../core/docUpgrade';
+import { currentCommandId, moveRenamedKeys, renameIds } from '../core/renamed';
 import { defaultMaxLengths, splitMarkupAtMax, type MaxLengthPrefs } from '../core/maxLength';
 import { defaultDetailMarkPrefs, defaultDetailStyles, type DetailMarkPrefs, type DetailShapeStyle } from '../core/detailMarks';
 import { defaultCombineSettings, type CombineSettings } from '../core/combine';
@@ -48,7 +50,7 @@ export type ToolMode =
   | { kind: 'select' }
   | { kind: 'pan' }
   | { kind: 'zoomrect' }
-  | { kind: 'markup'; type: MarkupType; chestToolId?: string; resumeId?: string }
+  | { kind: 'markup'; type: MarkupType; libraryToolId?: string; resumeId?: string }
   | { kind: 'calibrate' }
   | { kind: 'viewport' }
   | { kind: 'region'; purpose: 'number' | 'title' | 'label' }
@@ -117,18 +119,18 @@ export interface UIState {
   showHiddenTools: boolean;
 }
 
-export type PanelId = 'sheets' | 'toolchest' | 'properties' | 'measurements' | 'layers' | 'compare' | 'autotakeoff' | 'markups' | 'summary';
+export type PanelId = 'sheets' | 'toollibrary' | 'properties' | 'measurements' | 'layers' | 'compare' | 'autotakeoff' | 'markups' | 'summary';
 export type DockSide = 'left' | 'right' | 'top' | 'bottom';
 export { PANEL_IDS };
 export const PANEL_TITLES: Record<PanelId, string> = {
   sheets: 'Sheets',
-  toolchest: 'Tool Chest',
+  toollibrary: 'Tool Library',
   properties: 'Properties',
   measurements: 'Measurements',
   layers: 'Layers',
   compare: 'Compare',
   autotakeoff: 'Auto Takeoff',
-  markups: 'Markups List',
+  markups: 'Takeoff List',
   summary: 'Takeoff Summary',
 };
 
@@ -159,9 +161,9 @@ export interface LayoutState {
   floatOrder: PanelId[];
   toolbar: { dock: 'top' | 'left' | 'right' | 'float'; x: number; y: number };
   locked: boolean;
-  /** Properties has had a section of its own (so opening it on a selection leaves the Tool Chest showing). */
+  /** Properties has had a section of its own (so opening it on a selection leaves the Tool Library showing). */
   propsOwn?: boolean;
-  /** Measurements was given a section of its own (between the Tool Chest and Properties). */
+  /** Measurements was given a section of its own (between the Tool Library and Properties). */
   measOwn?: boolean;
 }
 
@@ -233,11 +235,13 @@ export interface Prefs {
   crosshair: 'off' | 'draw' | 'always';
   /** Move the view while drawing or dragging past (or up to) its edge. */
   autoPan: boolean;
+  /** Size of the program's text and icons: 1 = 100% (Settings → General; a zoom of the whole window). */
+  uiScale: number;
   wheelZoom: boolean;
   showLabels: boolean;
   /** Line style rules for automatic takeoff measurements, by subject (first match wins). */
   autoStyles: AutoStyleRule[];
-  /** Without a matching rule: use the Tool Chest tool's look for the size (else a colour per size). */
+  /** Without a matching rule: use the Tool Library tool's look for the size (else a colour per size). */
   autoUseToolStyle: boolean;
   /** Automatic takeoff options (also in the Auto Takeoff panel). */
   auto: AutoOptions;
@@ -249,7 +253,7 @@ export interface Prefs {
   keys: Record<string, string[]>;
   /** Speed & graphics (Settings → Speed & Graphics). */
   perf: PerfPrefs;
-  /** Markups List style that files opened from now on start with (null: the built-in one). */
+  /** Takeoff List style that files opened from now on start with (null: the built-in one). */
   listStyle: MarkupListStyle | null;
   /** The subjects markups can have: shapes such as W, HSS, L, BP, C (Settings → Subjects). */
   subjects: string[];
@@ -294,12 +298,12 @@ export interface AutoOptions {
 
 export type SettingsTab = 'general' | 'units' | 'editing' | 'lengths' | 'keys' | 'subjects' | 'details' | 'combine' | 'list' | 'auto' | 'speed' | 'workspace';
 
-/** What a tool without a Tool Chest tool draws with (set in the Properties panel while it is picked). */
+/** What a tool without a Tool Library tool draws with (set in the Properties panel while it is picked). */
 export interface TypeDefault {
   style: MarkupStyle;
   subject?: string;
   label?: string;
-  /** Custom column values by column name, as Tool Chest tools keep them. */
+  /** Custom column values by column name, as Tool Library tools keep them. */
   custom?: Record<string, CustomValue>;
   depth?: number;
   width?: number;
@@ -355,7 +359,7 @@ export interface AppState {
   /** Members found by the automatic takeoff, waiting to be reviewed and created (not saved). */
   autoTakeoff: AutoTakeoffState | null;
   prefs: Prefs;
-  toolChest: ToolSet[];
+  toolLibrary: ToolSet[];
   typeDefaults: Partial<Record<MarkupType, TypeDefault>>;
   toasts: Toast[];
   lastSaved: number | null;
@@ -454,7 +458,7 @@ export interface AppState {
   setTypeDefault: (type: MarkupType, d: TypeDefault | null) => void;
   /** The markup the current tool draws next (no points yet): what the Properties panel shows before drawing. */
   nextMarkup: () => Markup | null;
-  /** Change what the current tool draws: its Tool Chest tool, else the defaults for its type. */
+  /** Change what the current tool draws: its Tool Library tool, else the defaults for its type. */
   editNextMarkup: (fn: (m: Markup) => Markup) => void;
 
   // columns / list
@@ -462,9 +466,9 @@ export interface AppState {
   updateColumn: (id: string, patch: Partial<CustomColumn>) => void;
   deleteColumn: (id: string) => void;
   setList: (patch: Partial<ListState>) => void;
-  /** Change how the active document's Markups List shows its columns (not an undo step). */
+  /** Change how the active document's Takeoff List shows its columns (not an undo step). */
   setListStyle: (patch: Partial<ListStyle>) => void;
-  /** Use a Markups List style on the active document: its custom columns are added or updated by name. */
+  /** Use a Takeoff List style on the active document: its custom columns are added or updated by name. */
   applyListStyle: (style: MarkupListStyle) => void;
 
   // layers
@@ -538,15 +542,15 @@ export interface AppState {
   resumeCount: (id: string) => void;
   setPrefs: (patch: Partial<Prefs>) => void;
 
-  // tool chest
-  setToolChest: (sets: ToolSet[]) => void;
+  // tool library
+  setToolLibrary: (sets: ToolSet[]) => void;
   addToolSet: (name: string) => string;
   updateToolSet: (id: string, patch: Partial<ToolSet>) => void;
   deleteToolSet: (id: string) => void;
-  upsertTool: (setId: string, tool: ChestTool) => void;
-  patchTool: (toolId: string, patch: Partial<ChestTool>) => void;
+  upsertTool: (setId: string, tool: LibraryTool) => void;
+  patchTool: (toolId: string, patch: Partial<LibraryTool>) => void;
   deleteTool: (setId: string, toolId: string) => void;
-  toolFromMarkup: (markupId: string, name?: string) => ChestTool | null;
+  toolFromMarkup: (markupId: string, name?: string) => LibraryTool | null;
 }
 
 export const emptyDoc = (): DocState => ({
@@ -611,8 +615,8 @@ export function defaultLayout(): LayoutState {
   return {
     panels: {
       sheets: place('left', 0),
-      toolchest: place('right', 1),
-      // Measurements in its own section below the Tool Chest, then Properties (it opens when a markup is
+      toollibrary: place('right', 1),
+      // Measurements in its own section below the Tool Library, then Properties (it opens when a markup is
       // drawn or selected): stacked, each resized by the splitter between them.
       properties: { ...place('right', 2), section: 2 },
       measurements: { ...place('right', 3), section: 1 },
@@ -623,7 +627,7 @@ export function defaultLayout(): LayoutState {
       summary: { ...place('bottom', 8), float: { x: 190, y: 250, w: 760, h: 360 } },
     },
     // Small screens start with the drawing visible; side panels open as overlays on demand.
-    active: { left: [narrow ? null : 'sheets'], right: [narrow ? null : 'toolchest', narrow ? null : 'measurements', null], top: [null], bottom: ['markups'] },
+    active: { left: [narrow ? null : 'sheets'], right: [narrow ? null : 'toollibrary', narrow ? null : 'measurements', null], top: [null], bottom: ['markups'] },
     split: { left: [1], right: [1.3, 1, 1.2], top: [1], bottom: [1] },
     propsOwn: true,
     measOwn: true,
@@ -636,7 +640,7 @@ export function defaultLayout(): LayoutState {
 
 function loadLayout(): LayoutState {
   const d = defaultLayout();
-  const saved = lsGet<Partial<LayoutState> | null>('ts.layout', null);
+  const saved = renameIds(lsGet<Partial<LayoutState> | null>('ts.layout', null));
   if (!saved) return d;
   const panels = { ...d.panels };
   for (const id of PANEL_IDS) if (saved.panels?.[id]) panels[id] = { ...d.panels[id], ...saved.panels[id] };
@@ -740,11 +744,14 @@ const attachedPanes = (panes: Pane[]) => panes.filter((p) => !p.detached);
 /** The id of the markup a tool draws next (shown in the Properties panel before drawing). */
 export const NEXT_MARKUP_ID = '__next';
 
+// Settings kept under earlier names are moved to the current ones before anything is read.
+if (typeof localStorage !== 'undefined') moveRenamedKeys(localStorage);
+
 /** Where the license key is kept on this computer, and when the trial started. */
 const LICENSE_KEY = 'ts.license';
 const TRIAL_KEY = 'ts.trial';
-/** The built-in tools already added to a saved Tool Chest (see addNewTools). */
-const CHEST_ADDED_KEY = 'ts.chestAdded';
+/** The built-in tools already added to a saved Tool Library (see addNewTools). */
+const LIBRARY_ADDED_KEY = 'ts.libraryAdded';
 
 const defaultPrefs = (): Prefs => ({
   author: 'Estimator',
@@ -754,6 +761,7 @@ const defaultPrefs = (): Prefs => ({
   ortho: false,
   crosshair: 'off',
   autoPan: true,
+  uiScale: 1,
   wheelZoom: true,
   showLabels: true,
   autoStyles: defaultAutoStyles(),
@@ -786,7 +794,7 @@ function loadPrefs(): Prefs {
     ...saved,
     auto: { ...d.auto, ...oldAuto, ...saved.auto },
     nudge: { ...d.nudge, ...saved.nudge },
-    keys: { ...saved.keys },
+    keys: Object.fromEntries(Object.entries(saved.keys ?? {}).map(([k, v]) => [currentCommandId(k), v])),
     perf: { ...d.perf, ...saved.perf },
     autoStyles: Array.isArray(saved.autoStyles) ? saved.autoStyles : d.autoStyles,
     subjects: Array.isArray(saved.subjects) ? cleanSubjects(saved.subjects.map(String)) : d.subjects,
@@ -806,15 +814,15 @@ let clipColumns: CustomColumn[] = [];
 const keepStyle = (d: DocState, cur: DocState): DocState => (d.listStyle === cur.listStyle ? d : { ...d, listStyle: cur.listStyle });
 
 export const useStore = create<AppState>()((set, get, api) => {
-  const savedChest = lsGet<ToolSet[] | null>('ts.toolchest', null);
+  const savedLibrary = lsGet<ToolSet[] | null>('ts.toollibrary', null);
   // Saved before sizes were written with a capital X, and before the newer built-in tools.
-  const toolChestFromStorage = (() => {
-    if (!savedChest) return null;
-    const done = lsGet<string[]>(CHEST_ADDED_KEY, []);
-    const added = addNewTools(upgradeToolChest(savedChest), done);
+  const toolLibraryFromStorage = (() => {
+    if (!savedLibrary) return null;
+    const done = lsGet<string[]>(LIBRARY_ADDED_KEY, []);
+    const added = addNewTools(upgradeToolLibrary(savedLibrary), done);
     if (added.done.length !== done.length) {
-      lsSet(CHEST_ADDED_KEY, added.done);
-      lsSet('ts.toolchest', added.sets);
+      lsSet(LIBRARY_ADDED_KEY, added.done);
+      lsSet('ts.toollibrary', added.sets);
     }
     return added.sets;
   })();
@@ -839,12 +847,12 @@ export const useStore = create<AppState>()((set, get, api) => {
 
   /** A new markup with the current tool's (or the type's default) properties; not yet added. */
   const buildMarkup = (type: MarkupType, sheetId: string, points: Pt[], extra: Partial<Markup> = {}): Markup => {
-    const { tool, toolChest, prefs, typeDefaults, doc } = get();
-    const chestTool =
-      tool.kind === 'markup' && tool.chestToolId ? toolChest.flatMap((s) => s.tools).find((t) => t.id === tool.chestToolId) : undefined;
+    const { tool, toolLibrary, prefs, typeDefaults, doc } = get();
+    const libraryTool =
+      tool.kind === 'markup' && tool.libraryToolId ? toolLibrary.flatMap((s) => s.tools).find((t) => t.id === tool.libraryToolId) : undefined;
     const td = typeDefaults[type];
     const custom: Record<string, CustomValue> = {};
-    const own = chestTool ? chestTool.custom : td?.custom;
+    const own = libraryTool ? libraryTool.custom : td?.custom;
     if (own) {
       const byName = new Map(doc.columns.map((c) => [normName(c.name), c.id]));
       for (const [k, v] of Object.entries(own)) {
@@ -853,31 +861,31 @@ export const useStore = create<AppState>()((set, get, api) => {
       }
     }
     const layerIds = new Set(doc.layers.map((l) => l.id));
-    const toolLayer = chestTool ? chestTool.layer : td?.layer;
+    const toolLayer = libraryTool ? libraryTool.layer : td?.layer;
     const layer = toolLayer && layerIds.has(toolLayer) ? toolLayer : '';
-    const dims = chestTool ?? td;
+    const dims = libraryTool ?? td;
     const now = Date.now();
     // Size tools stamp their current size on the markup (label, optionally subject and Member Size).
-    const size = chestTool?.sizeTool?.value.trim() ?? '';
-    if (size && chestTool?.sizeTool?.setMemberSize) {
+    const size = libraryTool?.sizeTool?.value.trim() ?? '';
+    if (size && libraryTool?.sizeTool?.setMemberSize) {
       const col = doc.columns.find((c) => normName(c.name) === 'membersize');
       if (col) custom[col.id] = size;
     }
     // The subject is a shape from the user's list: a size tool's size's shape, else the tool's own
     // subject when it is one, else the shape of the tool's Member Size (W24X55 → W), else none.
-    const toolSize = chestTool && Object.entries(chestTool.custom).find(([k]) => normName(k) === 'membersize')?.[1];
+    const toolSize = libraryTool && Object.entries(libraryTool.custom).find(([k]) => normName(k) === 'membersize')?.[1];
     const subject =
       (size ? subjectForSize(size, prefs.subjects) : undefined) ??
-      (findSubject(chestTool?.subject ?? '', prefs.subjects) || undefined) ??
+      (findSubject(libraryTool?.subject ?? '', prefs.subjects) || undefined) ??
       (toolSize ? subjectForSize(String(toolSize), prefs.subjects) : undefined) ??
-      (subjectFor(chestTool?.subject ?? td?.subject, prefs.subjects) || '');
+      (subjectFor(libraryTool?.subject ?? td?.subject, prefs.subjects) || '');
     const m: Markup = {
       id: uid('m'),
       sheetId,
       type,
       points,
       subject,
-      label: size || (chestTool ? chestTool.label : td?.label) || '',
+      label: size || (libraryTool ? libraryTool.label : td?.label) || '',
       comments: '',
       author: prefs.author,
       created: now,
@@ -885,10 +893,10 @@ export const useStore = create<AppState>()((set, get, api) => {
       status: 'None',
       checked: false,
       layer,
-      style: { ...(chestTool?.style ?? td?.style ?? defaultStyle(type)) },
+      style: { ...(libraryTool?.style ?? td?.style ?? defaultStyle(type)) },
       custom,
-      toolId: chestTool?.id,
-      text: chestTool?.text ?? (type === 'stamp' ? 'APPROVED' : undefined),
+      toolId: libraryTool?.id,
+      text: libraryTool?.text ?? (type === 'stamp' ? 'APPROVED' : undefined),
       depth: type === 'volume' ? dims?.depth ?? 4 : dims?.depth,
       width: dims?.width,
       units: dims?.units ? { ...dims.units } : undefined,
@@ -900,9 +908,9 @@ export const useStore = create<AppState>()((set, get, api) => {
   const mapMarkups = (ids: Set<string>, fn: (m: Markup) => Markup) =>
     commit((d) => ({ ...d, markups: d.markups.map((m) => (ids.has(m.id) ? { ...fn(m), modified: Date.now() } : m)) }));
 
-  const saveChest = (sets: ToolSet[]) => {
-    lsSet('ts.toolchest', sets);
-    set({ toolChest: sets });
+  const saveLibrary = (sets: ToolSet[]) => {
+    lsSet('ts.toollibrary', sets);
+    set({ toolLibrary: sets });
   };
 
   const setLayout = (patch: Partial<LayoutState>) => {
@@ -1045,8 +1053,8 @@ export const useStore = create<AppState>()((set, get, api) => {
       setUserUnits(p.units);
       return p;
     })(),
-    toolChest: toolChestFromStorage ?? defaultToolChest(),
-    typeDefaults: lsGet('ts.typeDefaults', {}),
+    toolLibrary: toolLibraryFromStorage ?? defaultToolLibrary(),
+    typeDefaults: renameIds(lsGet('ts.typeDefaults', {})),
     toasts: [],
     lastSaved: null,
 
@@ -1393,14 +1401,14 @@ export const useStore = create<AppState>()((set, get, api) => {
       return { ...buildMarkup(tool.type, currentSheetId ?? '', []), id: NEXT_MARKUP_ID, created: 0, modified: 0 };
     },
     editNextMarkup: (fn) => {
-      const { tool, toolChest, doc, typeDefaults } = get();
+      const { tool, toolLibrary, doc, typeDefaults } = get();
       const before = get().nextMarkup();
       if (!before || tool.kind !== 'markup') return;
       const m = fn(before);
-      const chestTool = tool.chestToolId ? toolChest.flatMap((x) => x.tools).find((t) => t.id === tool.chestToolId) : undefined;
+      const libraryTool = tool.libraryToolId ? toolLibrary.flatMap((x) => x.tools).find((t) => t.id === tool.libraryToolId) : undefined;
       const td = typeDefaults[tool.type];
       // Column values by column name, as tools keep them; the tool's values for columns not in this project stay.
-      const custom: Record<string, CustomValue> = { ...(chestTool ? chestTool.custom : td?.custom) };
+      const custom: Record<string, CustomValue> = { ...(libraryTool ? libraryTool.custom : td?.custom) };
       for (const c of doc.columns) {
         if (c.kind === 'formula') continue;
         for (const k of Object.keys(custom)) if (normName(k) === normName(c.name)) delete custom[k];
@@ -1408,12 +1416,12 @@ export const useStore = create<AppState>()((set, get, api) => {
         if (v !== undefined && v !== '') custom[c.name] = v;
       }
       const props = { subject: m.subject, style: m.style, depth: m.depth, width: m.width, units: m.units, layer: m.layer || undefined, custom };
-      if (!chestTool) return get().setTypeDefault(tool.type, { ...td, ...props, label: m.label || undefined });
-      const size = chestTool.sizeTool;
-      if (!size) return get().patchTool(chestTool.id, { ...props, label: m.label || undefined, text: m.text });
+      if (!libraryTool) return get().setTypeDefault(tool.type, { ...td, ...props, label: m.label || undefined });
+      const size = libraryTool.sizeTool;
+      if (!size) return get().patchTool(libraryTool.id, { ...props, label: m.label || undefined, text: m.text });
       // A size tool: its Label is its size (and its Member Size comes from that).
       if (size.setMemberSize) for (const k of Object.keys(custom)) if (normName(k) === 'membersize') delete custom[k];
-      get().patchTool(chestTool.id, { ...props, ...(m.label !== before.label && m.label.trim() ? { sizeTool: { ...size, value: m.label } } : {}) });
+      get().patchTool(libraryTool.id, { ...props, ...(m.label !== before.label && m.label.trim() ? { sizeTool: { ...size, value: m.label } } : {}) });
     },
 
     addColumn: (c) => {
@@ -1535,8 +1543,9 @@ export const useStore = create<AppState>()((set, get, api) => {
       set({ ui });
     },
     setPrefs: (patch) => {
-      const prefs = { ...get().prefs, ...patch };
+      const prefs = { ...get().prefs, ...patch, ...(patch.uiScale !== undefined ? { uiScale: clampUiScale(patch.uiScale) } : {}) };
       if (patch.units) setUserUnits(prefs.units);
+      if (patch.uiScale !== undefined) applyUiScale(prefs.uiScale);
       lsSet('ts.prefs', prefs);
       set({ prefs });
     },
@@ -1775,31 +1784,31 @@ export const useStore = create<AppState>()((set, get, api) => {
       const m = st.doc.markups.find((x) => x.id === id);
       if (!m || m.type !== 'count') return;
       if (m.sheetId !== st.currentSheetId) st.setCurrentSheet(m.sheetId);
-      const chestToolId = m.toolId && st.toolChest.some((s) => s.tools.some((t) => t.id === m.toolId)) ? m.toolId : undefined;
-      set({ tool: { kind: 'markup', type: 'count', chestToolId, resumeId: id }, selection: [id], editingTextId: null });
+      const libraryToolId = m.toolId && st.toolLibrary.some((s) => s.tools.some((t) => t.id === m.toolId)) ? m.toolId : undefined;
+      set({ tool: { kind: 'markup', type: 'count', libraryToolId, resumeId: id }, selection: [id], editingTextId: null });
       st.toast(`Resumed “${m.subject}” – click to add more. Esc to finish.`);
     },
 
-    setToolChest: (sets) => saveChest(sets),
+    setToolLibrary: (sets) => saveLibrary(sets),
     addToolSet: (name) => {
       const id = uid('set');
-      saveChest([...get().toolChest, { id, name, tools: [] }]);
+      saveLibrary([...get().toolLibrary, { id, name, tools: [] }]);
       return id;
     },
-    updateToolSet: (id, patch) => saveChest(get().toolChest.map((s) => (s.id === id ? { ...s, ...patch } : s))),
-    deleteToolSet: (id) => saveChest(get().toolChest.filter((s) => s.id !== id)),
+    updateToolSet: (id, patch) => saveLibrary(get().toolLibrary.map((s) => (s.id === id ? { ...s, ...patch } : s))),
+    deleteToolSet: (id) => saveLibrary(get().toolLibrary.filter((s) => s.id !== id)),
     upsertTool: (setId, tool) =>
-      saveChest(
-        get().toolChest.map((s) => {
+      saveLibrary(
+        get().toolLibrary.map((s) => {
           if (s.id !== setId) return { ...s, tools: s.tools.filter((t) => t.id !== tool.id) };
           const exists = s.tools.some((t) => t.id === tool.id);
           return { ...s, tools: exists ? s.tools.map((t) => (t.id === tool.id ? tool : t)) : [...s.tools, tool] };
         }),
       ),
     patchTool: (toolId, patch) =>
-      saveChest(get().toolChest.map((s) => (s.tools.some((t) => t.id === toolId) ? { ...s, tools: s.tools.map((t) => (t.id === toolId ? { ...t, ...patch } : t)) } : s))),
+      saveLibrary(get().toolLibrary.map((s) => (s.tools.some((t) => t.id === toolId) ? { ...s, tools: s.tools.map((t) => (t.id === toolId ? { ...t, ...patch } : t)) } : s))),
     deleteTool: (setId, toolId) =>
-      saveChest(get().toolChest.map((s) => (s.id === setId ? { ...s, tools: s.tools.filter((t) => t.id !== toolId) } : s))),
+      saveLibrary(get().toolLibrary.map((s) => (s.id === setId ? { ...s, tools: s.tools.filter((t) => t.id !== toolId) } : s))),
     toolFromMarkup: (markupId, name) => {
       const { doc } = get();
       const m = doc.markups.find((x) => x.id === markupId);

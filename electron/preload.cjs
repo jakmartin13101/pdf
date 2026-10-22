@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('buildsuite', {
   setGraphics: (mode) => ipcRenderer.invoke('buildsuite:set-graphics', mode),
   relaunch: () => ipcRenderer.invoke('buildsuite:relaunch'),
   computerId: () => ipcRenderer.invoke('buildsuite:computer-id'),
+  setZoom: (factor) => ipcRenderer.invoke('buildsuite:set-zoom', factor),
   onOpenFiles: (callback) => {
     const listener = (_event, files) => callback(files);
     ipcRenderer.on('buildsuite:open-files', listener);

@@ -459,7 +459,7 @@ export function StandardDetailsDialog({ detailId, newForMarkupId, newForMarkupId
                   </button>
                 </div>
               ) : (
-                <div className="hint">Select markups in the drawing or the Markups List (Ctrl+click or drag a box for several), then right-click them → Standard Details, or open this dialog to add a detail to them by hand.</div>
+                <div className="hint">Select markups in the drawing or the Takeoff List (Ctrl+click or drag a box for several), then right-click them → Standard Details, or open this dialog to add a detail to them by hand.</div>
               )}
             </div>
 

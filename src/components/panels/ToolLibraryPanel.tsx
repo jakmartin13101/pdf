@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, EyeOff, FolderPlus, MoreHorizontal, Plus, Wrench } from 'lucide-react';
-import type { ChestTool, ToolSet } from '../../types';
+import type { LibraryTool, ToolSet } from '../../types';
 import { getState, useStore } from '../../store/store';
 import { ToolSwatch } from '../icons';
 import { TYPE_INFO } from '../../core/markupTypes';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
-import { defaultToolChest } from '../../core/defaults';
+import { defaultToolLibrary } from '../../core/defaults';
 import { offerFile } from '../../store/files';
-import { cmdImportToolChest } from '../../store/commands';
+import { cmdImportToolLibrary } from '../../store/commands';
 import { uid } from '../../core/ids';
 import { normalizeSize, SHAPE_FAMILIES } from '../../core/steelShapes';
 import { PanelHeader } from '../dock/PanelHeader';
@@ -22,7 +22,7 @@ export function BeamIcon({ size = 14 }: { size?: number }) {
 }
 
 /** The editable size box shown on size tools; the value stays on the tool until changed here. */
-function SizeBox({ tool, onEnter }: { tool: ChestTool; onEnter: () => void }) {
+function SizeBox({ tool, onEnter }: { tool: LibraryTool; onEnter: () => void }) {
   const cfg = tool.sizeTool!;
   const [v, setV] = useState(cfg.value);
   useEffect(() => setV(cfg.value), [cfg.value]);
@@ -59,8 +59,8 @@ function SizeBox({ tool, onEnter }: { tool: ChestTool; onEnter: () => void }) {
   );
 }
 
-export function ToolChestPanel() {
-  const sets = useStore((s) => s.toolChest);
+export function ToolLibraryPanel() {
+  const sets = useStore((s) => s.toolLibrary);
   const tool = useStore((s) => s.tool);
   const selection = useStore((s) => s.selection);
   const loaded = useStore((s) => s.loaded);
@@ -70,14 +70,14 @@ export function ToolChestPanel() {
   const st = getState;
   const hiddenCount = sets.reduce((n, s) => n + (s.hidden ? 1 : 0) + s.tools.filter((t) => t.hidden).length, 0);
 
-  const activate = (t: ChestTool, toggle = true) => {
+  const activate = (t: LibraryTool, toggle = true) => {
     if (!loaded) return;
     const cur = st().tool;
-    if (toggle && cur.kind === 'markup' && cur.chestToolId === t.id) st().setTool({ kind: 'select' });
-    else st().setTool({ kind: 'markup', type: t.type, chestToolId: t.id });
+    if (toggle && cur.kind === 'markup' && cur.libraryToolId === t.id) st().setTool({ kind: 'select' });
+    else st().setTool({ kind: 'markup', type: t.type, libraryToolId: t.id });
   };
 
-  const toolMenu = (e: React.MouseEvent, set: ToolSet, t: ChestTool) => {
+  const toolMenu = (e: React.MouseEvent, set: ToolSet, t: LibraryTool) => {
     e.preventDefault();
     e.stopPropagation();
     setMenu({
@@ -141,7 +141,7 @@ export function ToolChestPanel() {
 
   return (
     <div className="panel" style={{ height: '100%' }}>
-      <PanelHeader title="Tool Chest" icon={<Wrench size={14} />}>
+      <PanelHeader title="Tool Library" icon={<Wrench size={14} />}>
         <button
           className="icon-btn"
           title="New steel shape / size tool (W, HSS, L, C… or any measurement with a typed label)"
@@ -155,7 +155,7 @@ export function ToolChestPanel() {
         </button>
         <button
           className="icon-btn"
-          title="Add selected markup to the tool chest"
+          title="Add selected markup to the tool library"
           disabled={selection.length !== 1}
           onClick={() => st().setDialog({ kind: 'toolEdit', setId: sets[0]?.id ?? st().addToolSet('My Tools'), fromMarkupId: selection[0] })}
         >
@@ -171,17 +171,17 @@ export function ToolChestPanel() {
         </button>
         <button
           className="icon-btn"
-          title="More: import, export or restore the default tool chest"
+          title="More: import, export or restore the default tool library"
           onClick={(e) => {
             const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
             setMenu({
               x: r.left,
               y: r.bottom + 2,
               items: [
-                { label: 'Import Tool Sets…', onClick: cmdImportToolChest },
+                { label: 'Import Tool Sets…', onClick: cmdImportToolLibrary },
                 {
-                  label: 'Export Tool Chest…',
-                  onClick: () => void offerFile(new Blob([JSON.stringify({ toolSets: sets }, null, 2)], { type: 'application/json' }), 'toolchest.json', 'Tool chest'),
+                  label: 'Export Tool Library…',
+                  onClick: () => void offerFile(new Blob([JSON.stringify({ toolSets: sets }, null, 2)], { type: 'application/json' }), 'toollibrary.json', 'Tool library'),
                 },
                 { sep: true },
                 {
@@ -189,9 +189,9 @@ export function ToolChestPanel() {
                   onClick: () =>
                     st().setDialog({
                       kind: 'confirm',
-                      title: 'Restore Default Tool Chest',
-                      message: 'Replace your tool chest with the default estimating tool sets?',
-                      onConfirm: () => st().setToolChest(defaultToolChest()),
+                      title: 'Restore Default Tool Library',
+                      message: 'Replace your tool library with the default estimating tool sets?',
+                      onConfirm: () => st().setToolLibrary(defaultToolLibrary()),
                     }),
                 },
               ],
@@ -201,13 +201,13 @@ export function ToolChestPanel() {
           <MoreHorizontal size={14} />
         </button>
       </PanelHeader>
-      <div className="panel-body" data-testid="toolchest">
+      <div className="panel-body" data-testid="toollibrary">
         {visibleSets.map((set) => {
           const tools = showHidden ? set.tools : set.tools.filter((t) => !t.hidden);
           const hiddenInSet = set.tools.length - set.tools.filter((t) => !t.hidden).length;
           return (
-            <div className={`chest-set${set.hidden ? ' is-hidden' : ''}`} key={set.id}>
-              <div className="chest-set-head" onClick={() => st().updateToolSet(set.id, { collapsed: !set.collapsed })} onContextMenu={(e) => setMenuFor(e, set)}>
+            <div className={`library-set${set.hidden ? ' is-hidden' : ''}`} key={set.id}>
+              <div className="library-set-head" onClick={() => st().updateToolSet(set.id, { collapsed: !set.collapsed })} onContextMenu={(e) => setMenuFor(e, set)}>
                 {set.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 {renaming === set.id ? (
                   <input
@@ -251,13 +251,13 @@ export function ToolChestPanel() {
                 </button>
               </div>
               {!set.collapsed && (
-                <div className="chest-tools">
+                <div className="library-tools">
                   {tools.map((t) => (
                     <div
                       key={t.id}
                       role="button"
                       tabIndex={0}
-                      className={`chest-tool${t.sizeTool ? ' size-tool' : ''}${t.hidden ? ' is-hidden' : ''}${tool.kind === 'markup' && tool.chestToolId === t.id ? ' active' : ''}${!loaded ? ' disabled' : ''}`}
+                      className={`library-tool${t.sizeTool ? ' size-tool' : ''}${t.hidden ? ' is-hidden' : ''}${tool.kind === 'markup' && tool.libraryToolId === t.id ? ' active' : ''}${!loaded ? ' disabled' : ''}`}
                       onClick={() => activate(t)}
                       onKeyDown={(e) => e.key === 'Enter' && activate(t)}
                       onDoubleClick={() =>
@@ -265,7 +265,7 @@ export function ToolChestPanel() {
                       }
                       onContextMenu={(e) => toolMenu(e, set, t)}
                       title={`${t.name} – ${TYPE_INFO[t.type].listName}${Object.keys(t.custom).length ? '\n' + Object.entries(t.custom).map(([k, v]) => `${k}: ${v}`).join('\n') : ''}`}
-                      data-testid="chest-tool"
+                      data-testid="library-tool"
                     >
                       <ToolSwatch tool={t} />
                       <span style={{ minWidth: 0, flex: 1 }}>
@@ -293,7 +293,7 @@ export function ToolChestPanel() {
                   ))}
                   {!tools.length && (
                     <div className="hint" style={{ padding: 6 }}>
-                      {set.tools.length ? 'All tools in this set are hidden.' : 'Empty set. Right-click a markup → Add to Tool Chest.'}
+                      {set.tools.length ? 'All tools in this set are hidden.' : 'Empty set. Right-click a markup → Add to Tool Library.'}
                     </div>
                   )}
                 </div>
@@ -312,7 +312,7 @@ export function ToolChestPanel() {
 }
 
 /** Re-style selected markups with a tool's properties ("Apply Tool Properties"). */
-export function applyToolToSelection(t: ChestTool) {
+export function applyToolToSelection(t: LibraryTool) {
   const st = getState();
   const cols = new Map(st.doc.columns.map((c) => [c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c.id]));
   const size = t.sizeTool?.value.trim() ?? '';

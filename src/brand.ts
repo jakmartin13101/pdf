@@ -28,6 +28,8 @@ export interface DesktopBridge {
   relaunch?(): Promise<void>;
   /** This computer's ID for licenses tied to computers (from the operating system's machine ID). */
   computerId?(): Promise<string>;
+  /** Zooms every window of the program (text and icon size); kept for the next start. */
+  setZoom?(factor: number): Promise<void>;
 }
 
 export type GpuMode = 'auto' | 'off' | 'force';

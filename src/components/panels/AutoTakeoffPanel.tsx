@@ -2,7 +2,7 @@
 // create length measurements for them in one step.
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Loader2, RotateCcw, ScanLine, Trash2, Wand2 } from 'lucide-react';
-import type { ChestTool, CustomValue, DocState, Markup, MarkupStyle, Scale, Sheet } from '../../types';
+import type { LibraryTool, CustomValue, DocState, Markup, MarkupStyle, Scale, Sheet } from '../../types';
 import { autoIncluded, currentSheet, featureOn, getState, useStore, type AutoMember, type AutoOptions, type AutoTakeoffState } from '../../store/store';
 import { EndAdjuster, LineSample, endNames } from '../EndAdjuster';
 import { autoLook, autoSubject } from '../../core/autoStyles';
@@ -16,8 +16,8 @@ import { pageVectors } from '../../core/pdf';
 import { MEMBER_FAMILIES, existingMeasurements, extendMember, findMemberLabels, matchMembers, printedScales } from '../../core/autoTakeoff';
 import { findPreset, fmtNumber, formatLength, isMetric, lengthToReport, parseLength, scaleFromPreset, LENGTH_SUFFIX } from '../../core/units';
 
-/** Markup fields for a member: from its Tool Chest tool when there is one, else plain steel. */
-function markupFields(doc: DocState, tool: ChestTool | undefined, style: MarkupStyle, m: AutoMember, subjects: string[]): Partial<Markup> {
+/** Markup fields for a member: from its Tool Library tool when there is one, else plain steel. */
+function markupFields(doc: DocState, tool: LibraryTool | undefined, style: MarkupStyle, m: AutoMember, subjects: string[]): Partial<Markup> {
   const byName = new Map(doc.columns.map((c) => [normName(c.name), c]));
   const custom: Record<string, CustomValue> = {};
   const put = (name: string, v: CustomValue) => {
@@ -56,7 +56,7 @@ function AutoTakeoff() {
   const doc = useStore((s) => s.doc);
   const sheet = useStore(currentSheet);
   const result = useStore((s) => s.autoTakeoff);
-  const chest = useStore((s) => s.toolChest);
+  const library = useStore((s) => s.toolLibrary);
   const prefs = useStore((s) => s.prefs);
   const opts = prefs.auto;
   const [busy, setBusy] = useState<string | null>(null);
@@ -68,9 +68,9 @@ function AutoTakeoff() {
   };
   const looks = useMemo(() => {
     const out = new Map<string, ReturnType<typeof autoLook>>();
-    for (const m of result?.members ?? []) if (!out.has(m.size)) out.set(m.size, autoLook(chest, prefs, m.size));
+    for (const m of result?.members ?? []) if (!out.has(m.size)) out.set(m.size, autoLook(library, prefs, m.size));
     return out;
-  }, [result, chest, prefs]);
+  }, [result, library, prefs]);
 
   const sheetsById = useMemo(() => new Map(doc.sheets.map((s) => [s.id, s])), [doc.sheets]);
   const extendIn = opts.extend.trim() ? parseLength(opts.extend, 'ft-in') : 0;
@@ -165,7 +165,7 @@ function AutoTakeoff() {
     }
     const items = included.map((m) => {
       const sh = sheetsById.get(m.sheetId)!;
-      const look = looks.get(m.size) ?? autoLook(chest, prefs, m.size);
+      const look = looks.get(m.size) ?? autoLook(library, prefs, m.size);
       return { sheetId: m.sheetId, points: pointsFor(m, scaleFor(sh, m)), extra: markupFields(doc, look.tool, look.style, m, prefs.subjects) };
     });
     st.setTool({ kind: 'select' });
@@ -309,7 +309,7 @@ function AutoTakeoff() {
                         {(() => {
                           const look = looks.get(size);
                           return look ? (
-                            <span title={look.rule ? `Line style rule: subject ${look.rule.match === 'is' ? 'is' : look.rule.match === 'contains' ? 'contains' : 'starts with'} “${look.rule.text}”` : look.tool ? `Tool Chest tool “${look.tool.name}”` : 'Colour for this size'}>
+                            <span title={look.rule ? `Line style rule: subject ${look.rule.match === 'is' ? 'is' : look.rule.match === 'contains' ? 'contains' : 'starts with'} “${look.rule.text}”` : look.tool ? `Tool Library tool “${look.tool.name}”` : 'Colour for this size'}>
                               <LineSample style={look.style} width={22} />
                             </span>
                           ) : null;

@@ -3,7 +3,7 @@ import { DEFAULT_SUBJECTS, cleanSubjects, findSubject, splitOldSubject, subjectF
 import { summaryKey } from '../src/core/summary';
 import { newAutoStyle, withRule } from '../src/core/autoStyles';
 import { defaultStyle, textColor } from '../src/core/markupTypes';
-import { defaultToolChest } from '../src/core/defaults';
+import { defaultToolLibrary } from '../src/core/defaults';
 
 describe('subjects are shapes', () => {
   it('finds the shape a size belongs to', () => {
@@ -41,8 +41,8 @@ describe('subjects are shapes', () => {
     expect(summaryKey('', '')).toBe('(no subject)');
   });
 
-  it('starts the Tool Chest with shape subjects', () => {
-    const tools = defaultToolChest().flatMap((s) => s.tools);
+  it('starts the Tool Library with shape subjects', () => {
+    const tools = defaultToolLibrary().flatMap((s) => s.tools);
     const by = (name: string) => tools.find((t) => t.name === name)!.subject;
     expect(by('W24X55')).toBe('W');
     expect(by('HSS6X6X3/8 Column')).toBe('HSS');

@@ -18,7 +18,7 @@ export interface DockTarget {
 }
 
 /** Every panel, in the order of their tabs. */
-export const PANEL_IDS: PanelId[] = ['sheets', 'toolchest', 'properties', 'measurements', 'layers', 'compare', 'autotakeoff', 'markups', 'summary'];
+export const PANEL_IDS: PanelId[] = ['sheets', 'toollibrary', 'properties', 'measurements', 'layers', 'compare', 'autotakeoff', 'markups', 'summary'];
 const ORDER = PANEL_IDS;
 
 export const sectionCount = (l: LayoutState, side: DockSide) => Math.max(1, l.split[side]?.length ?? 1);
@@ -169,7 +169,7 @@ export function upgradeLayout(l: LayoutState): LayoutState {
 
 /**
  * Once: Properties sharing its dock section with other panels gets a section of its own below them (closed
- * unless it was showing), so opening it on a selection doesn't hide the Tool Chest.
+ * unless it was showing), so opening it on a selection doesn't hide the Tool Library.
  */
 export function propertiesOwnSection(l: LayoutState): LayoutState {
   const p = l.panels.properties;
@@ -187,7 +187,7 @@ export function propertiesOwnSection(l: LayoutState): LayoutState {
 
 
 /**
- * Once: Measurements sharing its dock section with other panels (the Tool Chest) gets a section of its
+ * Once: Measurements sharing its dock section with other panels (the Tool Library) gets a section of its
  * own, open, just below it – above Properties – so the three show stacked.
  */
 export function measurementsOwnSection(l: LayoutState): LayoutState {

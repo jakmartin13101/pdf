@@ -6,7 +6,7 @@ import { getState, useStore } from '../../store/store';
 import { allColumns, customColId } from '../../core/columns';
 import { buildSummary, primaryQuantity, summableCustomColumns } from '../../core/summary';
 import { AREA_SUFFIX, LENGTH_SUFFIX, VOLUME_SUFFIX, fmtNumber } from '../../core/units';
-import { useFilteredRows } from './MarkupsList';
+import { useFilteredRows } from './TakeoffList';
 import { exportSummaryCsv, printSummary } from '../MenuBar';
 import { csvBlob, summaryCsv } from '../../core/export';
 import { offerFile } from '../../store/files';
@@ -92,7 +92,7 @@ export function SummaryPanel() {
           </select>
         </label>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-dim)' }}>
-          <input type="checkbox" checked={useFilter} onChange={(e) => setUseFilter(e.target.checked)} /> Use Markups List filters
+          <input type="checkbox" checked={useFilter} onChange={(e) => setUseFilter(e.target.checked)} /> Use Takeoff List filters
         </label>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-dim)' }} title="Include the material standard details add">
           <input type="checkbox" checked={showDetails} onChange={(e) => getState().setList({ showDetails: e.target.checked })} data-testid="summary-toggle-details" /> Standard detail material

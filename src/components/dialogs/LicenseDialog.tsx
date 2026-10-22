@@ -11,7 +11,7 @@ import { Modal } from './Modal';
 /** What the tiers include, line by line. */
 const ROWS: { what: string; basic: boolean; pro: boolean }[] = [
   { what: 'Measuring, counts and markups; scales and viewports', basic: true, pro: true },
-  { what: 'Tool Chest, Markups List, Takeoff Summary and exports', basic: true, pro: true },
+  { what: 'Tool Library, Takeoff List, Takeoff Summary and exports', basic: true, pro: true },
   { what: 'Standard details, maximum lengths, split view', basic: true, pro: true },
   { what: `${FEATURES.combine.name} – cut list and order list`, basic: false, pro: true },
   { what: `${FEATURES.autoTakeoff.name} – beams and tubing`, basic: false, pro: true },

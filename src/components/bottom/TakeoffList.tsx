@@ -18,7 +18,7 @@ import { TYPE_ICON } from '../icons';
 import { ContextMenu, type MenuItem } from '../ContextMenu';
 import { exportMarkupsCsv } from '../MenuBar';
 import { bareUnit, fmtLen, formatLength, parseLength } from '../../core/units';
-import { applyToolToSelection } from '../panels/ToolChestPanel';
+import { applyToolToSelection } from '../panels/ToolLibraryPanel';
 import { detailMenuItems } from '../detailMenu';
 import { dimText, takesDepth, takesWidth } from '../../core/measure';
 
@@ -343,7 +343,7 @@ function Cell({ col, row, editing }: { col: ColumnSpec; row: Row; editing: boole
   }
 }
 
-export function MarkupsList() {
+export function TakeoffList() {
   // Inside the top/bottom tab bars the tab names the panel; elsewhere it needs its own header.
   const ctx = useContext(PanelContext);
   const showHeader = !!ctx && (ctx.dock === 'left' || ctx.dock === 'right' || ctx.dock === 'float');
@@ -469,7 +469,7 @@ export function MarkupsList() {
     }
     const ids = selection.includes(r.markup.id) ? selection : [r.markup.id];
     if (!selection.includes(r.markup.id)) s.setSelection(ids);
-    const chestTools = s.toolChest.flatMap((t) => t.tools);
+    const libraryTools = s.toolLibrary.flatMap((t) => t.tools);
     setMenu({
       x: e.clientX,
       y: e.clientY,
@@ -499,14 +499,14 @@ export function MarkupsList() {
         { label: r.markup.checked ? 'Uncheck' : 'Check', onClick: () => s.updateMarkups(ids, (m) => ({ ...m, checked: !r.markup.checked })) },
         {
           label: 'Apply Tool Properties',
-          children: chestTools.length
-            ? chestTools.slice(0, 40).map((t) => ({
+          children: libraryTools.length
+            ? libraryTools.slice(0, 40).map((t) => ({
                 label: t.name,
                 onClick: () => applyToolToSelection(t),
               }))
             : [{ label: '(no tools)', disabled: true }],
         },
-        { label: 'Add to Tool Chest…', onClick: () => s.setDialog({ kind: 'toolEdit', setId: s.toolChest[0]?.id ?? '', fromMarkupId: r.markup.id }) },
+        { label: 'Add to Tool Library…', onClick: () => s.setDialog({ kind: 'toolEdit', setId: s.toolLibrary[0]?.id ?? '', fromMarkupId: r.markup.id }) },
         { label: ids.length > 1 ? `Add Detail to ${ids.length} Markups…` : 'Add Detail…', onClick: () => s.setDialog({ kind: 'addDetail', markupIds: ids }) },
         { label: ids.length > 1 ? `Standard Details (${ids.length} selected)` : 'Standard Details', children: detailMenuItems(ids) },
         { sep: true },
@@ -585,7 +585,7 @@ export function MarkupsList() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-      {showHeader && <PanelHeader title="Markups List" icon={<Table2 size={14} />} />}
+      {showHeader && <PanelHeader title="Takeoff List" icon={<Table2 size={14} />} />}
       <div className="list-toolbar">
         <div className="search">
           <Search size={13} style={{ color: 'var(--text-faint)' }} />
@@ -666,7 +666,7 @@ export function MarkupsList() {
         >
           <LayoutTemplate size={14} />
         </button>
-        <button className="icon-btn" title="Export markups list to CSV" onClick={exportMarkupsCsv}>
+        <button className="icon-btn" title="Export takeoff list to CSV" onClick={exportMarkupsCsv}>
           <Download size={14} />
         </button>
       </div>
@@ -860,7 +860,7 @@ export function MarkupsList() {
             {!items.length && (
               <tr>
                 <td colSpan={visibleCols.length} className="empty-note" style={{ height: 60 }}>
-                  {rows.length ? 'No markups match the current filters.' : 'No markups yet. Pick a measurement tool or a Tool Chest tool and start your takeoff.'}
+                  {rows.length ? 'No markups match the current filters.' : 'No markups yet. Pick a measurement tool or a Tool Library tool and start your takeoff.'}
                 </td>
               </tr>
             )}

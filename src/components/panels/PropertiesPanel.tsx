@@ -35,7 +35,7 @@ export function PropertiesPanel() {
   const doc = useStore((s) => s.doc);
   const hidden = useStore((s) => s.prefs.propHidden);
   const tool = useStore((s) => s.tool);
-  const toolChest = useStore((s) => s.toolChest);
+  const toolLibrary = useStore((s) => s.toolLibrary);
   const [choosing, setChoosing] = useState(false);
   const selected = useMemo(() => {
     const s = new Set(selection);
@@ -53,7 +53,7 @@ export function PropertiesPanel() {
       <div className="panel" style={{ height: '100%' }}>
         <PanelHeader title="Properties" icon={<SlidersHorizontal size={14} />} />
         <div className="empty-note">
-          Select a markup on the drawing or in the Markups List to view and edit its properties and takeoff data.
+          Select a markup on the drawing or in the Takeoff List to view and edit its properties and takeoff data.
         </div>
       </div>
     );
@@ -65,7 +65,7 @@ export function PropertiesPanel() {
   const row = one ? rows[0] : null;
   const types = new Set(items.map((m) => m.type));
   const allMeasure = items.every((m) => TYPE_INFO[m.type].measure);
-  // Changes go to the selected markups, or to the tool (its Tool Chest tool, else its type's defaults).
+  // Changes go to the selected markups, or to the tool (its Tool Library tool, else its type's defaults).
   const update = (fn: (m: Markup) => Markup) => (forTool ? st.editNextMarkup(fn) : st.updateMarkups(ids, fn));
   const setCustom = (colId: string, v: CustomValue) => {
     if (!forTool) return st.setCustomValue(ids, colId, v);
@@ -75,14 +75,14 @@ export function PropertiesPanel() {
   };
   const setStyle = <K extends keyof MarkupStyle>(k: K, v: MarkupStyle[K]) => update((m) => ({ ...m, style: { ...m.style, [k]: v } }));
   const set = (patch: Partial<Markup>) => update((m) => ({ ...m, ...patch }));
-  const chestTool = forTool && tool.kind === 'markup' && tool.chestToolId ? toolChest.flatMap((x) => x.tools).find((t) => t.id === tool.chestToolId) : undefined;
+  const libraryTool = forTool && tool.kind === 'markup' && tool.libraryToolId ? toolLibrary.flatMap((x) => x.tools).find((t) => t.id === tool.libraryToolId) : undefined;
   const style = (k: keyof MarkupStyle) => common(items, (m) => m.style[k]);
   const Icon = one ? TYPE_ICON[one.type] : null;
   const sheet = one ? doc.sheets.find((s) => s.id === one.sheetId) : undefined;
   const vp = one && sheet && one.points[0] ? viewportAt(sheet, one.points[0]) : undefined;
   const hasLines = items.some((m) => !['count', 'text', 'stamp', 'highlight'].includes(m.type));
   const hasFill = items.some((m) => ['area', 'volume', 'polygon', 'rectangle', 'ellipse', 'cloud', 'text', 'callout', 'count', 'highlight'].includes(m.type));
-  const hasEnds = items.every((m) => ['length', 'line', 'arrow', 'polyline', 'polylength', 'callout'].includes(m.type));
+  const hasEnds = items.every((m) => ['length', 'line', 'arrow', 'polyline', 'pathlength', 'callout'].includes(m.type));
   const hasText = items.some((m) => TYPE_INFO[m.type].measure || ['text', 'callout'].includes(m.type));
   const byName = (n: string) => doc.columns.find((c) => normName(c.name) === n);
   const heightCol = byName('height');
@@ -416,8 +416,8 @@ export function PropertiesPanel() {
   })();
 
   const header = forTool ? (
-    <PanelHeader icon={<Wrench size={14} />} title={chestTool ? `Tool: ${chestTool.name}` : `${TYPE_INFO[one!.type].label} Tool`}>
-      {!chestTool && st.typeDefaults[one!.type] && (
+    <PanelHeader icon={<Wrench size={14} />} title={libraryTool ? `Tool: ${libraryTool.name}` : `${TYPE_INFO[one!.type].label} Tool`}>
+      {!libraryTool && st.typeDefaults[one!.type] && (
         <button className="icon-btn" title="Back to the built-in properties for this tool" onClick={() => st.setTypeDefault(one!.type, null)} data-testid="tool-props-reset">
           <RotateCcw size={14} />
         </button>
@@ -431,7 +431,7 @@ export function PropertiesPanel() {
         </button>
       )}
       {one && (
-        <button className="icon-btn" title="Add to Tool Chest" onClick={() => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: one.id })}>
+        <button className="icon-btn" title="Add to Tool Library" onClick={() => st.setDialog({ kind: 'toolEdit', setId: st.toolLibrary[0]?.id ?? '', fromMarkupId: one.id })}>
           <PackagePlus size={14} />
         </button>
       )}
@@ -452,7 +452,7 @@ export function PropertiesPanel() {
 
   const toolNote = forTool && (
     <div className="tool-props-note" data-testid="tool-props">
-      <b>Next {TYPE_INFO[one!.type].label.toLowerCase()}</b> – change anything before drawing. {chestTool ? `Kept in the Tool Chest tool “${chestTool.name}”.` : 'Kept as this tool’s defaults.'}
+      <b>Next {TYPE_INFO[one!.type].label.toLowerCase()}</b> – change anything before drawing. {libraryTool ? `Kept in the Tool Library tool “${libraryTool.name}”.` : 'Kept as this tool’s defaults.'}
     </div>
   );
 
@@ -515,7 +515,7 @@ export function PropertiesPanel() {
               }
               forceOpen={choosing}
             >
-              {choosing && <div className="hint">Tick the fields to show in this list. Hidden fields keep their values in the markup and the Markups List.</div>}
+              {choosing && <div className="hint">Tick the fields to show in this list. Hidden fields keep their values in the markup and the Takeoff List.</div>}
               {otherFields.map((f) =>
                 choosing ? (
                   <label key={f.key} className="prop-field-pick" data-testid="prop-field-pick">
@@ -576,7 +576,7 @@ export function PropertiesPanel() {
                 <CommitInput multiline value={one.text ?? ''} onCommit={(v) => set({ text: v })} />
               </div>
             )}
-            {types.has('stamp') && one && (!forTool || chestTool) && (
+            {types.has('stamp') && one && (!forTool || libraryTool) && (
               <div className="field">
                 <label>Stamp</label>
                 <select value={STAMP_TEXTS.includes(one.text ?? '') ? one.text : '__custom'} onChange={(e) => e.target.value !== '__custom' && set({ text: e.target.value })}>
@@ -587,7 +587,7 @@ export function PropertiesPanel() {
                 </select>
               </div>
             )}
-            {types.has('stamp') && one && (!forTool || chestTool) && (
+            {types.has('stamp') && one && (!forTool || libraryTool) && (
               <div className="field">
                 <label>Stamp text</label>
                 <CommitInput value={one.text ?? ''} onCommit={(v) => set({ text: v })} />

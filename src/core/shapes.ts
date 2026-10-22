@@ -87,7 +87,7 @@ export function symbolPath(sym: CountSymbol, p: Pt, r: number): string {
 
 export const OPEN_SYMBOLS = new Set<CountSymbol>(['check', 'cross']);
 
-/** Where to place a polylength label: midpoint of its longest segment. */
+/** Where to place a path length label: midpoint of its longest segment. */
 export function polylineLabelAnchor(pts: Pt[]): { p: Pt; angle: number } {
   let best = 1;
   let bestLen = -1;

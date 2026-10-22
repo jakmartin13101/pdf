@@ -83,9 +83,9 @@ export function FlattenDialog({ markupIds }: { markupIds?: string[] }) {
       )}
       <label className="set-check">
         <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} data-testid="flatten-keep" />
-        <span>Keep them in the takeoff (Markups List and Summary) – moved to a hidden, locked “Flattened” layer so they are not drawn twice</span>
+        <span>Keep them in the takeoff (Takeoff List and Summary) – moved to a hidden, locked “Flattened” layer so they are not drawn twice</span>
       </label>
-      {!keep && <div className="hint warn-text">The flattened markups are removed from the Markups List and Summary. Undo (Ctrl+Z) brings them back.</div>}
+      {!keep && <div className="hint warn-text">The flattened markups are removed from the Takeoff List and Summary. Undo (Ctrl+Z) brings them back.</div>}
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bentPlateTool, defaultToolChest } from '../src/core/defaults';
+import { bentPlateTool, defaultToolLibrary } from '../src/core/defaults';
 import { addNewTools } from '../src/core/docUpgrade';
 import { outlinePoints, pasteAnchor } from '../src/core/shapes';
 import { plf } from '../src/core/steelShapes';
@@ -17,7 +17,7 @@ describe('pasting: the copied markups are picked up by their farthest-left point
     // Page y runs down: the bottom has the greater y.
     expect(outlinePoints(at('rectangle', [[10, 20], [60, 90]]))).toHaveLength(4);
     expect(pasteAnchor([at('rectangle', [[10, 20], [60, 90]])])).toEqual({ x: 10, y: 90 });
-    expect(pasteAnchor([at('polylength', [[50, 10], [50, 120], [200, 120]])])).toEqual({ x: 50, y: 120 });
+    expect(pasteAnchor([at('pathlength', [[50, 10], [50, 120], [200, 120]])])).toEqual({ x: 50, y: 120 });
   });
 
   it('several markups by the farthest-left point of them all', () => {
@@ -28,17 +28,17 @@ describe('pasting: the copied markups are picked up by their farthest-left point
 });
 
 describe('bent plate measured as a length', () => {
-  it('a size tool in the Tool Chest: type BP sizes, each weighs by the foot', () => {
+  it('a size tool in the Tool Library: type BP sizes, each weighs by the foot', () => {
     const t = bentPlateTool();
     expect(t.type).toBe('length');
     expect(t.subject).toBe('BP');
     expect(t.sizeTool).toMatchObject({ family: 'BP', value: 'BP3X3X1/4', setMemberSize: true });
     expect(plf(t.sizeTool!.value)).toBe(5.1);
-    const misc = defaultToolChest().find((s) => s.name === 'Misc Metals')!;
+    const misc = defaultToolLibrary().find((s) => s.name === 'Misc Metals')!;
     expect(misc.tools.some((x) => x.sizeTool?.family === 'BP')).toBe(true);
   });
 
-  it('added once to a saved Tool Chest; deleting it afterwards keeps it deleted', () => {
+  it('added once to a saved Tool Library; deleting it afterwards keeps it deleted', () => {
     const saved: ToolSet[] = [
       { id: 'a', name: 'Structural Steel', tools: [] },
       { id: 'b', name: 'Misc Metals', tools: [] },
@@ -49,7 +49,7 @@ describe('bent plate measured as a length', () => {
     expect(first.done).toEqual(['bent-plate']);
     // Deleted by the user: not brought back.
     expect(addNewTools(saved, first.done).sets).toBe(saved);
-    // A chest that already has a bent plate size tool gets no second one.
+    // A library that already has a bent plate size tool gets no second one.
     expect(addNewTools(first.sets, []).sets).toBe(first.sets);
   });
 });

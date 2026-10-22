@@ -976,7 +976,7 @@ export function Viewer({ paneId }: { paneId: string }) {
       if (sel.some((x) => SPLITTABLE.has(st.doc.markups.find((y) => y.id === x)?.type ?? 'line')))
         items.push({ label: 'Split at Maximum Length', onClick: () => cmdSplitAtMax(sel) });
       items.push({ label: 'Properties', onClick: () => st.showPanel('properties') });
-      items.push({ label: 'Add to Tool Chest…', onClick: () => st.setDialog({ kind: 'toolEdit', setId: st.toolChest[0]?.id ?? '', fromMarkupId: id }) });
+      items.push({ label: 'Add to Tool Library…', onClick: () => st.setDialog({ kind: 'toolEdit', setId: st.toolLibrary[0]?.id ?? '', fromMarkupId: id }) });
       const forDetails = getState().selection.includes(id) ? getState().selection : [id];
       items.push({ label: forDetails.length > 1 ? `Add Detail to ${forDetails.length} Markups…` : 'Add Detail…', onClick: () => st.setDialog({ kind: 'addDetail', markupIds: forDetails }) });
       items.push({ label: forDetails.length > 1 ? `Standard Details (${forDetails.length} selected)` : 'Standard Details', children: detailMenuItems(forDetails) });
@@ -1117,13 +1117,13 @@ export function Viewer({ paneId }: { paneId: string }) {
     if (tool.kind === 'cutout') type = 'polygon';
     if (tool.kind === 'calibrate') type = 'length';
     if (!type || !pts || pts.length < 1) return null;
-    const chest = tool.kind === 'markup' && tool.chestToolId ? st.toolChest.flatMap((t) => t.tools).find((t) => t.id === tool.chestToolId) : undefined;
+    const libTool = tool.kind === 'markup' && tool.libraryToolId ? st.toolLibrary.flatMap((t) => t.tools).find((t) => t.id === tool.libraryToolId) : undefined;
     const style =
       tool.kind === 'calibrate'
         ? { ...defaultDraftStyle(), color: '#00a2ff', lineStart: 'tick' as const, lineEnd: 'tick' as const }
         : tool.kind === 'cutout'
           ? { ...defaultDraftStyle(), color: '#ff00aa', lineStyle: 'dashed' as const }
-          : chest?.style ?? st.typeDefaults[type]?.style ?? defaultDraftStyle(type);
+          : libTool?.style ?? st.typeDefaults[type]?.style ?? defaultDraftStyle(type);
     const points = pts;
     return {
       id: '__draft',
@@ -1141,7 +1141,7 @@ export function Viewer({ paneId }: { paneId: string }) {
       layer: '',
       style,
       custom: {},
-      depth: chest?.depth ?? 4,
+      depth: libTool?.depth ?? 4,
     };
   }, [draft, hover, freehand, tool, sheet]);
 
@@ -1337,7 +1337,7 @@ function defaultDraftStyle(type: MarkupType = 'line') {
 function draftMarkupFor(tool: ToolMode, sheetId: string): Partial<Markup> {
   const st = getState();
   if (tool.kind !== 'markup') return {};
-  const chest = tool.chestToolId ? st.toolChest.flatMap((t) => t.tools).find((t) => t.id === tool.chestToolId) : undefined;
+  const libTool = tool.libraryToolId ? st.toolLibrary.flatMap((t) => t.tools).find((t) => t.id === tool.libraryToolId) : undefined;
   return {
     id: '__rect',
     sheetId,
@@ -1352,8 +1352,8 @@ function draftMarkupFor(tool: ToolMode, sheetId: string): Partial<Markup> {
     checked: false,
     layer: '',
     custom: {},
-    text: tool.type === 'stamp' ? chest?.text ?? 'APPROVED' : '',
-    style: chest?.style ?? st.typeDefaults[tool.type]?.style ?? defaultStyleFor(tool.type),
+    text: tool.type === 'stamp' ? libTool?.text ?? 'APPROVED' : '',
+    style: libTool?.style ?? st.typeDefaults[tool.type]?.style ?? defaultStyleFor(tool.type),
   };
 }
 

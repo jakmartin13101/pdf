@@ -2,7 +2,7 @@ import type { MarkupStyle, MarkupType } from '../types';
 
 export interface TypeInfo {
   label: string;
-  /** Text shown in the markups list "Type" column. */
+  /** Text shown in the takeoff list "Type" column. */
   listName: string;
   measure: boolean;
   /** How points are captured. */
@@ -14,7 +14,7 @@ export interface TypeInfo {
 
 export const TYPE_INFO: Record<MarkupType, TypeInfo> = {
   length: { label: 'Length', listName: 'Length Measurement', measure: true, input: 'two-point', minPoints: 2, shortcut: 'Shift+Alt+L' },
-  polylength: { label: 'Polylength', listName: 'Polylength Measurement', measure: true, input: 'multi', minPoints: 2, shortcut: 'Shift+Alt+P' },
+  pathlength: { label: 'Path Length', listName: 'Path Length Measurement', measure: true, input: 'multi', minPoints: 2, shortcut: 'Shift+Alt+P' },
   perimeter: { label: 'Perimeter', listName: 'Perimeter Measurement', measure: true, input: 'multi', closed: true, minPoints: 3 },
   area: { label: 'Area', listName: 'Area Measurement', measure: true, input: 'multi', closed: true, minPoints: 3, shortcut: 'Shift+Alt+A' },
   volume: { label: 'Volume', listName: 'Volume Measurement', measure: true, input: 'multi', closed: true, minPoints: 3 },
@@ -34,7 +34,7 @@ export const TYPE_INFO: Record<MarkupType, TypeInfo> = {
   stamp: { label: 'Stamp', listName: 'Stamp', measure: false, input: 'drag-rect', minPoints: 2 },
 };
 
-export const MEASURE_TYPES: MarkupType[] = ['length', 'polylength', 'area', 'perimeter', 'volume', 'count', 'angle'];
+export const MEASURE_TYPES: MarkupType[] = ['length', 'pathlength', 'area', 'perimeter', 'volume', 'count', 'angle'];
 export const MARKUP_TYPES: MarkupType[] = ['text', 'callout', 'cloud', 'rectangle', 'ellipse', 'line', 'arrow', 'polyline', 'polygon', 'pen', 'highlight', 'stamp'];
 
 export const BASE_STYLE: MarkupStyle = {
@@ -58,7 +58,7 @@ export function defaultStyle(type: MarkupType): MarkupStyle {
   switch (type) {
     case 'length':
       return { ...BASE_STYLE, color: '#e8112d', lineStart: 'tick', lineEnd: 'tick' };
-    case 'polylength':
+    case 'pathlength':
       return { ...BASE_STYLE, color: '#e8112d', lineWidth: 2.5 };
     case 'perimeter':
       return { ...BASE_STYLE, color: '#1f6feb', lineWidth: 2.5 };

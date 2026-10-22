@@ -103,17 +103,17 @@ function StartScreen() {
             </li>
             <li>
               <span>
-                Create standardized tools<small>Tool Chest: W-shapes, HSS, deck, counts…</small>
+                Create standardized tools<small>Tool Library: W-shapes, HSS, deck, counts…</small>
               </span>
             </li>
             <li>
               <span>
-                Measure, count & mark up<small>Length, polylength, area, volume, count</small>
+                Measure, count & mark up<small>Length, path length, area, volume, count</small>
               </span>
             </li>
             <li>
               <span>
-                Review the Markups List<small>Edit, filter, sort and group the data</small>
+                Review the Takeoff List<small>Edit, filter, sort and group the data</small>
               </span>
             </li>
             <li>

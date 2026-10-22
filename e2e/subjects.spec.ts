@@ -6,7 +6,7 @@ const rows = (page: import('@playwright/test').Page) => page.getByTestId('markup
 test('subjects are shapes from a list each user keeps', async ({ page }) => {
   await openSample(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W18X35' }).first().click();
   await clickAt(page, gx(0) + 9, gy(0));
   await clickAt(page, gx(1) - 9, gy(0));
   await page.keyboard.press('Escape');
@@ -69,7 +69,7 @@ test('subjects from before (sizes) change to shapes in one step', async ({ page 
 test('labels and text can have their own colour', async ({ page }) => {
   await openSample(page);
   await gotoSheet(page, 2);
-  await page.getByTestId('chest-tool').filter({ hasText: 'W18X35' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W18X35' }).first().click();
   await clickAt(page, gx(0) + 9, gy(0));
   await clickAt(page, gx(1) - 9, gy(0));
   await page.keyboard.press('Escape');

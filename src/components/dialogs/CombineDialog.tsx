@@ -386,7 +386,7 @@ export function CombineDialog() {
         </div>
       ) : (
         <div className="empty-note" data-testid="combine-empty">
-          No length measurements with a size yet. Take off members with a size tool, a Tool Chest tool with a Member Size, or the automatic takeoff.
+          No length measurements with a size yet. Take off members with a size tool, a Tool Library tool with a Member Size, or the automatic takeoff.
         </div>
       )}
     </Modal>

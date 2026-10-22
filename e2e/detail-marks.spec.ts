@@ -12,7 +12,7 @@ const dir = (p: { x: number; y: number }[]) => Math.atan2(p[1].y - p[0].y, p[1].
 
 async function beams(page: Page) {
   // A W24X55 along grid line B (horizontal) and one down grid line 2 (vertical).
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0) + 9, gy(1));
   await clickAt(page, gx(1) - 9, gy(1));
   await clickAt(page, gx(2), gy(0) + 9);
@@ -23,8 +23,8 @@ async function beams(page: Page) {
 
 test('material added by a standard detail is drawn beside its markup', async ({ page }) => {
   await openSample(page);
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
   await beams(page);

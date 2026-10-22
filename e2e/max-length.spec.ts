@@ -6,8 +6,8 @@ const FT = 9; // page points per foot at 1/8" = 1'-0"
 test('a measurement longer than its shape\'s maximum is taken off as pieces along the same line', async ({ page }) => {
   await openSample(page);
   // Exact lengths: no snapping to the drawing or to other markups.
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
 
@@ -21,7 +21,7 @@ test('a measurement longer than its shape\'s maximum is taken off as pieces alon
   await page.getByTestId('settings-done').click();
 
   // One 63'-0" W24X55 line.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0), gy(1));
   await clickAt(page, gx(0) + 63 * FT, gy(1));
   await page.keyboard.press('Escape');
@@ -45,7 +45,7 @@ test('a measurement longer than its shape\'s maximum is taken off as pieces alon
   expect(ends[0][0][1]).toBeCloseTo(ends[1][1][1], 3);
 
   // Shapes without a maximum are left alone: a 63'-0" C10X15.3 stays one markup.
-  await page.getByTestId('chest-tool').filter({ hasText: 'C10X15.3' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'C10X15.3' }).first().click();
   await clickAt(page, gx(0), gy(3));
   await clickAt(page, gx(0) + 63 * FT, gy(3));
   await page.keyboard.press('Escape');
@@ -71,7 +71,7 @@ test('a measurement longer than its shape\'s maximum is taken off as pieces alon
   await page.locator('.menu-item', { hasText: 'Length Measurements…' }).click();
   await page.getByTestId('set-max-enabled').uncheck();
   await page.getByTestId('settings-done').click();
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   await clickAt(page, gx(0), gy(4));
   await clickAt(page, gx(0) + 63 * FT, gy(4));
   await page.keyboard.press('Escape');

@@ -3,13 +3,13 @@ import { calibrateFoundationPlan, clickAt, gotoSheet, gx, gy, openSample, showPr
 
 test('sizes, the selection totals, detail piece lengths with Galv, and the Properties panel', async ({ page }) => {
   await openSample(page);
-  await page.getByRole('button', { name: 'CONTENT', exact: true }).click();
-  await page.getByRole('button', { name: 'MARKUP', exact: true }).click();
+  await page.getByRole('button', { name: 'DWG SNAP', exact: true }).click();
+  await page.getByRole('button', { name: 'MARKUP SNAP', exact: true }).click();
   await calibrateFoundationPlan(page);
   await gotoSheet(page, 2);
 
   // Three 23'-0" W24X55 beams.
-  await page.getByTestId('chest-tool').filter({ hasText: 'W24X55' }).first().click();
+  await page.getByTestId('library-tool').filter({ hasText: 'W24X55' }).first().click();
   for (let i = 0; i < 3; i++) {
     await clickAt(page, gx(i) + 9, gy(1));
     await clickAt(page, gx(i + 1) - 9, gy(1));

@@ -36,7 +36,7 @@ test('finds the labelled beams and tubing on a plan and measures them at the dra
   const count = page.getByTestId('list-count');
   await expect(count).toHaveText('48 markups · 48 selected'); // the new measurements are selected
   await expect(page.getByTestId('auto-member')).toHaveCount(0);
-  // Sizes go in as label and Member Size, the subject is their shape (W), using the Tool Chest tool for the size when there is one.
+  // Sizes go in as label and Member Size, the subject is their shape (W), using the Tool Library tool for the size when there is one.
   await page.getByTestId('list-search').fill('W24X55');
   await expect(count).toContainText('Showing 23 of 48');
   await expect(rows.first().locator('[data-col=subject]')).toHaveText('W');

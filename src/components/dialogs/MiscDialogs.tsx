@@ -169,7 +169,7 @@ export function AboutDialog() {
         <b>{FULL_NAME}</b> is a construction drawing measurement, markup and quantity takeoff workspace, part of the {SUITE_NAME} suite of construction programs.
       </p>
       <p style={{ margin: 0 }} className="hint">
-        Import drawings → label sheets → calibrate scales (per sheet and per viewport) → measure, count and mark up with Tool Chest tools → review the editable Markups List with custom
+        Import drawings → label sheets → calibrate scales (per sheet and per viewport) → measure, count and mark up with Tool Library tools → review the editable Takeoff List with custom
         and formula columns → filter, sort and group → summarize and export.
       </p>
       <p style={{ margin: 0 }} className="hint">

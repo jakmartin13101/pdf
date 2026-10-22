@@ -5,18 +5,18 @@ import { PanelContext, DockMenuButton } from './PanelHeader';
 import { beginDockDrag, consumeDragClick } from './dragging';
 import { dockPanels, sectionCount, sectionPanels } from '../../store/dockLayout';
 import { SheetsPanel } from '../panels/SheetsPanel';
-import { ToolChestPanel } from '../panels/ToolChestPanel';
+import { ToolLibraryPanel } from '../panels/ToolLibraryPanel';
 import { PropertiesPanel } from '../panels/PropertiesPanel';
 import { MeasurementsPanel } from '../panels/MeasurementsPanel';
 import { LayersPanel } from '../panels/LayersPanel';
 import { ComparePanel } from '../panels/ComparePanel';
 import { AutoTakeoffPanel } from '../panels/AutoTakeoffPanel';
-import { MarkupsList } from '../bottom/MarkupsList';
+import { TakeoffList } from '../bottom/TakeoffList';
 import { SummaryPanel } from '../bottom/SummaryPanel';
 
 export const PANEL_ICONS: Record<PanelId, (p: { size?: number }) => ReactNode> = {
   sheets: (p) => <Files {...p} />,
-  toolchest: (p) => <Wrench {...p} />,
+  toollibrary: (p) => <Wrench {...p} />,
   properties: (p) => <SlidersHorizontal {...p} />,
   measurements: (p) => <Ruler {...p} />,
   layers: (p) => <Layers {...p} />,
@@ -35,8 +35,8 @@ function PanelBody({ id }: { id: PanelId }) {
   switch (id) {
     case 'sheets':
       return <SheetsPanel />;
-    case 'toolchest':
-      return <ToolChestPanel />;
+    case 'toollibrary':
+      return <ToolLibraryPanel />;
     case 'properties':
       return <PropertiesPanel />;
     case 'measurements':
@@ -48,7 +48,7 @@ function PanelBody({ id }: { id: PanelId }) {
     case 'autotakeoff':
       return <AutoTakeoffPanel />;
     case 'markups':
-      return <MarkupsList />;
+      return <TakeoffList />;
     case 'summary':
       return <SummaryPanel />;
   }

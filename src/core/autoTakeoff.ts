@@ -644,7 +644,7 @@ export function existingMeasurements(members: Pick<FoundMember, 'id' | 'p1' | 'p
     const u = { x: (m.p2.x - m.p1.x) / len, y: (m.p2.y - m.p1.y) / len };
     const n = { x: -u.y, y: u.x };
     for (const mk of markups) {
-      if (mk.type !== 'length' && mk.type !== 'polylength') continue;
+      if (mk.type !== 'length' && mk.type !== 'pathlength') continue;
       let covered = 0;
       let dist = Infinity;
       for (let i = 1; i < mk.points.length; i++) {
@@ -682,7 +682,7 @@ export function extendMember(m: Pick<FoundMember, 'p1' | 'p2'>, ext: number): [P
   ];
 }
 
-/** Colour for a size without a Tool Chest tool: stable per size. */
+/** Colour for a size without a Tool Library tool: stable per size. */
 export function sizeColor(size: string): string {
   const palette = ['#e8112d', '#f46036', '#b5179e', '#2e86de', '#0b8f8a', '#6a4c93', '#d1199a', '#1aa34a', '#ff9f1c', '#3a86ff', '#9c6644', '#118ab2'];
   let h = 0;

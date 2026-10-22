@@ -12,11 +12,11 @@ import { exportPdf } from './MenuBar';
 import { useShortcuts } from './useShortcuts';
 
 const MARKUP_GROUP: MarkupType[] = ['text', 'callout', 'cloud', 'highlight', 'pen', 'line', 'arrow', 'polyline', 'rectangle', 'ellipse', 'polygon', 'stamp'];
-const MEASURE_GROUP: MarkupType[] = ['length', 'polylength', 'area', 'perimeter', 'volume', 'count', 'angle'];
+const MEASURE_GROUP: MarkupType[] = ['length', 'pathlength', 'area', 'perimeter', 'volume', 'count', 'angle'];
 
 function sameTool(a: ToolMode, b: ToolMode) {
   if (a.kind !== b.kind) return false;
-  if (a.kind === 'markup' && b.kind === 'markup') return a.type === b.type && !a.chestToolId;
+  if (a.kind === 'markup' && b.kind === 'markup') return a.type === b.type && !a.libraryToolId;
   return true;
 }
 
@@ -119,7 +119,7 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
               title={`${TYPE_INFO[t].label}${sc(`tool.${t}`) ? ` (${sc(`tool.${t}`)})` : ''}`}
               label={t === 'text' || t === 'callout' || t === 'cloud' || t === 'highlight' ? TYPE_INFO[t].label.replace(' Box', '') : undefined}
               small={!(t === 'text' || t === 'callout' || t === 'cloud' || t === 'highlight')}
-              active={tool.kind === 'markup' && tool.type === t && !tool.chestToolId}
+              active={tool.kind === 'markup' && tool.type === t && !tool.libraryToolId}
               disabled={!loaded}
               onClick={() => set({ kind: 'markup', type: t })}
             />
@@ -137,7 +137,7 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
               icon={TYPE_ICON[t]}
               label={TYPE_INFO[t].label}
               title={`${TYPE_INFO[t].label} measurement${sc(`tool.${t}`) ? ` (${sc(`tool.${t}`)})` : ''}`}
-              active={tool.kind === 'markup' && tool.type === t && !tool.chestToolId}
+              active={tool.kind === 'markup' && tool.type === t && !tool.libraryToolId}
               disabled={!loaded}
               onClick={() => set({ kind: 'markup', type: t })}
             />
@@ -147,7 +147,7 @@ export function Toolbar({ placement }: { placement: 'top' | 'left' | 'right' | '
       </div>
       <div className="tb-group">
         <div className="tb-row">
-          <TB icon={Table2} label="Markups" active={markupsOpen} onClick={() => st().togglePanel('markups')} title="Show or hide the Markups List" />
+          <TB icon={Table2} label="Markups" active={markupsOpen} onClick={() => st().togglePanel('markups')} title="Show or hide the Takeoff List" />
           <TB icon={Sigma} label="Summary" active={summaryOpen} onClick={() => st().togglePanel('summary')} title="Show or hide the Takeoff Summary" />
           <TB icon={GitCompareArrows} label="Compare" active={compareOpen} disabled={!loaded} onClick={() => st().togglePanel('compare')} title="Overlay and compare two sheets" />
           <TB icon={Wand2} label="Auto" active={autoOpen} disabled={!loaded} locked={!autoPro} onClick={() => st().togglePanel('autotakeoff')} title="Automatic takeoff: find labelled beams and tubing and measure them" />

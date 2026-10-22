@@ -1394,13 +1394,13 @@ input[type='range'] {
   position: static;
 }
 
-/* ---------------------------------------------------------------- tool chest */
+/* ---------------------------------------------------------------- tool library */
 
-.chest-set {
+.library-set {
   border-bottom: 1px solid var(--border);
 }
 
-.chest-set-head {
+.library-set-head {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1411,24 +1411,24 @@ input[type='range'] {
   background: var(--bg-panel-2);
 }
 
-.chest-set-head .name {
+.library-set-head .name {
   flex: 1;
 }
 
-.chest-set-head .count {
+.library-set-head .count {
   color: var(--text-faint);
   font-weight: 400;
   font-size: 11px;
 }
 
-.chest-tools {
+.library-tools {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: 4px;
   padding: 6px;
 }
 
-.chest-tool {
+.library-tool {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1441,23 +1441,23 @@ input[type='range'] {
   min-width: 0;
 }
 
-.chest-tool:hover {
+.library-tool:hover {
   background: var(--bg-hover);
 }
 
-.chest-tool.active {
+.library-tool.active {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
 
-.chest-tool .tname {
+.library-tool .tname {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
 }
 
-.chest-tool .ttype {
+.library-tool .ttype {
   display: block;
   font-size: 10px;
   color: var(--text-faint);
@@ -1628,7 +1628,7 @@ input[type='range'] {
   color: var(--text-dim);
 }
 
-/* ---------------------------------------------------------------- bottom panel / markups list */
+/* ---------------------------------------------------------------- bottom panel / takeoff list */
 
 .bottom,
 .edge-dock {
@@ -2719,18 +2719,18 @@ kbd {
   flex: none;
 }
 
-/* tool chest */
-.chest-tool.size-tool {
+/* tool library */
+.library-tool.size-tool {
   grid-column: 1 / -1;
 }
 
-.chest-tool.disabled {
+.library-tool.disabled {
   opacity: 0.5;
   pointer-events: none;
 }
 
-.chest-tool.is-hidden,
-.chest-set.is-hidden > .chest-set-head {
+.library-tool.is-hidden,
+.library-set.is-hidden > .library-set-head {
   opacity: 0.45;
 }
 
@@ -3823,7 +3823,7 @@ button.linkish {
   padding: 2px 12px 2px 0;
 }
 
-/* markups list: header layout */
+/* takeoff list: header layout */
 .grid th.drop-before {
   box-shadow: inset 2px 0 0 var(--accent);
 }

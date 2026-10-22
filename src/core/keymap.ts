@@ -15,7 +15,7 @@ export interface CommandDef {
 
 const MEASURE_KEYS: [MarkupType, string, string][] = [
   ['length', 'Length', 'Shift+Alt+L'],
-  ['polylength', 'Polylength', 'Shift+Alt+M'],
+  ['pathlength', 'Path Length', 'Shift+Alt+M'],
   ['area', 'Area', 'Shift+Alt+A'],
   ['perimeter', 'Perimeter', 'Shift+Alt+P'],
   ['volume', 'Volume', 'Shift+Alt+V'],
@@ -59,6 +59,9 @@ export const COMMANDS: CommandDef[] = [
   { id: 'view.fitWidth', label: 'Fit Width', group: 'View', keys: ['Ctrl+9'] },
   { id: 'view.zoomIn', label: 'Zoom In', group: 'View', keys: ['Ctrl+='] },
   { id: 'view.zoomOut', label: 'Zoom Out', group: 'View', keys: ['Ctrl+-'] },
+  { id: 'view.uiLarger', label: 'Larger Text and Icons', group: 'View', keys: ['Ctrl+Shift+='], anywhere: true },
+  { id: 'view.uiSmaller', label: 'Smaller Text and Icons', group: 'View', keys: ['Ctrl+Shift+-'], anywhere: true },
+  { id: 'view.uiNormal', label: 'Normal Text and Icon Size', group: 'View', keys: [], anywhere: true },
   { id: 'view.labels', label: 'Measurement Labels on Drawing', group: 'View', keys: [] },
   { id: 'sheet.next', label: 'Next Sheet', group: 'View', keys: ['PageDown', 'Ctrl+ArrowRight'] },
   { id: 'sheet.prev', label: 'Previous Sheet', group: 'View', keys: ['PageUp', 'Ctrl+ArrowLeft'] },
@@ -87,7 +90,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'takeoff.addDetail', label: 'Add Detail to Selection…', group: 'Takeoff', keys: [] },
   { id: 'takeoff.details', label: 'Standard Details…', group: 'Takeoff', keys: [] },
   { id: 'takeoff.auto', label: 'Automatic Takeoff Panel', group: 'Takeoff', keys: [] },
-  { id: 'takeoff.markups', label: 'Markups List', group: 'Takeoff', keys: [] },
+  { id: 'takeoff.markups', label: 'Takeoff List', group: 'Takeoff', keys: [] },
   { id: 'takeoff.summary', label: 'Takeoff Summary', group: 'Takeoff', keys: [] },
 
   { id: 'doc.pageLabels', label: 'Page Labels…', group: 'Document', keys: [] },

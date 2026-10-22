@@ -1,7 +1,7 @@
 // How automatic takeoff measurements look: line style rules by subject (Settings → Auto Takeoff),
-// then the Tool Chest tool for the size, then a colour per size.
+// then the Tool Library tool for the size, then a colour per size.
 
-import type { AutoStyleRule, ChestTool, Markup, MarkupStyle, ToolSet } from '../types';
+import type { AutoStyleRule, LibraryTool, Markup, MarkupStyle, ToolSet } from '../types';
 import { normName } from './formula';
 import { defaultStyle } from './markupTypes';
 import { sizeColor } from './autoTakeoff';
@@ -55,10 +55,10 @@ export const withRule = (style: MarkupStyle, r: AutoStyleRule): MarkupStyle => (
 
 const same = (a: string, b: string) => normName(a) === normName(b);
 
-/** The Tool Chest tool that takes off this size as a length, if there is one. */
-export function chestToolForSize(chest: ToolSet[], size: string): ChestTool | undefined {
-  const tools = chest.flatMap((s) => s.tools).filter((t) => t.type === 'length' || t.type === 'polylength');
-  const memberSize = (t: ChestTool) => Object.entries(t.custom).find(([k]) => normName(k) === 'membersize')?.[1];
+/** The Tool Library tool that takes off this size as a length, if there is one. */
+export function libraryToolForSize(library: ToolSet[], size: string): LibraryTool | undefined {
+  const tools = library.flatMap((s) => s.tools).filter((t) => t.type === 'length' || t.type === 'pathlength');
+  const memberSize = (t: LibraryTool) => Object.entries(t.custom).find(([k]) => normName(k) === 'membersize')?.[1];
   const hits = tools.filter((t) => same(String(memberSize(t) ?? ''), size) || (t.sizeTool && same(t.sizeTool.value, size)) || same(t.subject, size));
   return hits.find((t) => t.type === 'length') ?? hits[0];
 }
@@ -68,14 +68,14 @@ export const autoSubject = (size: string, subjects: string[] = DEFAULT_SUBJECTS)
 
 export interface AutoLookPrefs {
   autoStyles: AutoStyleRule[];
-  /** Without a matching rule: the Tool Chest tool's look for the size (true) or a colour per size. */
+  /** Without a matching rule: the Tool Library tool's look for the size (true) or a colour per size. */
   autoUseToolStyle: boolean;
   subjects?: string[];
 }
 
 /** The line a member of this size will be drawn with. */
-export function autoLook(chest: ToolSet[], prefs: AutoLookPrefs, size: string): { style: MarkupStyle; tool?: ChestTool; rule?: AutoStyleRule } {
-  const tool = chestToolForSize(chest, size);
+export function autoLook(library: ToolSet[], prefs: AutoLookPrefs, size: string): { style: MarkupStyle; tool?: LibraryTool; rule?: AutoStyleRule } {
+  const tool = libraryToolForSize(library, size);
   const base: MarkupStyle = tool && prefs.autoUseToolStyle ? { ...tool.style } : { ...defaultStyle('length'), color: sizeColor(size), lineWidth: 3 };
   const rule = autoStyleFor(prefs.autoStyles, autoSubject(size, prefs.subjects)) ?? autoStyleFor(prefs.autoStyles, size);
   return { style: rule ? withRule(base, rule) : base, tool, rule };

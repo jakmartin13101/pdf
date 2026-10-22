@@ -1,4 +1,4 @@
-import type { ChestTool, CountSymbol, CustomColumn, Layer, MarkupStyle, MarkupType, ToolSet } from '../types';
+import type { LibraryTool, CountSymbol, CustomColumn, Layer, MarkupStyle, MarkupType, ToolSet } from '../types';
 import { defaultStyle } from './markupTypes';
 import { uid } from './ids';
 import { DEFAULT_SUBJECTS, subjectFor, subjectForSize } from './subjects';
@@ -72,7 +72,7 @@ function tool(
   color: string,
   custom: Record<string, string | number>,
   extra: Partial<MarkupStyle> & { subject?: string; depth?: number; text?: string; symbol?: CountSymbol } = {},
-): ChestTool {
+): LibraryTool {
   const base = defaultStyle(type);
   const { subject, depth, text, ...styleExtra } = extra;
   // Subjects are shapes: the one given, else the shape of the tool's Member Size (W24X55 → W), else none.
@@ -101,15 +101,15 @@ const steel = (size: string, extra: Record<string, string | number> = {}) => ({
   ...extra,
 });
 
-/** Bent plate measured as a length: type its size (legs × thickness) in its box in the Tool Chest. */
-export function bentPlateTool(): ChestTool {
+/** Bent plate measured as a length: type its size (legs × thickness) in its box in the Tool Library. */
+export function bentPlateTool(): LibraryTool {
   return {
     ...tool('Bent Plate', 'length', '#c2410c', steel('BP3X3X1/4', { Grade: 'A36', Category: 'Misc Metals' }), { subject: 'BP', lineWidth: 2.5, fontBold: true }),
     sizeTool: { family: 'BP', value: 'BP3X3X1/4', setSubject: true, setMemberSize: true },
   };
 }
 
-export function defaultToolChest(): ToolSet[] {
+export function defaultToolLibrary(): ToolSet[] {
   return [
     {
       id: uid(),
@@ -126,7 +126,7 @@ export function defaultToolChest(): ToolSet[] {
         }),
         tool('HSS6X6X3/8 Beam', 'length', '#2e86de', steel('HSS6X6X3/8', { Grade: 'A500 Gr. C' }), { subject: 'HSS6X6X3/8', lineStyle: 'dashed', lineWidth: 3 }),
         tool('W10X33 Column', 'count', '#0b7a75', steel('W10X33', { Grade: 'A992' }), { subject: 'Column', symbol: 'diamond', symbolSize: 10 }),
-        tool('L4X4X3/8', 'polylength', '#2a9d8f', steel('L4X4X3/8', { Grade: 'A36', Category: 'Misc Metals' }), { lineWidth: 2.5 }),
+        tool('L4X4X3/8', 'pathlength', '#2a9d8f', steel('L4X4X3/8', { Grade: 'A36', Category: 'Misc Metals' }), { lineWidth: 2.5 }),
         tool('C10X15.3', 'length', '#6a4c93', steel('C10X15.3', { Grade: 'A36' }), { lineWidth: 2.5, lineStyle: 'dashed' }),
         tool('1/2" Plate', 'area', '#ff9f1c', steel('PL1/2', { Grade: 'A36', Category: 'Misc Metals' }), { fillOpacity: 0.3 }),
         tool('BP3X3X1/4', 'length', '#c2410c', steel('BP3X3X1/4', { Grade: 'A36', Category: 'Misc Metals' }), { subject: 'BP', lineWidth: 2.5 }),
@@ -148,8 +148,8 @@ export function defaultToolChest(): ToolSet[] {
       id: uid(),
       name: 'Misc Metals',
       tools: [
-        tool('Handrail', 'polylength', '#e76f51', { Category: 'Misc Metals', Material: 'Steel', Qty: 1, 'Member Size': 'Pipe 1-1/2 Std' }, { lineWidth: 3 }),
-        tool('Guardrail', 'polylength', '#f4a261', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { lineWidth: 3, lineStyle: 'dashed' }),
+        tool('Handrail', 'pathlength', '#e76f51', { Category: 'Misc Metals', Material: 'Steel', Qty: 1, 'Member Size': 'Pipe 1-1/2 Std' }, { lineWidth: 3 }),
+        tool('Guardrail', 'pathlength', '#f4a261', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { lineWidth: 3, lineStyle: 'dashed' }),
         tool('Stair', 'count', '#264653', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { symbol: 'star', symbolSize: 12 }),
         tool('Ladder', 'count', '#2a9d8f', { Category: 'Misc Metals', Material: 'Steel', Qty: 1 }, { symbol: 'triangle', symbolSize: 10 }),
         tool('Lintel', 'length', '#bc4749', steel('L6X4X3/8', { Category: 'Misc Metals' }), { lineWidth: 2.5 }),
@@ -162,7 +162,7 @@ export function defaultToolChest(): ToolSet[] {
       tools: [
         tool('Slab on Grade (4")', 'volume', '#7a7a7a', { Category: 'Concrete', Material: 'Concrete', Grade: '4000 psi', Qty: 1 }, { depth: 4, subject: 'Slab on Grade' }),
         tool('Slab Area', 'area', '#6c757d', { Category: 'Concrete', Material: 'Concrete', Qty: 1 }, { subject: 'Slab Area' }),
-        tool('Continuous Footing', 'polylength', '#5f6caf', { Category: 'Concrete', Material: 'Concrete', Qty: 1 }, { lineWidth: 4 }),
+        tool('Continuous Footing', 'pathlength', '#5f6caf', { Category: 'Concrete', Material: 'Concrete', Qty: 1 }, { lineWidth: 4 }),
         tool('Spread Footing', 'count', '#495057', { Category: 'Concrete', Material: 'Concrete', Qty: 1 }, { symbol: 'square', symbolSize: 12 }),
         tool('Site Area', 'area', '#2d6a4f', { Category: 'General', Qty: 1 }, { fillOpacity: 0.15 }),
       ],
@@ -173,14 +173,14 @@ export function defaultToolChest(): ToolSet[] {
       tools: [
         tool('Doors', 'count', '#d00000', { Category: 'Architectural', Qty: 1 }, { symbol: 'circle' }),
         tool('Windows', 'count', '#0077b6', { Category: 'Architectural', Qty: 1 }, { symbol: 'square' }),
-        tool('Walls', 'polylength', '#9d4edd', { Category: 'Architectural', Qty: 1 }, { lineWidth: 4 }),
+        tool('Walls', 'pathlength', '#9d4edd', { Category: 'Architectural', Qty: 1 }, { lineWidth: 4 }),
         tool('Flooring', 'area', '#ffb703', { Category: 'Architectural', Qty: 1 }, {}),
         tool('Ceiling', 'area', '#8ecae6', { Category: 'Architectural', Qty: 1 }, {}),
         tool('Floor Drains', 'count', '#023e8a', { Category: 'Plumbing', Qty: 1 }, { symbol: 'circle' }),
         tool('Light Fixtures', 'count', '#f77f00', { Category: 'Electrical', Qty: 1 }, { symbol: 'star' }),
-        tool('Ductwork', 'polylength', '#2b9348', { Category: 'Mechanical', Qty: 1 }, { lineWidth: 4 }),
-        tool('Piping', 'polylength', '#0096c7', { Category: 'Plumbing', Qty: 1 }, { lineWidth: 2.5 }),
-        tool('Electrical Run', 'polylength', '#fb8500', { Category: 'Electrical', Qty: 1 }, { lineWidth: 2, lineStyle: 'dotted' }),
+        tool('Ductwork', 'pathlength', '#2b9348', { Category: 'Mechanical', Qty: 1 }, { lineWidth: 4 }),
+        tool('Piping', 'pathlength', '#0096c7', { Category: 'Plumbing', Qty: 1 }, { lineWidth: 2.5 }),
+        tool('Electrical Run', 'pathlength', '#fb8500', { Category: 'Electrical', Qty: 1 }, { lineWidth: 2, lineStyle: 'dotted' }),
       ],
     },
     {
