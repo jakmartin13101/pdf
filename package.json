@@ -16,6 +16,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "docs:screenshots": "playwright test -c playwright.docs.config.ts",
     "sample": "node scripts/generate-sample.mjs",
     "build:artifact": "node scripts/build-artifact.mjs",
     "example": "node scripts/generate-example.mjs",

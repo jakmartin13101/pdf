@@ -9,8 +9,8 @@
   drawing, dragging, menus and resizing still follow the mouse. The drawing's own zoom is unchanged.
 
 ### New names
-- **Tool Library** (was Tool Chest), **Takeoff List** (was Markups List), **Path Length** (the multi-point length
-  measurement), and the status-bar switches **DWG SNAP**, **MARKUP SNAP** and **KEEP TOOL**. Everything else works as
+- The **Tool Library**, the **Takeoff List**, **Path Length** (the multi-point length measurement), and the status-bar
+  switches **DWG SNAP**, **MARKUP SNAP** and **KEEP TOOL**. Everything else works as
   before: your tool library, workspace layout, key bindings and tool defaults are brought over on the first start, and
   takeoffs saved by earlier versions open as before (their path lengths and the standard details that pick them by
   type included).

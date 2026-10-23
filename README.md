@@ -752,6 +752,7 @@ npm run dev        # Vite dev server
 npm run build      # type-check + production build to dist/
 npm test           # unit tests (units, parsing, scales, geometry, formulas, steel weights, rows, automatic takeoff, line styles, shortcuts, page labels, flattening, takeoff saved in the PDF, list styles, subjects, combine, detail material on the drawing and its presets, dock sections, maximum lengths)
 npm run test:e2e   # Playwright end-to-end tests against the sample drawing set
+npm run docs:screenshots   # remake the screenshots in docs/ used by this README
 npm run sample     # regenerate the sample set and the S1.02 Addendum 2 revision PDF in public/samples/
 npm run example    # regenerate the example takeoff (sample set + addendum; needs `npm run dev` running)
 npm run build:artifact  # self-contained bundle in dist-artifact/ for publishing as a claude.ai Artifact
